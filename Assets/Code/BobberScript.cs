@@ -19,6 +19,9 @@ public class Bobber : MonoBehaviour
     void Start()
     {
         rb = GetComponent<Rigidbody>();
+
+        // Apply full random rotation on X, Y, Z when spawned
+        transform.rotation = Random.rotation;
     }
 
     void OnCollisionEnter(Collision collision)
@@ -40,7 +43,8 @@ public class Bobber : MonoBehaviour
                 transform.position.z
             );
 
-            transform.rotation = Quaternion.Euler(0f, transform.eulerAngles.y, 0f);
+            // Preserve random Y rotation, but align to water surface on X/Z
+            transform.rotation = Quaternion.Euler(0f, transform.rotation.eulerAngles.y, 0f);
         }
     }
 
@@ -85,6 +89,7 @@ public class Bobber : MonoBehaviour
 
         rb.linearDamping = waterDrag;
 
+        // Smoothly rotate to upright but preserve Y rotation
         Quaternion upright = Quaternion.Euler(0f, transform.rotation.eulerAngles.y, 0f);
         rb.MoveRotation(Quaternion.Slerp(rb.rotation, upright, Time.fixedDeltaTime * 2f));
     }

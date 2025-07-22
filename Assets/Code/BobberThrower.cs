@@ -3,6 +3,8 @@ using UnityEngine.UI;
 
 public class ObjectThrower : MonoBehaviour
 {
+    private bool readyToThrow = true;
+
     [Header("Gameplay")]
     public GameObject objectToHide; // Drag the object to hide here
 
@@ -80,7 +82,8 @@ public class ObjectThrower : MonoBehaviour
         }
 
         // ✅ Left-click: Start charging if bobber is NOT in water
-        if (Input.GetKeyDown(KeyCode.Mouse0) && !bobberInWater)
+        // ✅ Left-click: Start charging if bobber is NOT in water and throwing is allowed
+        if (Input.GetKeyDown(KeyCode.Mouse0) && !bobberInWater && readyToThrow)
         {
             StartCharging();
         }
@@ -196,7 +199,7 @@ public class ObjectThrower : MonoBehaviour
             bobberIndicator.SetActive(false);
 
         if (castLine != null)
-            castLine.Detach(); // If applicable in your implementation
+            castLine.Detach();
 
         if (characterController != null)
             characterController.enabled = true;
@@ -207,11 +210,21 @@ public class ObjectThrower : MonoBehaviour
         if (objectToHide != null)
             objectToHide.SetActive(true);
 
-
         isCharging = false;
         currentThrowForce = 0f;
         bobberInWater = false;
+
+        readyToThrow = false; // prevent immediate re-throw
+
+        // Optional: re-enable after short delay
+        Invoke(nameof(EnableThrowing), 0.2f); // small buffer time to avoid immediate rethrow
     }
+
+    void EnableThrowing()
+    {
+        readyToThrow = true;
+    }
+
 
     void ThrowObject()
     {
