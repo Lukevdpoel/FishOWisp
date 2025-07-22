@@ -1,0 +1,20 @@
+# This file uses centimeters as units for non-parametric coordinates.
+
+mtllib WaterPlaneMiddle.mtl
+g default
+v 1.320036 0.000000 1.358237
+v 1.420276 0.000000 1.269152
+v -1.420276 0.000000 -0.161159
+v -0.141409 0.000000 -1.358237
+vt 0.033142 0.001992
+vt 0.954414 0.549584
+vt 0.534668 0.998008
+vt 0.001905 0.037140
+vn 0.000000 1.000000 0.000000
+vn 0.000000 1.000000 0.000000
+vn 0.000000 1.000000 0.000000
+vn 0.000000 1.000000 0.000000
+s off
+g pPlane3
+usemtl initialShadingGroup
+f 2/1/1 4/2/2 3/3/3 1/4/4

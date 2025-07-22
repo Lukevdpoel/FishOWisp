@@ -1,0 +1,95 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: dc38003c0e0db6641a4762d4f392de52, type: 3}
+  m_Name: GrassBrush
+  m_EditorClassIdentifier: 
+  prefabs:
+  - gameObject: {fileID: 3607023696798312926, guid: 7fd77839b10f07f44b82e5d172f6fa41, type: 3}
+    settings:
+      m_Strength: 100
+      m_RotationRangeMin: {x: 0, y: 0, z: 0}
+      m_RotationRangeMax: {x: 0, y: 360, z: 0}
+      m_ScaleRangeMin: {x: 1, y: 1.0055866, z: 1}
+      m_ScaleRangeMax: {x: 1, y: 1.0055866, z: 1}
+      m_UniformScale: {x: 1, y: 1}
+      m_UniformBool: 0
+      m_XRotationBool: 0
+      m_YRotationBool: 1
+      m_ZRotationBool: 0
+      m_XScaleBool: 0
+      m_YScaleBool: 1
+      m_ZScaleBool: 0
+    name: GrassPrefab
+  - gameObject: {fileID: 8831516602073904388, guid: 40ee69e0a5c920642988198ba597e5ef, type: 3}
+    settings:
+      m_Strength: 74.1
+      m_RotationRangeMin: {x: 0, y: 210.1676, z: 0}
+      m_RotationRangeMax: {x: 0, y: 360, z: 0}
+      m_ScaleRangeMin: {x: 0.5810056, y: 0.5810056, z: 0.74860334}
+      m_ScaleRangeMax: {x: 1, y: 1, z: 1}
+      m_UniformScale: {x: 1, y: 1}
+      m_UniformBool: 0
+      m_XRotationBool: 0
+      m_YRotationBool: 1
+      m_ZRotationBool: 0
+      m_XScaleBool: 1
+      m_YScaleBool: 1
+      m_ZScaleBool: 1
+    name: Leaves1
+  - gameObject: {fileID: 5862559552194332451, guid: 2642fd303cdefa94088ea9ea08e5c629, type: 3}
+    settings:
+      m_Strength: 81.7
+      m_RotationRangeMin: {x: 0, y: 0, z: 0}
+      m_RotationRangeMax: {x: 0, y: 360, z: 0}
+      m_ScaleRangeMin: {x: 0.4972067, y: 0.4972067, z: 0.6089386}
+      m_ScaleRangeMax: {x: 1, y: 1, z: 1}
+      m_UniformScale: {x: 1, y: 1}
+      m_UniformBool: 0
+      m_XRotationBool: 0
+      m_YRotationBool: 1
+      m_ZRotationBool: 0
+      m_XScaleBool: 1
+      m_YScaleBool: 1
+      m_ZScaleBool: 1
+    name: Leaves2
+  - gameObject: {fileID: 4606615251325261197, guid: 6331c21cf25f70746818ba79bf62b590, type: 3}
+    settings:
+      m_Strength: 72.8
+      m_RotationRangeMin: {x: 0, y: 0, z: 0}
+      m_RotationRangeMax: {x: 0, y: 360, z: 0}
+      m_ScaleRangeMin: {x: 0.4972067, y: 0.5530726, z: 0.6089386}
+      m_ScaleRangeMax: {x: 1, y: 1, z: 1}
+      m_UniformScale: {x: 1, y: 1}
+      m_UniformBool: 0
+      m_XRotationBool: 0
+      m_YRotationBool: 1
+      m_ZRotationBool: 0
+      m_XScaleBool: 0
+      m_YScaleBool: 1
+      m_ZScaleBool: 0
+    name: Leaves3
+  - gameObject: {fileID: 560037237569242085, guid: 25cfc439b907e8e468aa032f846820b0, type: 3}
+    settings:
+      m_Strength: 50
+      m_RotationRangeMin: {x: 0, y: 142.7933, z: 0}
+      m_RotationRangeMax: {x: 0, y: 199.1061, z: 0}
+      m_ScaleRangeMin: {x: 1, y: 0.27374297, z: 1}
+      m_ScaleRangeMax: {x: 1, y: 0.66480446, z: 1}
+      m_UniformScale: {x: 1, y: 1}
+      m_UniformBool: 0
+      m_XRotationBool: 0
+      m_YRotationBool: 1
+      m_ZRotationBool: 0
+      m_XScaleBool: 0
+      m_YScaleBool: 1
+      m_ZScaleBool: 0
+    name: GrassLong
