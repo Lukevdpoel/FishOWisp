@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class Bobber : MonoBehaviour
 {
@@ -12,9 +12,13 @@ public class Bobber : MonoBehaviour
     public float waterDrag = 1f;
     public float buoyancyForce = 10f;
 
+    [HideInInspector]
+    public ObjectThrower thrower;
+
     private Rigidbody rb;
     private bool isInWater = false;
     private float waterSurfaceY;
+    private bool hasNotifiedThrower = false;
 
     void Start()
     {
@@ -45,6 +49,8 @@ public class Bobber : MonoBehaviour
 
             // Preserve random Y rotation, but align to water surface on X/Z
             transform.rotation = Quaternion.Euler(0f, transform.rotation.eulerAngles.y, 0f);
+
+            NotifyThrower();
         }
     }
 
@@ -55,6 +61,8 @@ public class Bobber : MonoBehaviour
             isInWater = true;
             waterSurfaceY = other.bounds.max.y;
             rb.isKinematic = false; // Enable buoyancy
+
+            NotifyThrower();
         }
     }
 
@@ -92,5 +100,14 @@ public class Bobber : MonoBehaviour
         // Smoothly rotate to upright but preserve Y rotation
         Quaternion upright = Quaternion.Euler(0f, transform.rotation.eulerAngles.y, 0f);
         rb.MoveRotation(Quaternion.Slerp(rb.rotation, upright, Time.fixedDeltaTime * 2f));
+    }
+
+    void NotifyThrower()
+    {
+        if (hasNotifiedThrower || thrower == null) return;
+
+        Debug.Log("🌊 Bobber notifying ObjectThrower: landed in water.");
+        thrower.NotifyBobberInWater();
+        hasNotifiedThrower = true;
     }
 }
