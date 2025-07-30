@@ -2,6 +2,9 @@
 
 public class LineToThrownObject : MonoBehaviour
 {
+    [Tooltip("Start point for the line (e.g. castPoint on player)")]
+    public Transform startPoint; // << NEW: Set this from ObjectThrower
+
     private LineRenderer lineRenderer;
     private Transform target;
 
@@ -9,7 +12,6 @@ public class LineToThrownObject : MonoBehaviour
     {
         lineRenderer = GetComponent<LineRenderer>();
 
-        // Hide the line at the beginning
         if (lineRenderer != null)
         {
             lineRenderer.positionCount = 2;
@@ -19,13 +21,12 @@ public class LineToThrownObject : MonoBehaviour
 
     void Update()
     {
-        // Only show and update the line if we have a target
-        if (target != null)
+        if (target != null && startPoint != null)
         {
             if (!lineRenderer.enabled)
                 lineRenderer.enabled = true;
 
-            lineRenderer.SetPosition(0, transform.position);
+            lineRenderer.SetPosition(0, startPoint.position); // Fixed: use castPoint
             lineRenderer.SetPosition(1, target.position);
         }
         else
@@ -35,21 +36,16 @@ public class LineToThrownObject : MonoBehaviour
         }
     }
 
-    // Call this after the bobber is instantiated
+    // Attach end of line to bobber
     public void AttachTo(Transform newTarget)
     {
         target = newTarget;
     }
+
     public void Detach()
     {
-        // You can clear any references or visual line elements here
-        transform.parent = null;
-
-        // Example: If you have a LineRenderer component
-        // LineRenderer line = GetComponent<LineRenderer>();
-        // if (line != null) line.enabled = false;
+        target = null;
+        if (lineRenderer != null)
+            lineRenderer.enabled = false;
     }
-
-
-
 }

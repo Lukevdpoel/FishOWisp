@@ -36,6 +36,14 @@ Material:
         m_Texture: {fileID: 2800000, guid: b722543030734cb4893dea1471a6b4fb, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _RefractionNoise:
+        m_Texture: {fileID: 2800000, guid: 831c5593c581cba48b8b8d269a2958b0, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _SampleTexture2D_dbed7ba62da145539bcb443af4674c3e_Texture_1_Texture2D:
+        m_Texture: {fileID: 2800000, guid: 831c5593c581cba48b8b8d269a2958b0, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _SmoothnessMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
@@ -66,6 +74,10 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReflectionStrength: 0.08
+    - _RefractionSpeed: 0.01
+    - _RefractionSpeed_1: 1
+    - _RefractionStrength: 0.33
+    - _RefractionTiling: 3.24
     - _Samples: 125
     - _Smoothness: 1
     - _StepSize: 0.1

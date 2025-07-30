@@ -21,7 +21,8 @@ public class ObjectThrower : MonoBehaviour
     public float chargeRate = 10f;
 
     [Header("Cast Line")]
-    public LineToThrownObject castLine;
+    public LineToThrownObject castLine; // assign in inspector
+    public Transform castPoint;         // drag your cast point (hand/rod tip)
 
     [Header("UI")]
     public Slider chargeSlider;
@@ -43,6 +44,15 @@ public class ObjectThrower : MonoBehaviour
 
     private GameObject activeBobber;
 
+    void DestroyBobber()
+    {
+        if (activeBobber != null)
+        {
+            Destroy(activeBobber);
+            activeBobber = null;
+        }
+    }
+
     void Start()
     {
         playerTransform = transform;
@@ -63,6 +73,12 @@ public class ObjectThrower : MonoBehaviour
 
         if (animator == null)
             Debug.LogWarning("Animator not assigned.");
+
+        // ✅ Ensure cast line starts from the proper point every time
+        if (castLine != null && castPoint != null)
+        {
+            castLine.startPoint = castPoint;
+        }
     }
 
     void Update()
@@ -70,6 +86,14 @@ public class ObjectThrower : MonoBehaviour
         // Left Click (Down)
         if (Input.GetKeyDown(KeyCode.Mouse0))
         {
+            if (Input.GetKey(KeyCode.Mouse0) && isCharging)
+            {
+                ChargeThrow();
+                UpdateDirectionFromMouse();
+                RotatePlayerToDirection();
+                UpdateBobber();
+            }
+
             if (isReelingIn)
             {
                 Debug.Log("Blocked: Reeling in...");
@@ -118,7 +142,6 @@ public class ObjectThrower : MonoBehaviour
             objectToHide.SetActive(false);
     }
 
-
     void StartCharging()
     {
         if (bobberInWater || isReelingIn)
@@ -141,15 +164,16 @@ public class ObjectThrower : MonoBehaviour
 
         if (rb != null)
         {
-            rb.velocity = Vector3.zero;
+            rb.linearVelocity = Vector3.zero;
             rb.isKinematic = true;
         }
 
+        // Delay destroying the bobber until midway through the animation
         if (activeBobber != null)
         {
-            Destroy(activeBobber);
-            activeBobber = null;
+            Invoke(nameof(DestroyBobber), reelInAnimationTime / 2f);  // halfway through animation
         }
+
 
         if (animator != null && !string.IsNullOrEmpty(chargingAnimTrigger))
         {
@@ -212,13 +236,12 @@ public class ObjectThrower : MonoBehaviour
 
         GameObject thrownObject = Instantiate(throwablePrefab, throwPoint.position, Quaternion.Euler(180f, 0f, 0f));
 
-        // Update: assign thrower to Bobber script
+        // Assign thrower to Bobber script
         Bobber bobberScript = thrownObject.GetComponent<Bobber>();
         if (bobberScript != null)
         {
             bobberScript.thrower = this;
         }
-
 
         Rigidbody thrownRb = thrownObject.GetComponent<Rigidbody>();
         if (thrownRb != null)
@@ -278,10 +301,12 @@ public class ObjectThrower : MonoBehaviour
             animator.SetTrigger(reelInAnimTrigger);
         }
 
+        // Don't destroy immediately — delay it:
         if (activeBobber != null)
         {
-            Destroy(activeBobber);
-            activeBobber = null;
+            // Destroy bobber halfway through animation
+            float delay = reelInAnimationTime / 2f;
+            Invoke(nameof(DestroyActiveBobber), delay);
         }
 
         if (chargeSlider != null)
@@ -308,6 +333,16 @@ public class ObjectThrower : MonoBehaviour
 
         Invoke(nameof(FinishReelIn), reelInAnimationTime);
     }
+
+    void DestroyActiveBobber()
+    {
+        if (activeBobber != null)
+        {
+            Destroy(activeBobber);
+            activeBobber = null;
+        }
+    }
+
 
     void FinishReelIn()
     {

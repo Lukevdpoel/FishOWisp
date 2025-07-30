@@ -140,7 +140,7 @@ Rigidbody:
   serializedVersion: 4
   m_Mass: 0.5
   m_Drag: 0
-  m_AngularDrag: 3
+  m_AngularDrag: 2
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
@@ -198,6 +198,7 @@ MonoBehaviour:
   bounceDamp: 1
   waterDrag: 3
   buoyancyForce: 28.4
+  thrower: {fileID: 0}
 --- !u!1 &2632130456758833499 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 2866621852552652557, guid: 6e37fa6b622d93248a229bac3c75dbd3, type: 3}
