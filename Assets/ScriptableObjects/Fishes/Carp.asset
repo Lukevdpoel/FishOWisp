@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afe3ccf2c6be7e5408b954fc8a0e283b, type: 3}
+  m_Name: Carp
+  m_EditorClassIdentifier: 
+  fishName: Carp
+  description: 'Vis
+
+'
+  fishImage: {fileID: 0}
+  fishprefab: {fileID: 1220417014944494901, guid: 02a24d3817c12914da6e2958edb98a86, type: 3}
+  minLengthCm: 2
+  maxLengthCm: 9
+  rarity: 4
+  catchProbability: 0.5
+  basePrice: 69
+  preferredBait: 0
+  preferredWeather: 0
+  cameraviewdistance: 1
