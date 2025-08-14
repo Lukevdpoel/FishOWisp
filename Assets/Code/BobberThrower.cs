@@ -3,26 +3,17 @@ using UnityEngine.UI;
 
 public class ObjectThrower : MonoBehaviour
 {
-    private bool readyToThrow = true;
-    private bool bobberInWater = false;
-    private bool isCharging = false;
-    private bool isReelingIn = false;
-    private float currentThrowForce;
-    private Vector3 throwDirection;
-
     [Header("Gameplay")]
     public GameObject objectToHide;
 
     [Header("Throwing")]
     public GameObject throwablePrefab;
     public Transform throwPoint;
-    public float minThrowForce = 5f;
-    public float maxThrowForce = 20f;
-    public float chargeRate = 10f;
+    public float minThrowForce = 5f, maxThrowForce = 20f, chargeRate = 10f;
 
     [Header("Cast Line")]
-    public LineToThrownObject castLine; // assign in inspector
-    public Transform castPoint;         // drag your cast point (hand/rod tip)
+    public LineToThrownObject castLine;
+    public Transform castPoint;
 
     [Header("UI")]
     public Slider chargeSlider;
@@ -33,183 +24,139 @@ public class ObjectThrower : MonoBehaviour
 
     [Header("Animation")]
     public Animator animator;
-    public string chargingAnimTrigger = "StartCharging";
-    public string throwAnimTrigger = "Throw";
-    public string reelInAnimTrigger = "ReelIn";
+    public string chargingAnimTrigger = "StartCharging", throwAnimTrigger = "Throw", reelInAnimTrigger = "ReelIn";
     public float reelInAnimationTime = 0.6f;
 
+    private bool readyToThrow = true, bobberInWater = false, isCharging = false, isReelingIn = false;
+    private float currentThrowForce;
+    private Vector3 throwDirection;
+    private GameObject activeBobber;
     private CharacterController characterController;
     private Rigidbody rb;
     private Transform playerTransform;
 
-    private GameObject activeBobber;
-
-    void DestroyBobber()
-    {
-        if (activeBobber != null)
-        {
-            Destroy(activeBobber);
-            activeBobber = null;
-        }
-    }
-
     void Start()
     {
         playerTransform = transform;
-
-        if (chargeSlider != null)
-        {
-            chargeSlider.minValue = minThrowForce;
-            chargeSlider.maxValue = maxThrowForce;
-            chargeSlider.value = minThrowForce;
-            chargeSlider.gameObject.SetActive(false);
-        }
-
-        if (bobberIndicator != null)
-            bobberIndicator.SetActive(false);
-
         characterController = GetComponent<CharacterController>();
         rb = GetComponent<Rigidbody>();
 
-        if (animator == null)
-            Debug.LogWarning("Animator not assigned.");
+        SetupSlider(minThrowForce, maxThrowForce);
+        SetUIActive(chargeSlider, false);
+        SetUIActive(bobberIndicator, false);
 
-        // ✅ Ensure cast line starts from the proper point every time
-        if (castLine != null && castPoint != null)
-        {
-            castLine.startPoint = castPoint;
-        }
+        if (castLine && castPoint) castLine.startPoint = castPoint;
+        if (!animator) Debug.LogWarning("Animator not assigned.");
     }
 
     void Update()
     {
-        // Left Click (Down)
+        HandleInput();
+    }
+
+    void HandleInput()
+    {
         if (Input.GetKeyDown(KeyCode.Mouse0))
         {
-            if (Input.GetKey(KeyCode.Mouse0) && isCharging)
-            {
-                ChargeThrow();
-                UpdateDirectionFromMouse();
-                RotatePlayerToDirection();
-                UpdateBobber();
-            }
-
             if (isReelingIn)
-            {
-                Debug.Log("Blocked: Reeling in...");
                 return;
-            }
 
-            if (bobberInWater)
+            if (activeBobber)
             {
-                Debug.Log("Left click while bobber in water → Reel in");
                 ReelInAndReset();
                 return;
             }
 
-            if (readyToThrow)
-            {
-                Debug.Log("Start charging...");
+            if (readyToThrow && !activeBobber)
                 StartCharging();
-                return;
-            }
         }
 
-        // Left Click (Held)
         if (Input.GetKey(KeyCode.Mouse0) && isCharging)
         {
             ChargeThrow();
-            UpdateDirectionFromMouse();
-            RotatePlayerToDirection();
-            UpdateBobber();
+            UpdateAimAndRotation();
+            UpdateBobberIndicator();
         }
 
-        // Left Click (Released)
         if (Input.GetKeyUp(KeyCode.Mouse0) && isCharging)
         {
-            Debug.Log("Throwing object...");
-            ThrowObject();
+            if (!activeBobber && !isReelingIn)
+                ThrowObject();
+
+            ResetChargeState();
         }
-    }
-
-    public void NotifyBobberInWater()
-    {
-        Debug.Log("✅ NotifyBobberInWater CALLED");
-
-        bobberInWater = true;
-
-        if (objectToHide != null)
-            objectToHide.SetActive(false);
     }
 
     void StartCharging()
     {
-        if (bobberInWater || isReelingIn)
-        {
-            Debug.LogWarning("Blocked StartCharging — bobberInWater or isReelingIn");
-            return;
-        }
+        if (activeBobber || isReelingIn) return;
 
         isCharging = true;
         currentThrowForce = minThrowForce;
 
-        if (chargeSlider != null)
-            chargeSlider.gameObject.SetActive(true);
+        SetUIActive(chargeSlider, true);
+        SetUIActive(bobberIndicator, true);
+        DisableMovement();
 
-        if (bobberIndicator != null)
-            bobberIndicator.SetActive(true);
-
-        if (characterController != null)
-            characterController.enabled = false;
-
-        if (rb != null)
-        {
-            rb.linearVelocity = Vector3.zero;
-            rb.isKinematic = true;
-        }
-
-        // Delay destroying the bobber until midway through the animation
-        if (activeBobber != null)
-        {
-            Invoke(nameof(DestroyBobber), reelInAnimationTime / 2f);  // halfway through animation
-        }
-
-
-        if (animator != null && !string.IsNullOrEmpty(chargingAnimTrigger))
-        {
-            animator.SetTrigger(chargingAnimTrigger);
-        }
+        animator?.SetTrigger(chargingAnimTrigger);
     }
 
     void ChargeThrow()
     {
-        currentThrowForce += chargeRate * Time.deltaTime;
-        currentThrowForce = Mathf.Min(currentThrowForce, maxThrowForce);
-
-        if (chargeSlider != null)
-            chargeSlider.value = currentThrowForce;
+        currentThrowForce = Mathf.Min(currentThrowForce + chargeRate * Time.deltaTime, maxThrowForce);
+        if (chargeSlider) chargeSlider.value = currentThrowForce;
     }
 
-    void UpdateDirectionFromMouse()
+    void ThrowObject()
+    {
+        if (activeBobber || isReelingIn) return;
+
+        GameObject thrownObject = Instantiate(throwablePrefab, throwPoint.position, Quaternion.Euler(180, 0, 0));
+        activeBobber = thrownObject;
+
+        if (thrownObject.TryGetComponent(out Bobber bobber))
+            bobber.thrower = this;
+
+        if (thrownObject.TryGetComponent(out Rigidbody thrownRb))
+            thrownRb.AddForce(throwDirection * currentThrowForce, ForceMode.VelocityChange);
+
+        if (castLine)
+        {
+            Transform anchor = thrownObject.transform.Find("LineAnchor");
+            castLine.AttachTo(anchor ? anchor : thrownObject.transform);
+        }
+
+        EnableMovement();
+        animator?.SetTrigger(throwAnimTrigger);
+    }
+
+    void ReelInAndReset()
+    {
+        isReelingIn = true;
+        readyToThrow = false;
+
+        animator?.SetTrigger(reelInAnimTrigger);
+        Invoke(nameof(DestroyActiveBobber), reelInAnimationTime / 2f);
+        Invoke(nameof(FinishReelIn), reelInAnimationTime);
+
+        castLine?.Detach();
+        SetUIActive(chargeSlider, false);
+        SetUIActive(bobberIndicator, false);
+
+        EnableMovement();
+        objectToHide?.SetActive(true);
+
+        ResetChargeState();
+        bobberInWater = false;
+    }
+
+    void UpdateAimAndRotation()
     {
         Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
-        Vector3 point;
-        if (Physics.Raycast(ray, out RaycastHit hit, 100f, aimLayerMask))
-        {
-            point = hit.point;
-        }
-        else
-        {
-            point = ray.origin + ray.direction * 50f;
-        }
+        Vector3 point = Physics.Raycast(ray, out var hit, 100f, aimLayerMask) ? hit.point : ray.origin + ray.direction * 50f;
 
-        Vector3 dir = (point - throwPoint.position);
-        dir.y = 0f;
-        throwDirection = dir.normalized;
-    }
+        throwDirection = (point - throwPoint.position).WithY(0).normalized;
 
-    void RotatePlayerToDirection()
-    {
         if (throwDirection.sqrMagnitude > 0.001f)
         {
             Quaternion targetRot = Quaternion.LookRotation(throwDirection);
@@ -217,137 +164,80 @@ public class ObjectThrower : MonoBehaviour
         }
     }
 
-    void UpdateBobber()
+    void UpdateBobberIndicator()
     {
-        if (bobberIndicator != null)
+        if (bobberIndicator)
         {
             Vector3 predictedPoint = throwPoint.position + throwDirection * currentThrowForce;
             bobberIndicator.transform.position = predictedPoint + Vector3.up * 0.1f;
         }
     }
 
-    void ThrowObject()
-    {
-        if (bobberInWater || isReelingIn)
-        {
-            Debug.LogWarning("Blocked ThrowObject — bobberInWater or isReelingIn");
-            return;
-        }
-
-        GameObject thrownObject = Instantiate(throwablePrefab, throwPoint.position, Quaternion.Euler(180f, 0f, 0f));
-
-        // Assign thrower to Bobber script
-        Bobber bobberScript = thrownObject.GetComponent<Bobber>();
-        if (bobberScript != null)
-        {
-            bobberScript.thrower = this;
-        }
-
-        Rigidbody thrownRb = thrownObject.GetComponent<Rigidbody>();
-        if (thrownRb != null)
-        {
-            thrownRb.AddForce(throwDirection * currentThrowForce, ForceMode.VelocityChange);
-        }
-
-        activeBobber = thrownObject;
-
-        if (castLine != null)
-        {
-            Transform anchor = thrownObject.transform.Find("LineAnchor");
-            if (anchor != null)
-            {
-                castLine.AttachTo(anchor);
-            }
-            else
-            {
-                Debug.LogWarning("LineAnchor not found, falling back.");
-                castLine.AttachTo(thrownObject.transform);
-            }
-        }
-
-        if (chargeSlider != null)
-        {
-            chargeSlider.value = minThrowForce;
-            chargeSlider.gameObject.SetActive(false);
-        }
-
-        if (bobberIndicator != null)
-            bobberIndicator.SetActive(false);
-
-        if (characterController != null)
-            characterController.enabled = true;
-
-        if (rb != null)
-            rb.isKinematic = false;
-
-        isCharging = false;
-        currentThrowForce = 0f;
-
-        if (animator != null && !string.IsNullOrEmpty(throwAnimTrigger))
-        {
-            animator.SetTrigger(throwAnimTrigger);
-        }
-    }
-
-    void ReelInAndReset()
-    {
-        Debug.Log("Reeling in...");
-
-        isReelingIn = true;
-        readyToThrow = false;
-
-        if (animator != null && !string.IsNullOrEmpty(reelInAnimTrigger))
-        {
-            animator.SetTrigger(reelInAnimTrigger);
-        }
-
-        // Don't destroy immediately — delay it:
-        if (activeBobber != null)
-        {
-            // Destroy bobber halfway through animation
-            float delay = reelInAnimationTime / 2f;
-            Invoke(nameof(DestroyActiveBobber), delay);
-        }
-
-        if (chargeSlider != null)
-            chargeSlider.gameObject.SetActive(false);
-
-        if (bobberIndicator != null)
-            bobberIndicator.SetActive(false);
-
-        if (castLine != null)
-            castLine.Detach();
-
-        if (characterController != null)
-            characterController.enabled = true;
-
-        if (rb != null)
-            rb.isKinematic = false;
-
-        if (objectToHide != null)
-            objectToHide.SetActive(true);
-
-        isCharging = false;
-        currentThrowForce = 0f;
-        bobberInWater = false;
-
-        Invoke(nameof(FinishReelIn), reelInAnimationTime);
-    }
-
     void DestroyActiveBobber()
     {
-        if (activeBobber != null)
-        {
-            Destroy(activeBobber);
-            activeBobber = null;
-        }
+        if (activeBobber) Destroy(activeBobber);
+        activeBobber = null;
     }
-
 
     void FinishReelIn()
     {
-        Debug.Log("Finished reeling. Ready to throw.");
         isReelingIn = false;
         readyToThrow = true;
+    }
+
+    void DisableMovement()
+    {
+        if (characterController) characterController.enabled = false;
+        if (rb)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.isKinematic = true;
+        }
+    }
+
+    void EnableMovement()
+    {
+        if (characterController) characterController.enabled = true;
+        if (rb) rb.isKinematic = false;
+    }
+
+    void SetupSlider(float min, float max)
+    {
+        if (!chargeSlider) return;
+        chargeSlider.minValue = min;
+        chargeSlider.maxValue = max;
+        chargeSlider.value = min;
+    }
+
+    void SetUIActive(Component uiElement, bool state)
+    {
+        if (uiElement) uiElement.gameObject.SetActive(state);
+    }
+
+    void SetUIActive(GameObject obj, bool state)
+    {
+        if (obj) obj.SetActive(state);
+    }
+
+    void ResetChargeState()
+    {
+        isCharging = false;
+        currentThrowForce = 0f;
+        if (chargeSlider) chargeSlider.value = minThrowForce;
+    }
+
+    public void NotifyBobberInWater()
+    {
+        bobberInWater = true;
+        objectToHide?.SetActive(false);
+    }
+}
+
+static class VectorExtensions
+{
+    public static Vector3 WithY(this Vector3 v, float y)
+    {
+        v.y = y;
+        return v;
     }
 }

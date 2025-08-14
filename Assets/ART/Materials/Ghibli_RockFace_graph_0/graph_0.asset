@@ -37,7 +37,7 @@ MonoBehaviour:
       Index: 0
       Type: 8
       Channel: baseColor
-    OutputTexture: {fileID: 2800000, guid: 19b8e648e5dada64581682a3edb21f49, type: 3}
+    OutputTexture: {fileID: 2800000, guid: 0d5ff14820847ed4b8a8a403db988fca, type: 3}
     sRGB: 1
     IsVirtual: 0
     IsAlphaAssignable: 1
@@ -53,7 +53,7 @@ MonoBehaviour:
       Index: 1
       Type: 8
       Channel: normal
-    OutputTexture: {fileID: 2800000, guid: b9b5571b9976bdb4eb72a0b105ab1aa1, type: 3}
+    OutputTexture: {fileID: 2800000, guid: c4d9e222171fecc4ebdf6fbea79108d0, type: 3}
     sRGB: 0
     IsVirtual: 0
     IsAlphaAssignable: 0
@@ -85,7 +85,7 @@ MonoBehaviour:
       Index: 3
       Type: 8
       Channel: metallic
-    OutputTexture: {fileID: 2800000, guid: 1b332c92a02ac0b4792edc89d1fd528b, type: 3}
+    OutputTexture: {fileID: 2800000, guid: 142c33d38deb0d740a6181efd76a71fe, type: 3}
     sRGB: 0
     IsVirtual: 0
     IsAlphaAssignable: 1
@@ -101,7 +101,7 @@ MonoBehaviour:
       Index: 4
       Type: 8
       Channel: height
-    OutputTexture: {fileID: 2800000, guid: 2e2786e717a3a8c40960e8976dd61fa7, type: 3}
+    OutputTexture: {fileID: 2800000, guid: 4400c6b1e9dcea641b8d3c64153b76c1, type: 3}
     sRGB: 1
     IsVirtual: 0
     IsAlphaAssignable: 1
@@ -117,7 +117,7 @@ MonoBehaviour:
       Index: 5
       Type: 8
       Channel: ambientOcclusion
-    OutputTexture: {fileID: 2800000, guid: f8a750676b259ed46894a73063188592, type: 3}
+    OutputTexture: {fileID: 2800000, guid: ddff95678f14146498c83f6166099fa8, type: 3}
     sRGB: 0
     IsVirtual: 0
     IsAlphaAssignable: 1
@@ -133,8 +133,10 @@ MonoBehaviour:
     <presetinput identifier=\"$outputsize\" uid=\"2297813683\" type=\"8\" value=\"10,10\"
     />\n  <presetinput identifier=\"Grass_Intensity\" uid=\"3894361806\" type=\"0\"
     value=\"0.488\" />\n  <presetinput identifier=\"Rock_Base_Color\" uid=\"3894346894\"
-    type=\"3\" value=\"0.503904,0.528302,0.396226,1\" />\n  <presetinput identifier=\"saturation\"
-    uid=\"3894348600\" type=\"0\" value=\"0.543\" />\n </sbspreset>\n"
+    type=\"3\" value=\"0.206924,0.410674,0.471698,1\" />\n  <presetinput identifier=\"hue\"
+    uid=\"3894348622\" type=\"0\" value=\"0.14\" />\n  <presetinput identifier=\"saturation\"
+    uid=\"3894348600\" type=\"0\" value=\"1\" />\n  <presetinput identifier=\"luminosity\"
+    uid=\"3894348586\" type=\"0\" value=\"0.378\" />\n </sbspreset>\n"
   IsRuntimeOnly: 0
   GenerateAllOutputs: 0
   GenerateAllMipmaps: 1
@@ -220,7 +222,7 @@ MonoBehaviour:
             output image
           Type: 3
           WidgetType: 3
-        Data: {x: 0.503904, y: 0.528302, z: 0.396226, w: 1}
+        Data: {x: 0.20692416, y: 0.41067365, z: 0.4716981, w: 1}
         NumericalDescription:
           DefaultValue: {x: 0.468258, y: 0.48503, z: 0.436811, w: 1}
           MinValue: {x: 0, y: 0, z: 0, w: 0}
@@ -241,7 +243,7 @@ MonoBehaviour:
             image
           Type: 0
           WidgetType: 1
-        Data: 0.5
+        Data: 0.14
         NumericalDescription:
           DefaultValue: 0.5
           MinValue: 0
@@ -262,7 +264,7 @@ MonoBehaviour:
             of the input image's color
           Type: 0
           WidgetType: 1
-        Data: 0.543
+        Data: 1
         NumericalDescription:
           DefaultValue: 0.5
           MinValue: 0
@@ -283,7 +285,7 @@ MonoBehaviour:
             of the input image
           Type: 0
           WidgetType: 1
-        Data: 0.5
+        Data: 0.378
         NumericalDescription:
           DefaultValue: 0.5
           MinValue: 0

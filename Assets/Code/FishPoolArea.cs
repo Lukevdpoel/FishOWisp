@@ -25,15 +25,7 @@ public class FishPoolArea : MonoBehaviour
         }
     }
 
-    private void Update()
-    {
-        if (playerInRange && Input.GetKeyDown(KeyCode.E))
-        {
-            TryCatchFish();
-        }
-    }
-
-    private void TryCatchFish()
+    public void TryCatchFish()
     {
         if (fishPool == null || fishPool.availableFish.Count == 0)
         {
