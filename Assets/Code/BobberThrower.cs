@@ -56,6 +56,8 @@ public class ObjectThrower : MonoBehaviour
 
     void HandleInput()
     {
+        if (PauseManager.Instance.GetPaused()) return;
+
         if (Input.GetKeyDown(KeyCode.Mouse0))
         {
             if (isReelingIn)

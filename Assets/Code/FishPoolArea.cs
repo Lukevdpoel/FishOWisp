@@ -1,28 +1,62 @@
 using UnityEngine;
+using System.Collections;
 
 [RequireComponent(typeof(Collider))]
 public class FishPoolArea : MonoBehaviour
 {
     public FishPool fishPool;
+    public bool fishCatchable = true;
 
-    private bool playerInRange = false;
+    [Header("Catch Timing")]
+    public float minCatchTime = 2f; // minimum seconds before a catch
+    public float maxCatchTime = 5f; // maximum seconds before a catch
+
+    private Coroutine catchRoutine;
+    private bool bobberInside = false;
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Player"))
+        if (other.CompareTag("Bobber"))
         {
-            playerInRange = true;
-            Debug.Log($"Player entered pool: {fishPool.poolName}");
+            bobberInside = true;
+            Debug.Log($"Bobber entered pool: {fishPool.poolName}");
+
+            if (fishCatchable && catchRoutine == null)
+            {
+                catchRoutine = StartCoroutine(CatchFishAfterDelay());
+            }
         }
     }
 
     private void OnTriggerExit(Collider other)
     {
-        if (other.CompareTag("Player"))
+        if (other.CompareTag("Bobber"))
         {
-            playerInRange = false;
-            Debug.Log($"Player left pool: {fishPool.poolName}");
+            bobberInside = false;
+            Debug.Log($"Bobber exited pool: {fishPool.poolName}");
+
+            // Stop the catch timer if the bobber leaves
+            if (catchRoutine != null)
+            {
+                StopCoroutine(catchRoutine);
+                catchRoutine = null;
+            }
         }
+    }
+
+    private IEnumerator CatchFishAfterDelay()
+    {
+        float waitTime = Random.Range(minCatchTime, maxCatchTime);
+        Debug.Log($"Waiting {waitTime:F1} seconds to try and catch a fish...");
+
+        yield return new WaitForSeconds(waitTime);
+
+        if (bobberInside && fishCatchable)
+        {
+            TryCatchFish();
+        }
+
+        catchRoutine = null; // reset so it can start again next time
     }
 
     public void TryCatchFish()

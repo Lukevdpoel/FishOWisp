@@ -1,13 +1,13 @@
+using System.Collections.Generic;
 using UnityEngine;
 
-[CreateAssetMenu(menuName = "Fishing/Fish Pool")]
+[CreateAssetMenu(fileName = "NewFishPool", menuName = "Fishing/Fish Pool")]
 public class FishPool : ScriptableObject
 {
-    public string[] fishTypes;
+    public string poolName;
+    [TextArea]
+    public string description;
 
-    public string GetRandomFish()
-    {
-        if (fishTypes == null || fishTypes.Length == 0) return "Nothing";
-        return fishTypes[Random.Range(0, fishTypes.Length)];
-    }
+    [Tooltip("Fish that can be caught in this pool.")]
+    public List<FishPreset> availableFish;
 }

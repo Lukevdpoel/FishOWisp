@@ -3,10 +3,8 @@ using System.IO;
 using Sirenix.OdinInspector;
 using UnityEngine;
 
-public class FishEncyclopediaManager : MonoBehaviour
+public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
 {
-    public static FishEncyclopediaManager Instance;
-
     private const string SaveKey = "FishEncyclopedia";
     private string SavePath => Path.Combine(Application.persistentDataPath, "encyclopedia.json");
 
@@ -15,15 +13,13 @@ public class FishEncyclopediaManager : MonoBehaviour
     [ToggleLeft]
     public bool deleteOnStart = false;
 
-    public List<FishPreset> allFishPresets; // Assign all available fish in the inspector or dynamically
+    public List<FishPreset> allFishPresets; 
     public List<FishEncyclopediaEntry> encyclopediaEntries = new List<FishEncyclopediaEntry>();
 
     private void Awake()
     {
-        if (Instance == null)
+        if (Instance == null || Instance == this)
         {
-            Instance = this;
-
             if (deleteOnStart)
             {
                 DeleteEncyclopediaSave();
@@ -80,7 +76,7 @@ public class FishEncyclopediaManager : MonoBehaviour
         {
             encyclopediaEntries = new List<FishEncyclopediaEntry>();
         }
-
+        return;
         foreach (var preset in allFishPresets)
         {
             // Add missing presets to encyclopedia

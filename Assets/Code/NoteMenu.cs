@@ -5,17 +5,14 @@ using UnityEngine.SceneManagement;
 
 public class NoteMenu : MonoBehaviour
 {
-    public static bool GameIsPaused = false;
 
     public GameObject NoteMenuUI;
 
-
-    // Update is called once per frame
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.Tab))
         {
-            if (GameIsPaused)
+            if (NoteMenuUI.activeSelf)
             {
                 Resume();
             }
@@ -30,13 +27,14 @@ public class NoteMenu : MonoBehaviour
         public void Resume()
         {
             NoteMenuUI.SetActive(false);
-            GameIsPaused = false;
+            PauseManager.Instance.SetPaused(false,true);
         }
 
         void Pause()
         {
             NoteMenuUI.SetActive(true);
-            GameIsPaused = true;
+
+          PauseManager.Instance.SetPaused(true,true);
         }
 
  
