@@ -12,7 +12,7 @@ public class ModelViewer : MonoBehaviour
 
     void Awake()
     {
-        // Singleton enforcement
+        // Singleton enforcements
         if (Instance != null && Instance != this)
         {
             Destroy(gameObject);
@@ -36,7 +36,8 @@ public class ModelViewer : MonoBehaviour
         camera.transform.localPosition = new Vector3(0, 0, -prefab.cameraviewdistance);
 
         // Instantiate new model as child of container
-        currentModel = Instantiate(prefab.fishprefab, modelContainer);
+        // Corrected 'fishprefab' to 'fishPrefab' to match the FishPreset script.
+        currentModel = Instantiate(prefab.fishPrefab, modelContainer);
         currentModel.transform.localPosition = Vector3.zero;
         currentModel.transform.localRotation = Quaternion.identity;
         currentModel.transform.localScale = Vector3.one;

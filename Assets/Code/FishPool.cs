@@ -1,5 +1,5 @@
-using System.Collections.Generic;
 using UnityEngine;
+using System.Collections.Generic;
 
 [CreateAssetMenu(fileName = "NewFishPool", menuName = "Fishing/Fish Pool")]
 public class FishPool : ScriptableObject

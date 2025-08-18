@@ -6,15 +6,15 @@ using System.Collections;
 [RequireComponent(typeof(CharacterController), typeof(PlayerController))]
 public class ObjectThrower : MonoBehaviour
 {
-    // Made enum public for better access from other scripts
-    public enum ThrowerState { Ready, Charging, Thrown, Reeling }
-    private ThrowerState currentState = ThrowerState.Ready;
+    // Defines the possible states the fishing mechanic can be in.
+    public enum FishingState { Idle, Charging, WaitingForBite, FishOnLine, Reeling }
+    private FishingState currentState = FishingState.Idle;
 
     [Header("Gameplay")]
     public GameObject objectToHide;
 
     [Header("Throwing")]
-    public GameObject throwablePrefab;
+    public GameObject throwablePrefab; // This is your Bobber Prefab
     public Transform bobberSpawnPoint;
     public float minThrowForce = 5f, maxThrowForce = 20f, chargeRate = 10f;
     public float reelInArcHeight = 2f;
@@ -39,28 +39,20 @@ public class ObjectThrower : MonoBehaviour
     public string throwAnimTrigger = "Throw";
     public string reelInAnimTrigger = "ReelIn";
 
-    // --- Public Properties for External Scripts ---
-    public ThrowerState CurrentState => currentState;
-    // FIX 1: Added a public property to replace the old 'isCharging' variable.
-    public bool IsCharging => currentState == ThrowerState.Charging;
-
     // --- Private Variables ---
     private float currentThrowForce;
     private Vector3 throwDirection;
-    private GameObject activeBobber;
-    // FIX 2: Re-added the 'bobberInWater' variable needed by an external script.
-    private bool bobberInWater = false;
+    private Bobber activeBobber; // Now stores the Bobber script directly
+    private bool isBobberSettled = false; // FIXED: Flag to prevent instant reeling
 
     // --- Cached Components ---
     private CharacterController characterController;
-    private Rigidbody rb;
     private PlayerController playerController;
     private Camera mainCamera;
 
     void Awake()
     {
         characterController = GetComponent<CharacterController>();
-        rb = GetComponent<Rigidbody>();
         playerController = GetComponent<PlayerController>();
         mainCamera = Camera.main;
     }
@@ -77,26 +69,59 @@ public class ObjectThrower : MonoBehaviour
 
     void Update()
     {
-        switch (currentState)
+        // Input handling based on the current fishing state
+        if (Input.GetKeyDown(KeyCode.Mouse0))
         {
-            case ThrowerState.Ready:
-                if (Input.GetKeyDown(KeyCode.Mouse0)) StartCharging();
-                break;
-            case ThrowerState.Charging:
-                HandleCharging();
-                break;
-            case ThrowerState.Thrown:
-                CheckRopeDistance();
-                if (Input.GetKeyDown(KeyCode.Mouse0)) StartReelIn();
-                break;
-            case ThrowerState.Reeling:
-                break;
+            switch (currentState)
+            {
+                case FishingState.Idle:
+                    StartCharging();
+                    break;
+                case FishingState.WaitingForBite:
+                    StartReeling();
+                    break;
+                case FishingState.FishOnLine:
+                    StartReeling();
+                    break;
+            }
+        }
+
+        if (Input.GetKeyUp(KeyCode.Mouse0))
+        {
+            if (currentState == FishingState.Charging)
+            {
+                ThrowObject();
+            }
+        }
+
+        if (Input.GetKeyDown(KeyCode.Mouse1) && currentState != FishingState.Idle)
+        {
+            ResetState();
+        }
+
+        if (currentState == FishingState.Charging)
+        {
+            HandleCharging();
+        }
+
+        if (currentState == FishingState.WaitingForBite || currentState == FishingState.FishOnLine)
+        {
+            CheckRopeDistance();
+        }
+    }
+
+    public void SignalFishBite(Bobber bobber)
+    {
+        if (bobber == activeBobber && currentState == FishingState.WaitingForBite)
+        {
+            Debug.Log("<b>Step 1:</b> A fish is on the line! Waiting for player to click.", this.gameObject);
+            currentState = FishingState.FishOnLine;
         }
     }
 
     private void StartCharging()
     {
-        currentState = ThrowerState.Charging;
+        currentState = FishingState.Charging;
         playerController.NotifyOfAction();
         currentThrowForce = minThrowForce;
 
@@ -114,15 +139,22 @@ public class ObjectThrower : MonoBehaviour
         UpdateAimAndRotation();
         UpdateBobberIndicator();
         playerController.NotifyOfAction();
-
-        if (Input.GetKeyUp(KeyCode.Mouse0)) ThrowObject();
     }
 
     private void ThrowObject()
     {
-        currentState = ThrowerState.Thrown;
+        GameObject bobberInstance = Instantiate(throwablePrefab, bobberSpawnPoint.position, Quaternion.identity);
+        activeBobber = bobberInstance.GetComponent<Bobber>();
 
-        activeBobber = Instantiate(throwablePrefab, bobberSpawnPoint.position, Quaternion.identity);
+        if (activeBobber == null)
+        {
+            Debug.LogError("The throwablePrefab is missing the Bobber script!");
+            Destroy(bobberInstance);
+            ResetState();
+            return;
+        }
+
+        currentState = FishingState.WaitingForBite;
         objectToHide?.SetActive(false);
         rope?.SetupRope(ropeConnectionPoint, activeBobber.transform);
 
@@ -134,9 +166,22 @@ public class ObjectThrower : MonoBehaviour
         ResetChargeUI();
         EnableMovement();
         animator?.SetTrigger(throwAnimTrigger);
+
+        // FIXED: Start a coroutine to add a delay before the distance check is active.
+        StartCoroutine(SettleBobberDelay());
     }
 
-    private void StartReelIn()
+    // FIXED: New coroutine to prevent the bobber from being reeled in instantly.
+    private IEnumerator SettleBobberDelay()
+    {
+        yield return new WaitForSeconds(0.5f); // Wait half a second
+        if (currentState == FishingState.WaitingForBite || currentState == FishingState.FishOnLine)
+        {
+            isBobberSettled = true;
+        }
+    }
+
+    private void StartReeling()
     {
         if (activeBobber == null)
         {
@@ -144,7 +189,17 @@ public class ObjectThrower : MonoBehaviour
             return;
         }
 
-        currentState = ThrowerState.Reeling;
+        if (activeBobber.hookedFish != null)
+        {
+            Debug.Log("<b>Step 2:</b> Fish is hooked! Telling bobber to swap models.", this.gameObject);
+            activeBobber.StartReeling();
+        }
+        else
+        {
+            Debug.Log("Reeling in the empty bobber.", this.gameObject);
+        }
+
+        currentState = FishingState.Reeling;
         playerController.NotifyOfAction();
         animator?.SetTrigger(reelInAnimTrigger);
         StartCoroutine(ReelInBobberArc());
@@ -160,6 +215,7 @@ public class ObjectThrower : MonoBehaviour
             yield break;
         }
 
+        // FIXED: Explicitly specify the component type <Rigidbody>
         if (activeBobber.TryGetComponent<Rigidbody>(out var bobberRb))
         {
             bobberRb.isKinematic = true;
@@ -188,10 +244,6 @@ public class ObjectThrower : MonoBehaviour
             yield return null;
         }
 
-        rope?.DeactivateRope();
-        Destroy(activeBobber);
-        activeBobber = null;
-
         if (objectToHide != null)
         {
             objectToHide.transform.SetParent(ropeConnectionPoint);
@@ -205,18 +257,16 @@ public class ObjectThrower : MonoBehaviour
 
     private void CheckRopeDistance()
     {
-        if (activeBobber != null && Vector3.Distance(ropeConnectionPoint.position, activeBobber.transform.position) > maxRopeDistance)
+        // FIXED: Only check the distance if the bobber has had time to settle.
+        if (isBobberSettled && activeBobber != null && Vector3.Distance(ropeConnectionPoint.position, activeBobber.transform.position) > maxRopeDistance)
         {
-            StartReelIn();
+            StartReeling();
         }
     }
 
-    // --- Helper & Public Methods ---
-
-    // FIX 2: Re-added the public method so other scripts can call it.
     public void NotifyBobberInWater()
     {
-        bobberInWater = true;
+        // This function is called by the Bobber. We can add logic here if needed.
     }
 
     private void UpdateAimAndRotation()
@@ -254,23 +304,29 @@ public class ObjectThrower : MonoBehaviour
 
     private void ResetState()
     {
+        rope?.DeactivateRope();
+
+        if (activeBobber != null)
+        {
+            Destroy(activeBobber.gameObject);
+            activeBobber = null;
+        }
+
         EnableMovement();
         ResetChargeUI();
-        // FIX 2: Added reset for the 'bobberInWater' flag.
-        bobberInWater = false;
-        currentState = ThrowerState.Ready;
+        currentState = FishingState.Idle;
+        isBobberSettled = false; // FIXED: Reset the settled flag
+        StopAllCoroutines(); // Stop any running coroutines like the settle delay
     }
 
     private void DisableMovement()
     {
         if (characterController) characterController.enabled = false;
-        if (rb) rb.isKinematic = true;
     }
 
     private void EnableMovement()
     {
         if (characterController) characterController.enabled = true;
-        if (rb) rb.isKinematic = false;
     }
 
     private void SetupSlider(float min, float max)

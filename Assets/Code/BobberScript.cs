@@ -1,16 +1,20 @@
 ﻿using UnityEngine;
-using System.Collections; // Required for Coroutines
+using System.Collections;
 
+[RequireComponent(typeof(Rigidbody))]
 public class Bobber : MonoBehaviour
 {
-    [Header("Effects")]
-    public ParticleSystem waterSplashEffect; // Assign your particle effect prefab here
-    public int splashCount = 3; // How many times the splash effect will play
-    public float splashInterval = 0.15f; // The delay between each splash
+    [Header("Visuals")]
+    [Tooltip("Assign the child GameObject that contains the bobber's model/mesh.")]
+    public GameObject bobberVisuals; // The visual part of the bobber to hide
 
-    [Header("Follow Effect")]
-    public ParticleSystem followEffect; // Assign the particle effect that will follow the bobber
-    public float followDuration = 2.0f; // How long the effect will follow the bobber
+    // --- Existing Bobber Fields ---
+    [Header("Effects")]
+    public ParticleSystem waterSplashEffect;
+    public int splashCount = 3;
+    public float splashInterval = 0.15f;
+    public ParticleSystem followEffect;
+    public float followDuration = 2.0f;
 
     [Header("Water Detection")]
     public LayerMask waterLayer;
@@ -29,9 +33,12 @@ public class Bobber : MonoBehaviour
     private bool isInWater = false;
     private float waterSurfaceY;
     private bool hasNotifiedThrower = false;
-
     private bool hasSplashed = false;
-    private float initialSplashHeight; // Stores the height of the first splash
+    private float initialSplashHeight;
+
+    [Header("Fishing State")]
+    public GameObject hookedFish { get; private set; }
+
 
     void Start()
     {
@@ -39,27 +46,109 @@ public class Bobber : MonoBehaviour
         transform.rotation = Random.rotation;
     }
 
+    /// <summary>
+    /// This method is called by the FishPoolArea when a fish bites.
+    /// </summary>
+    public void HookFish(GameObject fishInstance)
+    {
+        if (hookedFish != null)
+        {
+            Debug.LogWarning("Bobber already has a fish hooked! Ignoring new one.");
+            Destroy(fishInstance);
+            return;
+        }
+
+        hookedFish = fishInstance;
+        hookedFish.SetActive(false);
+        Debug.Log($"Bobber has hooked a {hookedFish.name}! Waiting for reel.");
+
+        // --- CORRECTED: This now finds the ObjectThrower script ---
+        ObjectThrower objectThrower = FindObjectOfType<ObjectThrower>();
+        if (objectThrower != null)
+        {
+            objectThrower.SignalFishBite(this);
+        }
+        else
+        {
+            Debug.LogError("ObjectThrower not found in scene! The fish will never appear.");
+        }
+    }
+
+    /// <summary>
+    /// Call this method from your main fishing script when the player successfully
+    /// reacts to a bite to begin reeling. This will show the fish.
+    /// </summary>
+    public void StartReeling()
+    {
+        Debug.Log("<b>Step 3:</b> StartReeling() method was called on the Bobber.", this.gameObject);
+
+        if (hookedFish == null)
+        {
+            Debug.LogError("Attempted to start reeling, but hookedFish is null! This shouldn't happen.", this.gameObject);
+            return;
+        }
+
+        Debug.Log("Reeling started! Swapping bobber with fish model.");
+
+        // Now, make the fish visible and attach it to the bobber's position.
+        hookedFish.SetActive(true);
+        Debug.Log($"<b>Step 4:</b> Fish '{hookedFish.name}' has been set to active.", hookedFish);
+
+        // --- Diagnostic Check ---
+        Renderer fishRenderer = hookedFish.GetComponentInChildren<Renderer>();
+        if (fishRenderer == null)
+        {
+            Debug.LogWarning($"The fish prefab '{hookedFish.name}' does not have a Renderer component in its children. It will be invisible.", hookedFish);
+        }
+        else if (!fishRenderer.enabled)
+        {
+            Debug.LogWarning($"The fish model '{hookedFish.name}' was activated, but its Renderer component is disabled. You may need to enable it on the prefab.", hookedFish);
+        }
+
+        hookedFish.transform.SetParent(this.transform);
+        hookedFish.transform.localPosition = Vector3.zero;
+        hookedFish.transform.localRotation = Quaternion.identity;
+
+        if (bobberVisuals != null)
+        {
+            bobberVisuals.SetActive(false);
+        }
+    }
+
+
+    /// <summary>
+    /// Call this when the fish is caught or gets away to clean up.
+    /// </summary>
+    public void ClearHookedFish()
+    {
+        if (hookedFish != null)
+        {
+            Destroy(hookedFish);
+            hookedFish = null;
+            Debug.Log("Hooked fish has been cleared.");
+
+            if (bobberVisuals != null)
+            {
+                bobberVisuals.SetActive(true);
+            }
+        }
+    }
+
+    // --- All existing physics and effects methods remain below ---
+
     void OnCollisionEnter(Collision collision)
     {
         if (isInWater) return;
 
-        // Check if the collision is with the water layer
         if (((1 << collision.gameObject.layer) & waterLayer) != 0)
         {
             HandleWaterEntry(collision.GetContact(0).point.y);
-
-            // Additional logic for collision-based water entry
             rb.linearVelocity = Vector3.zero;
             rb.angularVelocity = Vector3.zero;
             rb.isKinematic = true;
 
             Vector3 contactPoint = collision.GetContact(0).point;
-            transform.position = new Vector3(
-                transform.position.x,
-                contactPoint.y,
-                transform.position.z
-            );
-
+            transform.position = new Vector3(transform.position.x, contactPoint.y, transform.position.z);
             transform.rotation = Quaternion.Euler(0f, transform.rotation.eulerAngles.y, 0f);
         }
     }
@@ -69,27 +158,21 @@ public class Bobber : MonoBehaviour
         if (other.CompareTag(waterTag))
         {
             HandleWaterEntry(other.bounds.max.y);
-            rb.isKinematic = false; // Ensure rigidbody is not kinematic for buoyancy
+            rb.isKinematic = false;
         }
     }
 
-    /// <summary>
-    /// A centralized method to handle the logic when the bobber enters the water.
-    /// </summary>
-    /// <param name="surfaceY">The Y coordinate of the water surface.</param>
     void HandleWaterEntry(float surfaceY)
     {
-        if (isInWater) return; // Prevent this from running multiple times
+        if (isInWater) return;
 
         isInWater = true;
         waterSurfaceY = surfaceY;
 
         PlaySplashEffect();
-        PlayFollowEffect(); // Play the new follow effect
-
+        PlayFollowEffect();
         NotifyThrower();
     }
-
 
     void OnTriggerStay(Collider other)
     {
@@ -121,7 +204,6 @@ public class Bobber : MonoBehaviour
         }
 
         rb.linearDamping = waterDrag;
-
         Quaternion upright = Quaternion.Euler(0f, transform.rotation.eulerAngles.y, 0f);
         rb.MoveRotation(Quaternion.Slerp(rb.rotation, upright, Time.fixedDeltaTime * 2f));
     }
@@ -129,71 +211,54 @@ public class Bobber : MonoBehaviour
     void PlaySplashEffect()
     {
         if (hasSplashed || waterSplashEffect == null) return;
-
-        // Store the height of the very first impact
         initialSplashHeight = transform.position.y;
         StartCoroutine(SplashRoutine());
         hasSplashed = true;
     }
 
-    /// <summary>
-    /// Spawns the splash effect multiple times, maintaining the initial impact height.
-    /// </summary>
     private IEnumerator SplashRoutine()
     {
         for (int i = 0; i < splashCount; i++)
         {
-            // Create a new position using the bobber's current X/Z and the stored initial Y
             Vector3 splashPos = new Vector3(transform.position.x, initialSplashHeight, transform.position.z);
             Instantiate(waterSplashEffect, splashPos, Quaternion.identity);
             yield return new WaitForSeconds(splashInterval);
         }
     }
 
-    /// <summary>
-    /// Instantiates the follow effect and starts the coroutine to manage its lifetime.
-    /// </summary>
     void PlayFollowEffect()
     {
         if (followEffect == null) return;
-
-        // Instantiate the effect at the initial splash height, but do NOT parent it.
         Vector3 effectPos = new Vector3(transform.position.x, initialSplashHeight, transform.position.z);
         ParticleSystem followInstance = Instantiate(followEffect, effectPos, Quaternion.identity);
         StartCoroutine(FollowRoutine(followInstance));
     }
 
-    /// <summary>
-    /// Makes the particle effect follow the bobber's X/Z position at a fixed height for a set duration.
-    /// </summary>
+
+
     private IEnumerator FollowRoutine(ParticleSystem effectInstance)
     {
         float startTime = Time.time;
-        float initialY = effectInstance.transform.position.y; // The fixed height
+        float initialY = effectInstance.transform.position.y;
 
-        // Follow the bobber for the specified duration
         while (Time.time < startTime + followDuration)
         {
-            // Update the effect's position to follow the bobber on the X and Z axes, but keep the initial Y
+            if (effectInstance == null) yield break;
             effectInstance.transform.position = new Vector3(transform.position.x, initialY, transform.position.z);
-            yield return null; // Wait for the next frame
+            yield return null;
         }
 
-        // Stop the particle emission
-        effectInstance.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-
-        // Wait for the remaining particles to die out
-        yield return new WaitWhile(() => effectInstance.IsAlive(true));
-
-        // Destroy the particle system game object
-        Destroy(effectInstance.gameObject);
+        if (effectInstance != null)
+        {
+            effectInstance.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+            yield return new WaitWhile(() => effectInstance.IsAlive(true));
+            Destroy(effectInstance.gameObject);
+        }
     }
-
 
     void NotifyThrower()
     {
         if (hasNotifiedThrower || thrower == null) return;
-
         Debug.Log("🌊 Bobber notifying ObjectThrower: landed in water.");
         thrower.NotifyBobberInWater();
         hasNotifiedThrower = true;
