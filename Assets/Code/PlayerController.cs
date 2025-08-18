@@ -25,6 +25,11 @@ public class PlayerController : MonoBehaviour
     [Header("Camera Smoothing")]
     [SerializeField] private float cameraSmoothTime = 0.05f; // tweak in inspector
 
+    [Header("Camera Collision")]
+    [SerializeField] private LayerMask collisionLayers; // Set this to everything except the "Player" layer
+    [SerializeField] private float collisionRadius = 0.2f;
+    [SerializeField] private float zoomDampTime = 0.1f;
+
     // Private variables
     private CharacterController characterController;
     private Vector3 targetVelocity;
@@ -40,6 +45,10 @@ public class PlayerController : MonoBehaviour
     private float xVel, yVel;    // damping velocities
     private Camera cam;
 
+    // Camera zoom variables
+    private float currentCameraDistance;
+    private float distanceVelocity;
+
     void Start()
     {
         characterController = GetComponent<CharacterController>();
@@ -47,6 +56,7 @@ public class PlayerController : MonoBehaviour
         if (cameraTransform && playerModel)
         {
             startDistance = Vector3.Distance(cameraTransform.position, playerModel.position);
+            currentCameraDistance = startDistance;
             Vector3 initialCameraAngles = cameraTransform.eulerAngles;
             cameraXAngle = initialCameraAngles.y;
             cameraYAngle = initialCameraAngles.x;
@@ -126,11 +136,11 @@ public class PlayerController : MonoBehaviour
     private void HandleIdleAnimation()
     {
         bool isMoving = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f;
+        bool isRotatingCamera = Input.GetMouseButton(1);
 
-        if (isMoving)
+        if (isMoving || isRotatingCamera)
         {
-            idleTimer = 0f;
-            allowSitdown = true;
+            NotifyOfAction();
         }
         else
         {
@@ -144,11 +154,16 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    public void NotifyOfAction()
+    {
+        idleTimer = 0f;
+        allowSitdown = true;
+    }
+
     private void HandleCamera()
     {
         if (!cameraTransform || !playerModel) return;
 
-        // Update target orbit angles when RMB is held
         if (Input.GetMouseButton(1))
         {
             float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
@@ -159,22 +174,34 @@ public class PlayerController : MonoBehaviour
             cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
         }
 
-        // Smoothly damp actual orbit angles toward target
         smoothXAngle = Mathf.SmoothDampAngle(smoothXAngle, cameraXAngle, ref xVel, cameraSmoothTime);
         smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle, ref yVel, cameraSmoothTime);
 
         Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f);
-
-        // Base orbit around a pivot on the player (e.g., chest height)
         Vector3 pivot = playerModel.position + Vector3.up * pivotHeight;
-        Vector3 pos0 = pivot - (rotation * Vector3.forward * startDistance);
 
-        // If we have a Camera component, enforce screen-space vertical framing
+        // --- START OF COLLISION LOGIC ---
+
+        Vector3 forwardDir = rotation * Vector3.forward;
+        Vector3 cameraDirection = -forwardDir;
+        float targetDistance = startDistance;
+
+        RaycastHit hit;
+        if (Physics.SphereCast(pivot, collisionRadius, cameraDirection, out hit, startDistance, collisionLayers))
+        {
+            targetDistance = hit.distance;
+        }
+
+        currentCameraDistance = Mathf.SmoothDamp(currentCameraDistance, targetDistance, ref distanceVelocity, zoomDampTime);
+        Vector3 pos0 = pivot + cameraDirection * currentCameraDistance;
+
+        // --- END OF COLLISION LOGIC ---
+
         if (cam == null) cam = cameraTransform.GetComponent<Camera>();
         if (cam)
         {
-            Vector3 f = rotation * Vector3.forward; // camera forward
-            Vector3 u = rotation * Vector3.up;      // camera up
+            Vector3 f = rotation * Vector3.forward;
+            Vector3 u = rotation * Vector3.up;
             Vector3 target = (framingTarget ? framingTarget.position : playerModel.position);
 
             Vector3 v0 = target - pos0;
