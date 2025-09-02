@@ -54,7 +54,7 @@ Rigidbody:
     m_Bits: 0
   m_ExcludeLayers:
     serializedVersion: 2
-    m_Bits: 0
+    m_Bits: 256
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
   m_UseGravity: 1
@@ -100,12 +100,14 @@ MonoBehaviour:
   splashCount: 3
   splashInterval: 0.25
   followEffect: {fileID: 2799942127255786676, guid: c76c160a200da7541beafb148fa6be9c, type: 3}
-  followDuration: 2
+  followDuration: 0.5
+  airTumbleTorque: 229.9
   waterTag: Water
   floatHeight: -0.3
-  bounceDamp: 0.051
+  bounceDamp: 0.08
   buoyancyForce: 28.4
-  waterDrag: 1
+  waterDrag: 2
+  waterRotationSpeed: 5
 --- !u!1 &3855882591336779785
 GameObject:
   m_ObjectHideFlags: 0

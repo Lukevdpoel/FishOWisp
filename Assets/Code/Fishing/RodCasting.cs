@@ -4,6 +4,8 @@ public class RodCasting : MonoBehaviour
 {
     [Header("References")]
     public Transform throwOrigin;
+    [Tooltip("The visual model of the player to rotate.")]
+    public Transform playerModel;
 
     [Header("Casting Power")]
     public float minThrowForce = 5f;
@@ -73,16 +75,19 @@ public class RodCasting : MonoBehaviour
 
     private void UpdateAimAndRotation()
     {
-        // Get the forward direction of the camera and flatten it for a consistent horizontal aim.
-        Vector3 cameraForward = mainCamera.transform.forward;
-        cameraForward.y = 0;
-        throwDirection = cameraForward.normalized;
+        Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
 
-        // Make the player model look in the direction of the cast.
-        if (throwDirection.sqrMagnitude > 0.01f)
+        Vector3 direction = ray.direction;
+
+        // This line removes the vertical (Y) component of the aim.
+        direction.y = 0;
+
+        throwDirection = direction.normalized;
+
+        if (playerModel != null && throwDirection.sqrMagnitude > 0.01f)
         {
             Quaternion targetRot = Quaternion.LookRotation(throwDirection);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRot, Time.deltaTime * 10f);
+            playerModel.rotation = Quaternion.Slerp(playerModel.rotation, targetRot, Time.deltaTime * 10f);
         }
     }
 }

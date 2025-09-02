@@ -12,6 +12,10 @@ public class BobberController : MonoBehaviour
     public ParticleSystem followEffect;
     public float followDuration = 2.0f;
 
+    [Header("In-Air Physics")]
+    [Tooltip("How much the bobber tumbles in the air when cast.")]
+    public float airTumbleTorque = 5f;
+
     [Header("Water Detection")]
     public string waterTag = "Water";
 
@@ -20,6 +24,8 @@ public class BobberController : MonoBehaviour
     public float bounceDamp = 0.05f;
     public float buoyancyForce = 10f;
     public float waterDrag = 1f;
+    [Tooltip("How quickly the bobber rights itself in the water.")]
+    public float waterRotationSpeed = 2f;
 
     private Rigidbody rb;
     private bool isInWater = false;
@@ -27,12 +33,25 @@ public class BobberController : MonoBehaviour
     private float initialLinearDamping;
     private float waterSurfaceY;
     private CaughtFish hookedFish;
-    private GameObject activeFishModel; 
+    private GameObject activeFishModel;
+
+    public CaughtFish HookedFish => hookedFish;
+    public GameObject ActiveFishModel => activeFishModel;
+
 
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
         initialLinearDamping = rb.linearDamping;
+    }
+
+    void Start()
+    {
+        if (rb != null)
+        {
+            Vector3 randomTorque = Random.insideUnitSphere * airTumbleTorque;
+            rb.AddTorque(randomTorque, ForceMode.Impulse);
+        }
     }
 
     void OnTriggerEnter(Collider other)
@@ -94,9 +113,14 @@ public class BobberController : MonoBehaviour
 
     private IEnumerator SplashRoutine()
     {
+        Vector3 splashPosition = new Vector3(transform.position.x, waterSurfaceY, transform.position.z);
+
         for (int i = 0; i < splashCount; i++)
         {
-            Instantiate(waterSplashEffect, transform.position, Quaternion.identity);
+            splashPosition.x = transform.position.x;
+            splashPosition.z = transform.position.z;
+
+            Instantiate(waterSplashEffect, splashPosition, Quaternion.identity);
             yield return new WaitForSeconds(splashInterval);
         }
     }
@@ -108,8 +132,10 @@ public class BobberController : MonoBehaviour
         while (Time.time < startTime + followDuration)
         {
             if (effectInstance == null) yield break;
+
             effectPosition.x = transform.position.x;
             effectPosition.z = transform.position.z;
+
             effectInstance.transform.position = effectPosition;
             yield return null;
         }
@@ -131,6 +157,10 @@ public class BobberController : MonoBehaviour
                 Vector3 force = Vector3.up * (depth * buoyancyForce - rb.linearVelocity.y * bounceDamp);
                 rb.AddForce(force, ForceMode.Acceleration);
             }
+
+            Quaternion targetRotation = Quaternion.Euler(0, rb.rotation.eulerAngles.y, 0);
+            Quaternion newRotation = Quaternion.Slerp(rb.rotation, targetRotation, waterRotationSpeed * Time.fixedDeltaTime);
+            rb.MoveRotation(newRotation);
         }
     }
 
@@ -142,17 +172,10 @@ public class BobberController : MonoBehaviour
         FishingEvents.OnFishBite?.Invoke(this);
     }
 
-    private void OnEnable()
-    {
-        FishingEvents.OnStartReeling += ReelIn;
-    }
+    // REMOVED: The OnEnable and OnDisable methods are no longer needed here.
 
-    private void OnDisable()
-    {
-        FishingEvents.OnStartReeling -= ReelIn;
-    }
-
-    private void ReelIn()
+    // CHANGED: This method is now public and has a new name. It will be called by FishingLine.
+    public void SwapBobberForFishModel()
     {
         if (hookedFish != null && activeFishModel == null)
         {

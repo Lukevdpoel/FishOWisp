@@ -13,6 +13,15 @@ public class FishingLine : MonoBehaviour
     [Header("Reeling Animation")]
     public float reelInArcHeight = 2f;
     public float reelInAnimationTime = 0.5f;
+    [Tooltip("The delay in seconds before the bobber starts moving, to sync with the player animation.")]
+    public float reelInStartDelay = 0.25f;
+
+    [Tooltip("How long the reel-in animation takes when a fish is attached.")]
+    public float reelInAnimationTimeWithFish = 1.5f;
+
+    [Tooltip("How fast the fish model tumbles while being reeled in.")]
+    public float fishTumbleSpeed = 360f;
+
 
     private VerletRope verletRope;
     private BobberController activeBobber;
@@ -71,10 +80,21 @@ public class FishingLine : MonoBehaviour
     {
         if (activeBobber != null)
         {
+            StartCoroutine(DelayedReelInRoutine());
+        }
+    }
+
+    private IEnumerator DelayedReelInRoutine()
+    {
+        yield return new WaitForSeconds(reelInStartDelay);
+
+        if (activeBobber != null)
+        {
             StartCoroutine(ReelInBobberRoutine());
         }
     }
 
+    // --- MODIFIED ROUTINE ---
     private IEnumerator ReelInBobberRoutine()
     {
         if (activeBobber.TryGetComponent<Rigidbody>(out var bobberRb))
@@ -85,11 +105,23 @@ public class FishingLine : MonoBehaviour
         Vector3 startPoint = activeBobber.transform.position;
         float elapsedTime = 0f;
 
-        while (elapsedTime < reelInAnimationTime)
+        bool hasFish = activeBobber.HookedFish != null;
+
+        // NEW: If there's a fish, tell the bobber to swap its model NOW.
+        if (hasFish)
+        {
+            activeBobber.SwapBobberForFishModel();
+        }
+
+        // Get the reference to the fish model *after* it has been instantiated.
+        GameObject fishModel = activeBobber.ActiveFishModel;
+        float duration = hasFish ? reelInAnimationTimeWithFish : reelInAnimationTime;
+
+        while (elapsedTime < duration)
         {
             if (activeBobber == null) yield break;
 
-            float t = elapsedTime / reelInAnimationTime;
+            float t = elapsedTime / duration;
             Vector3 endPoint = rodTip.position;
 
             Vector3 controlPoint = (startPoint + endPoint) / 2f + Vector3.up * reelInArcHeight;
@@ -97,11 +129,16 @@ public class FishingLine : MonoBehaviour
             Vector3 m2 = Vector3.Lerp(controlPoint, endPoint, t);
             activeBobber.transform.position = Vector3.Lerp(m1, m2, t);
 
+            if (fishModel != null)
+            {
+                fishModel.transform.Rotate(new Vector3(1f, 0.5f, 0.2f), fishTumbleSpeed * Time.deltaTime);
+            }
+
             elapsedTime += Time.deltaTime;
             yield return null;
         }
 
         DestroyBobber();
-        FishingEvents.OnReelingCompleted?.Invoke(); 
+        FishingEvents.OnReelingCompleted?.Invoke();
     }
 }

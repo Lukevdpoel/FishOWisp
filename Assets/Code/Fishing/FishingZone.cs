@@ -6,10 +6,6 @@ public class FishingZone : MonoBehaviour
 {
     public FishPool fishPool;
 
-   /* [Header("Catch Timing")]
-    public float minCatchTime = 3f;
-    public float maxCatchTime = 8f;*/
-
     private Coroutine catchRoutine;
     private BobberController currentBobber;
 
@@ -47,31 +43,43 @@ public class FishingZone : MonoBehaviour
 
     private IEnumerator CatchFishAfterDelay()
     {
+        // First, check if there are any fish to catch
+        if (fishPool == null || fishPool.availableFish.Count == 0)
+        {
+            Debug.LogWarning("Fish pool is not set up or has no fish.");
+            yield break; // Exit the coroutine
+        }
+
+        // Select a fish preset from the pool *before* the wait begins.
+        var fishToCatch = fishPool.availableFish[Random.Range(0, fishPool.availableFish.Count)];
+
+        // Calculate the random wait time.
         float waitTime = Random.Range(fishPool.minCatchTime, fishPool.maxCatchTime);
+
+        // --- NEW DEBUG LOG ---
+        // Log the chosen fish and the countdown.
+        Debug.Log($"A {fishToCatch.fishName} will bite in {waitTime:F1} seconds...");
+
         yield return new WaitForSeconds(waitTime);
 
+        // If the bobber is still in the water, hook the fish.
         if (currentBobber != null)
         {
-            TryCatchFish();
+            // The "Try" is removed, as it will now always succeed.
+            HookFish(fishToCatch);
         }
-        catchRoutine = null; // Allow catching another fish
+
+        catchRoutine = null; // Allow catching another fish if the bobber stays in the zone.
     }
 
-    public void TryCatchFish()
+    // This method is simplified to just hook the fish without a probability check.
+    public void HookFish(FishPreset preset)
     {
-        if (fishPool == null || fishPool.availableFish.Count == 0) return;
-
-        // Select a fish and hook it to the bobber
-        var preset = fishPool.availableFish[Random.Range(0, fishPool.availableFish.Count)];
-        if (Random.value <= preset.catchProbability)
+        // The check for the currentBobber is already done in the coroutine,
+        // but it's good practice to keep it here as well.
+        if (currentBobber != null)
         {
             currentBobber.HookFish(preset);
-        }
-        else
-        {
-            Debug.Log($"{preset.fishName} got away!");
-            // Restart the timer to try for another fish
-            catchRoutine = StartCoroutine(CatchFishAfterDelay());
         }
     }
 }
