@@ -94,9 +94,18 @@ public class FishingLine : MonoBehaviour
         }
     }
 
-    // --- MODIFIED ROUTINE ---
+    // MODIFIED: Added a safety check at the beginning of the routine
     private IEnumerator ReelInBobberRoutine()
     {
+        // NEW: Safety check to ensure the bobber wasn't destroyed during the start delay.
+        if (activeBobber == null)
+        {
+            yield break;
+        }
+
+        // Now it's safe to stop the effects.
+        activeBobber.StopBiteEffects();
+
         if (activeBobber.TryGetComponent<Rigidbody>(out var bobberRb))
         {
             bobberRb.isKinematic = true;
@@ -107,18 +116,17 @@ public class FishingLine : MonoBehaviour
 
         bool hasFish = activeBobber.HookedFish != null;
 
-        // NEW: If there's a fish, tell the bobber to swap its model NOW.
         if (hasFish)
         {
             activeBobber.SwapBobberForFishModel();
         }
 
-        // Get the reference to the fish model *after* it has been instantiated.
         GameObject fishModel = activeBobber.ActiveFishModel;
         float duration = hasFish ? reelInAnimationTimeWithFish : reelInAnimationTime;
 
         while (elapsedTime < duration)
         {
+            // This second check handles the case where the bobber is destroyed mid-animation
             if (activeBobber == null) yield break;
 
             float t = elapsedTime / duration;

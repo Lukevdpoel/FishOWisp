@@ -43,40 +43,30 @@ public class FishingZone : MonoBehaviour
 
     private IEnumerator CatchFishAfterDelay()
     {
-        // First, check if there are any fish to catch
         if (fishPool == null || fishPool.availableFish.Count == 0)
         {
             Debug.LogWarning("Fish pool is not set up or has no fish.");
-            yield break; // Exit the coroutine
+            yield break;
         }
 
-        // Select a fish preset from the pool *before* the wait begins.
         var fishToCatch = fishPool.availableFish[Random.Range(0, fishPool.availableFish.Count)];
-
-        // Calculate the random wait time.
         float waitTime = Random.Range(fishPool.minCatchTime, fishPool.maxCatchTime);
 
-        // --- NEW DEBUG LOG ---
-        // Log the chosen fish and the countdown.
-        Debug.Log($"A {fishToCatch.fishName} will bite in {waitTime:F1} seconds...");
-
+        Debug.Log($"Something is interested... A {fishToCatch.fishName} will start nibbling in {waitTime:F1} seconds...");
         yield return new WaitForSeconds(waitTime);
 
-        // If the bobber is still in the water, hook the fish.
         if (currentBobber != null)
         {
-            // The "Try" is removed, as it will now always succeed.
-            HookFish(fishToCatch);
+            // Instead of hooking the fish, start the nibble sequence on the bobber.
+            currentBobber.StartNibbleSequence(fishToCatch);
         }
 
-        catchRoutine = null; // Allow catching another fish if the bobber stays in the zone.
+        catchRoutine = null;
     }
 
-    // This method is simplified to just hook the fish without a probability check.
+    // This method is no longer called from within this class, but can be left for other potential uses.
     public void HookFish(FishPreset preset)
     {
-        // The check for the currentBobber is already done in the coroutine,
-        // but it's good practice to keep it here as well.
         if (currentBobber != null)
         {
             currentBobber.HookFish(preset);

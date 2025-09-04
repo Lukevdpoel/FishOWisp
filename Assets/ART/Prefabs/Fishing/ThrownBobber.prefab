@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 172522552360651858}
   - component: {fileID: 545233111595933618}
   - component: {fileID: 693156924994179394}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: ThrownBobber
   m_TagString: Bobber
   m_Icon: {fileID: 0}
@@ -54,7 +54,7 @@ Rigidbody:
     m_Bits: 0
   m_ExcludeLayers:
     serializedVersion: 2
-    m_Bits: 256
+    m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
   m_UseGravity: 1
@@ -101,13 +101,25 @@ MonoBehaviour:
   splashInterval: 0.25
   followEffect: {fileID: 2799942127255786676, guid: c76c160a200da7541beafb148fa6be9c, type: 3}
   followDuration: 0.5
-  airTumbleTorque: 229.9
+  airTumbleTorque: 324.01
   waterTag: Water
   floatHeight: -0.3
   bounceDamp: 0.08
   buoyancyForce: 28.4
   waterDrag: 2
   waterRotationSpeed: 5
+  nibbleEffect: {fileID: 8568261835014280744, guid: 083ef2191dedfb747adc6daffe6e7c63, type: 3}
+  minNibbles: 1
+  maxNibbles: 5
+  nibbleInterval: 2
+  nibbleForce: 175
+  biteEffectMain: {fileID: 8568261835014280744, guid: eea403f562d88cf4eb75253f5b365f55, type: 3}
+  biteEffectSecondary: {fileID: 2799942127255786676, guid: c76c160a200da7541beafb148fa6be9c, type: 3}
+  biteForce: 300
+  biteDuration: 1
+  struggleForce: 6
+  directionChangeInterval: 1
+  struggleEffectPrefab: {fileID: 2799942127255786676, guid: c76c160a200da7541beafb148fa6be9c, type: 3}
 --- !u!1 &3855882591336779785
 GameObject:
   m_ObjectHideFlags: 0
@@ -120,7 +132,7 @@ GameObject:
   - component: {fileID: 3716595168449191038}
   - component: {fileID: 8105487699734407090}
   - component: {fileID: 7869150871539178994}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: LineAnchor
   m_TagString: Untagged
   m_Icon: {fileID: 0}
