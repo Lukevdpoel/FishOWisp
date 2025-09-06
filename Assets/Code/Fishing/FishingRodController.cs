@@ -16,19 +16,12 @@ public class FishingRodController : MonoBehaviour
     public float reactionTime = 1.5f;
 
     [Header("Fish Fight Mini-Game")]
-    [Tooltip("How much progress is needed to catch the fish. Can be modified by fish rarity later.")]
     public float maxFightProgress = 100f;
-    [Tooltip("How fast the progress bar fills when reeling correctly.")]
     public float reelInRate = 25f;
-    [Tooltip("How fast the progress bar drains if you reel while the fish is struggling.")]
     public float strugglePenaltyRate = 35f;
-    [Tooltip("Minimum time the fish will struggle for.")]
     public float minStruggleTime = 1.5f;
-    [Tooltip("Maximum time the fish will struggle for.")]
     public float maxStruggleTime = 3.0f;
-    [Tooltip("Minimum time the player has to reel in.")]
     public float minReelWindow = 1.0f;
-    [Tooltip("Maximum time the player has to reel in.")]
     public float maxReelWindow = 2.5f;
 
     private Coroutine fishFightCoroutine;
@@ -37,7 +30,6 @@ public class FishingRodController : MonoBehaviour
     private float currentFightProgress;
     private bool isFishInStrugglePhase;
 
-    // MODIFIED: Re-added the listener for OnCancelFishing for our fail state.
     private void OnEnable()
     {
         FishingEvents.OnThrowBobber += HandleThrow;
@@ -46,7 +38,6 @@ public class FishingRodController : MonoBehaviour
         FishingEvents.OnReelingCompleted += ResetFishingState;
     }
 
-    // MODIFIED: Re-added the listener for OnCancelFishing.
     private void OnDisable()
     {
         FishingEvents.OnThrowBobber -= HandleThrow;
@@ -127,25 +118,18 @@ public class FishingRodController : MonoBehaviour
         currentState = FishingState.FishOnTheLine;
         activeBobber = bobber;
         Debug.Log("A fish is biting! Hook it now!");
-
         fishEscapeCoroutine = StartCoroutine(FishEscapeTimer());
     }
 
-    // MODIFIED: This now correctly makes the fish get away.
     private IEnumerator FishEscapeTimer()
     {
         yield return new WaitForSeconds(reactionTime);
-
-        // This code runs ONLY if the player failed to click in time.
         FailToHookFish();
     }
 
-    // NEW: A dedicated method for when the player fails the reaction check.
     private void FailToHookFish()
     {
         Debug.Log("Too slow! The fish got away!");
-
-        // This event will tell other scripts (like FishingLine) to destroy the bobber instantly.
         FishingEvents.OnCancelFishing?.Invoke();
     }
 
@@ -157,10 +141,10 @@ public class FishingRodController : MonoBehaviour
             fishEscapeCoroutine = null;
         }
 
+        FishingEvents.OnHookFishSuccess?.Invoke();
         currentState = FishingState.FightingFish;
         currentFightProgress = 0f;
         Debug.Log("Hooked! State: Fighting Fish!");
-
         FishingEvents.OnFishFightBegin?.Invoke(activeBobber.HookedFish.preset);
         fishFightCoroutine = StartCoroutine(FishFightRoutine());
     }
@@ -176,11 +160,11 @@ public class FishingRodController : MonoBehaviour
         activeBobber.SetStruggleActive(false);
         FishingEvents.OnFishFightEnd?.Invoke(true);
 
+        Debug.Log("EVENT FIRED: OnStartReeling at " + Time.time);
+
         currentState = FishingState.Reeling;
         FishingEvents.OnStartReeling?.Invoke();
     }
-
-
 
     private IEnumerator FishFightRoutine()
     {
@@ -202,7 +186,6 @@ public class FishingRodController : MonoBehaviour
         }
     }
 
-    // NEW: This handler for the OnCancelFishing event is needed again.
     private void CancelFishingAction()
     {
         ResetFishingState();
@@ -215,9 +198,7 @@ public class FishingRodController : MonoBehaviour
         StopAllCoroutines();
         fishFightCoroutine = null;
         fishEscapeCoroutine = null;
-
         activeBobber = null;
-
         currentState = FishingState.Idle;
         danglingBobber?.SetActive(true);
         Debug.Log("State: Idle (Reset)");
