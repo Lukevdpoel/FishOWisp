@@ -19,6 +19,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private string reelInAnim = "ReelIn";
     [Tooltip("The name of the BOOLEAN parameter in the Animator for the sustained fighting state.")]
     [SerializeField] private string isFightingAnimBool = "IsFighting";
+    [Tooltip("The name of the BOOLEAN parameter for the reel-in animation during a fish fight.")]
+    [SerializeField] private string isReelingDuringFightAnimBool = "IsReelingDuringFight";
 
     [Header("Camera Orbit")]
     [SerializeField] private float cameraSpeed = 120f;
@@ -66,6 +68,10 @@ public class PlayerController : MonoBehaviour
         FishingEvents.OnCancelCharging += OnCastEnd;
         FishingEvents.OnCancelFishing += OnCastEnd;
         FishingEvents.OnThrowBobber += OnThrowBobber;
+
+        // Fish Fight Reeling Animation Events
+        FishingEvents.OnStartReelingDuringFight += StartReelingDuringFightAnim;
+        FishingEvents.OnStopReelingDuringFight += StopReelingDuringFightAnim;
     }
 
     private void OnDisable()
@@ -84,11 +90,31 @@ public class PlayerController : MonoBehaviour
         FishingEvents.OnCancelCharging -= OnCastEnd;
         FishingEvents.OnCancelFishing -= OnCastEnd;
         FishingEvents.OnThrowBobber -= OnThrowBobber;
+
+        // Fish Fight Reeling Animation Events
+        FishingEvents.OnStartReelingDuringFight -= StartReelingDuringFightAnim;
+        FishingEvents.OnStopReelingDuringFight -= StopReelingDuringFightAnim;
     }
 
     private void OnCastStart() => isCasting = true;
     private void OnCastEnd() => isCasting = false;
     private void OnThrowBobber(Vector3 direction, float force) => isCasting = false;
+
+    private void StartReelingDuringFightAnim()
+    {
+        if (animator && !string.IsNullOrEmpty(isReelingDuringFightAnimBool))
+        {
+            animator.SetBool(isReelingDuringFightAnimBool, true);
+        }
+    }
+
+    private void StopReelingDuringFightAnim()
+    {
+        if (animator && !string.IsNullOrEmpty(isReelingDuringFightAnimBool))
+        {
+            animator.SetBool(isReelingDuringFightAnimBool, false);
+        }
+    }
 
     private void PlayReelInAnim()
     {
@@ -108,7 +134,7 @@ public class PlayerController : MonoBehaviour
         HandleGravity();
         HandleAnimation();
         HandleIdleAnimation();
-        HandleCursorLocking(); // Method call renamed back
+        HandleCursorLocking();
         characterController?.Move(targetVelocity * Time.deltaTime);
     }
 
@@ -126,10 +152,9 @@ public class PlayerController : MonoBehaviour
     public void NotifyOfAction() { idleTimer = 0f; allowSitdown = true; }
     private void HandleCamera() { if (!cameraTransform || !playerModel) return; if (Input.GetMouseButton(1)) { float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime; float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime; cameraXAngle += mouseX; cameraYAngle -= mouseY; cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y); } smoothXAngle = Mathf.SmoothDampAngle(smoothXAngle, cameraXAngle, ref xVel, cameraSmoothTime); smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle, ref yVel, cameraSmoothTime); Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f); Vector3 pivot = playerModel.position + Vector3.up * pivotHeight; Vector3 forwardDir = rotation * Vector3.forward; Vector3 cameraDirection = -forwardDir; float targetDistance = startDistance; RaycastHit hit; if (Physics.SphereCast(pivot, collisionRadius, cameraDirection, out hit, startDistance, collisionLayers)) { targetDistance = hit.distance; } currentCameraDistance = Mathf.SmoothDamp(currentCameraDistance, targetDistance, ref distanceVelocity, zoomDampTime); Vector3 pos0 = pivot + cameraDirection * currentCameraDistance; if (cam == null) cam = cameraTransform.GetComponent<Camera>(); if (cam) { Vector3 f = rotation * Vector3.forward; Vector3 u = rotation * Vector3.up; Vector3 target = (framingTarget ? framingTarget.position : playerModel.position); Vector3 v0 = target - pos0; float yCam0 = Vector3.Dot(v0, u); float zCam0 = Mathf.Max(0.0001f, Vector3.Dot(v0, f)); float tanFov = Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad); float yNdcTarget = Mathf.Clamp(screenYTarget, 0.05f, 0.95f) * 2f - 1f; float s = yCam0 - yNdcTarget * zCam0 * tanFov; cameraTransform.position = pos0 + u * s; cameraTransform.rotation = rotation; } else { cameraTransform.position = pos0; cameraTransform.rotation = rotation; } }
 
-    // This method now handles both locking and visibility
     private void HandleCursorLocking()
     {
-        bool isOrbiting = Input.GetMouseButton(1); // Is the right mouse button held down?
+        bool isOrbiting = Input.GetMouseButton(1);
 
         if (isCasting || isOrbiting)
         {

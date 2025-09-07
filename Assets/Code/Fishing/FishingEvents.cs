@@ -19,7 +19,6 @@ public static class FishingEvents
     public static Action<BobberController> OnFishBite;
     public static Action<CaughtFish> OnFishHooked;
 
-    // NEW: This event fires the moment the player successfully hooks the fish.
     public static Action OnHookFishSuccess;
 
     // UI Events
@@ -29,4 +28,8 @@ public static class FishingEvents
     public static Action<FishPreset> OnFishFightBegin;
     public static Action<float, float> OnFishFightProgressUpdate;
     public static Action<bool> OnFishFightEnd;
+
+    // Fired when the player actively reels during a fish fight's calm phase.
+    public static Action OnStartReelingDuringFight;
+    public static Action OnStopReelingDuringFight;
 }

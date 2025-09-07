@@ -29,6 +29,7 @@ public class FishingRodController : MonoBehaviour
     private BobberController activeBobber;
     private float currentFightProgress;
     private bool isFishInStrugglePhase;
+    private bool wasReelingLastFrame = false;
 
     private void OnEnable()
     {
@@ -49,6 +50,27 @@ public class FishingRodController : MonoBehaviour
     void Update()
     {
         HandleInput();
+
+        // Manages the specific reel-in animation state during a fight.
+        if (currentState == FishingState.FightingFish)
+        {
+            bool isPressingReel = Input.GetKey(KeyCode.Mouse0);
+            bool canReel = !isFishInStrugglePhase;
+            bool isReelingThisFrame = isPressingReel && canReel;
+
+            if (isReelingThisFrame && !wasReelingLastFrame)
+            {
+                // Started reeling this frame
+                FishingEvents.OnStartReelingDuringFight?.Invoke();
+            }
+            else if (!isReelingThisFrame && wasReelingLastFrame)
+            {
+                // Stopped reeling this frame
+                FishingEvents.OnStopReelingDuringFight?.Invoke();
+            }
+
+            wasReelingLastFrame = isReelingThisFrame;
+        }
     }
 
     private void HandleInput()
@@ -144,6 +166,7 @@ public class FishingRodController : MonoBehaviour
         FishingEvents.OnHookFishSuccess?.Invoke();
         currentState = FishingState.FightingFish;
         currentFightProgress = 0f;
+        wasReelingLastFrame = false;
         Debug.Log("Hooked! State: Fighting Fish!");
         FishingEvents.OnFishFightBegin?.Invoke(activeBobber.HookedFish.preset);
         fishFightCoroutine = StartCoroutine(FishFightRoutine());
@@ -155,6 +178,12 @@ public class FishingRodController : MonoBehaviour
         {
             StopCoroutine(fishFightCoroutine);
             fishFightCoroutine = null;
+        }
+
+        if (wasReelingLastFrame)
+        {
+            FishingEvents.OnStopReelingDuringFight?.Invoke();
+            wasReelingLastFrame = false;
         }
 
         activeBobber.SetStruggleActive(false);
@@ -188,12 +217,19 @@ public class FishingRodController : MonoBehaviour
 
     private void CancelFishingAction()
     {
+        // This method now calls ResetFishingState, which contains the cleanup logic.
         ResetFishingState();
     }
 
     private void ResetFishingState()
     {
         if (currentState == FishingState.Idle) return;
+
+        if (wasReelingLastFrame)
+        {
+            FishingEvents.OnStopReelingDuringFight?.Invoke();
+            wasReelingLastFrame = false;
+        }
 
         StopAllCoroutines();
         fishFightCoroutine = null;
