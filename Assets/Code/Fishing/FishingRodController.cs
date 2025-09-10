@@ -3,13 +3,21 @@ using System.Collections;
 
 public class FishingRodController : MonoBehaviour
 {
-    public enum FishingState { Idle, Charging, WaitingForBite, FishOnTheLine, FightingFish, Reeling }
+    public enum FishingState { Idle, Charging, WaitingForBite, FishOnTheLine, FightingFish, Reeling, Cooldown }
 
     [Header("State")]
     [SerializeField] private FishingState currentState = FishingState.Idle;
 
     [Header("Object References")]
     public GameObject danglingBobber;
+
+    [Header("Animation & Cooldowns")]
+    [Tooltip("The animator for the player/rod.")]
+    public Animator playerAnimator;
+    [Tooltip("The name of the trigger parameter in the animator for the fail animation.")]
+    public string failAnimationTrigger = "FailHook";
+    [Tooltip("How many seconds casting is disabled after failing to hook a fish.")]
+    public float failCooldown = 2.0f;
 
     [Header("Timing")]
     [Tooltip("How many seconds the player has to react to a bite.")]
@@ -51,7 +59,6 @@ public class FishingRodController : MonoBehaviour
     {
         HandleInput();
 
-        // Manages the specific reel-in animation state during a fight.
         if (currentState == FishingState.FightingFish)
         {
             bool isPressingReel = Input.GetKey(KeyCode.Mouse0);
@@ -60,12 +67,10 @@ public class FishingRodController : MonoBehaviour
 
             if (isReelingThisFrame && !wasReelingLastFrame)
             {
-                // Started reeling this frame
                 FishingEvents.OnStartReelingDuringFight?.Invoke();
             }
             else if (!isReelingThisFrame && wasReelingLastFrame)
             {
-                // Stopped reeling this frame
                 FishingEvents.OnStopReelingDuringFight?.Invoke();
             }
 
@@ -82,13 +87,11 @@ public class FishingRodController : MonoBehaviour
                 case FishingState.Idle:
                     StartCharging();
                     break;
-
                 case FishingState.WaitingForBite:
                     Debug.Log("Reeling back the line.");
                     currentState = FishingState.Reeling;
                     FishingEvents.OnStartReeling?.Invoke();
                     break;
-
                 case FishingState.FishOnTheLine:
                     HookFishAndStartFight();
                     break;
@@ -152,7 +155,37 @@ public class FishingRodController : MonoBehaviour
     private void FailToHookFish()
     {
         Debug.Log("Too slow! The fish got away!");
+        if (fishEscapeCoroutine != null)
+        {
+            StopCoroutine(fishEscapeCoroutine);
+            fishEscapeCoroutine = null;
+        }
+        StartCoroutine(FailRoutine());
+    }
+
+    // MODIFIED: This routine now resets the bobber first, then handles the animation and cooldown.
+    private IEnumerator FailRoutine()
+    {
+        // Immediately fire the cancel event. This will destroy the bobber.
         FishingEvents.OnCancelFishing?.Invoke();
+
+        // Set the state to Cooldown to prevent input.
+        currentState = FishingState.Cooldown;
+        Debug.Log("State: Cooldown");
+
+        // Trigger the fail animation.
+        if (playerAnimator != null && !string.IsNullOrEmpty(failAnimationTrigger))
+        {
+            playerAnimator.SetTrigger(failAnimationTrigger);
+        }
+
+        // Wait for the specified cooldown period.
+        yield return new WaitForSeconds(failCooldown);
+
+        // Manually set the state back to Idle to allow casting again.
+        currentState = FishingState.Idle;
+        danglingBobber?.SetActive(true);
+        Debug.Log("State: Idle (Reset from Cooldown)");
     }
 
     private void HookFishAndStartFight()
@@ -188,9 +221,6 @@ public class FishingRodController : MonoBehaviour
 
         activeBobber.SetStruggleActive(false);
         FishingEvents.OnFishFightEnd?.Invoke(true);
-
-        Debug.Log("EVENT FIRED: OnStartReeling at " + Time.time);
-
         currentState = FishingState.Reeling;
         FishingEvents.OnStartReeling?.Invoke();
     }
@@ -217,8 +247,12 @@ public class FishingRodController : MonoBehaviour
 
     private void CancelFishingAction()
     {
-        // This method now calls ResetFishingState, which contains the cleanup logic.
-        ResetFishingState();
+        // This is called by the OnCancelFishing event. We let the FailRoutine handle the state changes
+        // in a failure case, so we only want this to run if we are NOT in the Cooldown state.
+        if (currentState != FishingState.Cooldown)
+        {
+            ResetFishingState();
+        }
     }
 
     private void ResetFishingState()
@@ -231,7 +265,8 @@ public class FishingRodController : MonoBehaviour
             wasReelingLastFrame = false;
         }
 
-        StopAllCoroutines();
+        // MODIFIED: We no longer stop all coroutines here, so the FailRoutine isn't interrupted.
+        // StopAllCoroutines(); 
         fishFightCoroutine = null;
         fishEscapeCoroutine = null;
         activeBobber = null;

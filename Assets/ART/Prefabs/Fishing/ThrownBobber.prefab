@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 172522552360651858}
   - component: {fileID: 545233111595933618}
   - component: {fileID: 693156924994179394}
+  - component: {fileID: 8704116694854614809}
   m_Layer: 7
   m_Name: ThrownBobber
   m_TagString: Bobber
@@ -100,7 +101,10 @@ MonoBehaviour:
   splashCount: 3
   splashInterval: 0.25
   followEffect: {fileID: 2799942127255786676, guid: c76c160a200da7541beafb148fa6be9c, type: 3}
-  followDuration: 0.5
+  followDuration: 0.3
+  waterEntrySound: {fileID: 8300000, guid: dc4ba211051ab5f4cbbf9e2c4a95b238, type: 3}
+  waterEntryVolumeScale: 2.24
+  impactSound: {fileID: 8300000, guid: a6c45050064a0e648b6e521a85da2f54, type: 3}
   airTumbleTorque: 324.01
   waterTag: Water
   floatHeight: -0.3
@@ -110,7 +114,7 @@ MonoBehaviour:
   waterRotationSpeed: 5
   nibbleEffect: {fileID: 8568261835014280744, guid: 083ef2191dedfb747adc6daffe6e7c63, type: 3}
   minNibbles: 1
-  maxNibbles: 5
+  maxNibbles: 2
   nibbleInterval: 2
   nibbleForce: 175
   biteEffectMain: {fileID: 8568261835014280744, guid: eea403f562d88cf4eb75253f5b365f55, type: 3}
@@ -120,6 +124,103 @@ MonoBehaviour:
   struggleForce: 6
   directionChangeInterval: 1
   struggleEffectPrefab: {fileID: 2799942127255786676, guid: c76c160a200da7541beafb148fa6be9c, type: 3}
+--- !u!82 &8704116694854614809
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2096275447604763850}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 0.703
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 91
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0.512
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
 --- !u!1 &3855882591336779785
 GameObject:
   m_ObjectHideFlags: 0
