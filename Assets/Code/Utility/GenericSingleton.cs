@@ -24,7 +24,7 @@ public class GenericSingleton<T> : SerializedMonoBehaviour
         }
     }
 
-    public virtual void Awake()
+    protected virtual void Awake()
     {
         if (_instance == null)
         {
@@ -32,7 +32,7 @@ public class GenericSingleton<T> : SerializedMonoBehaviour
         }
         else if (_instance != this)
         {
-            Destroy(gameObject);
+            Destroy(transform.root);
         }
     }
 }

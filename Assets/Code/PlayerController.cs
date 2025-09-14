@@ -150,21 +150,68 @@ public class PlayerController : MonoBehaviour
     private void HandleAnimation() { bool isWalking = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f; animator.SetBool("Walk", isWalking); }
     private void HandleIdleAnimation() { bool isMoving = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f; bool isRotatingCamera = Input.GetMouseButton(1); if (isMoving || isRotatingCamera) { NotifyOfAction(); } else { idleTimer += Time.deltaTime; } if (idleTimer >= sitDownHoldTime && allowSitdown) { animator.SetTrigger("Sitdown"); allowSitdown = false; } }
     public void NotifyOfAction() { idleTimer = 0f; allowSitdown = true; }
-    private void HandleCamera() { if (!cameraTransform || !playerModel) return; if (Input.GetMouseButton(1)) { float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime; float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime; cameraXAngle += mouseX; cameraYAngle -= mouseY; cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y); } smoothXAngle = Mathf.SmoothDampAngle(smoothXAngle, cameraXAngle, ref xVel, cameraSmoothTime); smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle, ref yVel, cameraSmoothTime); Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f); Vector3 pivot = playerModel.position + Vector3.up * pivotHeight; Vector3 forwardDir = rotation * Vector3.forward; Vector3 cameraDirection = -forwardDir; float targetDistance = startDistance; RaycastHit hit; if (Physics.SphereCast(pivot, collisionRadius, cameraDirection, out hit, startDistance, collisionLayers)) { targetDistance = hit.distance; } currentCameraDistance = Mathf.SmoothDamp(currentCameraDistance, targetDistance, ref distanceVelocity, zoomDampTime); Vector3 pos0 = pivot + cameraDirection * currentCameraDistance; if (cam == null) cam = cameraTransform.GetComponent<Camera>(); if (cam) { Vector3 f = rotation * Vector3.forward; Vector3 u = rotation * Vector3.up; Vector3 target = (framingTarget ? framingTarget.position : playerModel.position); Vector3 v0 = target - pos0; float yCam0 = Vector3.Dot(v0, u); float zCam0 = Mathf.Max(0.0001f, Vector3.Dot(v0, f)); float tanFov = Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad); float yNdcTarget = Mathf.Clamp(screenYTarget, 0.05f, 0.95f) * 2f - 1f; float s = yCam0 - yNdcTarget * zCam0 * tanFov; cameraTransform.position = pos0 + u * s; cameraTransform.rotation = rotation; } else { cameraTransform.position = pos0; cameraTransform.rotation = rotation; } }
 
-    private void HandleCursorLocking()
+    // ===================================================================
+    // MODIFIED METHODS BELOW
+    // ===================================================================
+
+    private void HandleCamera()
     {
-        bool isOrbiting = Input.GetMouseButton(1);
+        if (!cameraTransform || !playerModel) return;
 
-        if (isCasting || isOrbiting)
+        // Camera rotation is no longer dependent on holding a mouse button
+        float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
+        float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
+        cameraXAngle += mouseX;
+        cameraYAngle -= mouseY;
+        cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
+
+        smoothXAngle = Mathf.SmoothDampAngle(smoothXAngle, cameraXAngle, ref xVel, cameraSmoothTime);
+        smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle, ref yVel, cameraSmoothTime);
+
+        Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f);
+        Vector3 pivot = playerModel.position + Vector3.up * pivotHeight;
+        Vector3 forwardDir = rotation * Vector3.forward;
+        Vector3 cameraDirection = -forwardDir;
+
+        float targetDistance = startDistance;
+        RaycastHit hit;
+        if (Physics.SphereCast(pivot, collisionRadius, cameraDirection, out hit, startDistance, collisionLayers))
         {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
+            targetDistance = hit.distance;
+        }
+        currentCameraDistance = Mathf.SmoothDamp(currentCameraDistance, targetDistance, ref distanceVelocity, zoomDampTime);
+
+        Vector3 pos0 = pivot + cameraDirection * currentCameraDistance;
+
+        if (cam == null) cam = cameraTransform.GetComponent<Camera>();
+
+        if (cam)
+        {
+            Vector3 f = rotation * Vector3.forward;
+            Vector3 u = rotation * Vector3.up;
+            Vector3 target = (framingTarget ? framingTarget.position : playerModel.position);
+            Vector3 v0 = target - pos0;
+            float yCam0 = Vector3.Dot(v0, u);
+            float zCam0 = Mathf.Max(0.0001f, Vector3.Dot(v0, f));
+            float tanFov = Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
+            float yNdcTarget = Mathf.Clamp(screenYTarget, 0.05f, 0.95f) * 2f - 1f;
+            float s = yCam0 - yNdcTarget * zCam0 * tanFov;
+            cameraTransform.position = pos0 + u * s;
+            cameraTransform.rotation = rotation;
         }
         else
         {
-            Cursor.lockState = CursorLockMode.None;
-            Cursor.visible = true;
+            cameraTransform.position = pos0;
+            cameraTransform.rotation = rotation;
         }
+    }
+
+    private void HandleCursorLocking()
+    {
+        // Always lock the cursor for continuous camera control.
+        // You might want to add conditions here later for pausing the game or opening a menu.
+        Cursor.lockState = CursorLockMode.Locked;
+        Cursor.visible = false;
     }
 }

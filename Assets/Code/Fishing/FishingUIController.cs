@@ -100,6 +100,7 @@ public class FishingUIController : MonoBehaviour
         {
             chargeSlider.maxValue = max;
             chargeSlider.value = current;
+            Debug.Log("chargeSliderCalled");
         }
     }
 }
