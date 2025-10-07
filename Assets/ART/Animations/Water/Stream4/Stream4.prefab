@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 7995275329216338028}
   - component: {fileID: 5893130418690890227}
   - component: {fileID: 5496534877046246789}
+  - component: {fileID: -7758471006057314165}
   m_Layer: 0
   m_Name: Stream4
   m_TagString: Untagged
@@ -53,6 +54,8 @@ SpriteRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -74,6 +77,7 @@ SpriteRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -110,3 +114,28 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!205 &-7758471006057314165
+LODGroup:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1228054195053999029}
+  serializedVersion: 2
+  m_LocalReferencePoint: {x: 0, y: 0, z: 0}
+  m_Size: 1
+  m_FadeMode: 0
+  m_AnimateCrossFading: 0
+  m_LastLODIsBillboard: 0
+  m_LODs:
+  - screenRelativeHeight: 0.146827
+    fadeTransitionWidth: 0
+    renderers:
+    - renderer: {fileID: 5893130418690890227}
+  - screenRelativeHeight: 0.146827
+    fadeTransitionWidth: 0
+    renderers: []
+  - screenRelativeHeight: 0.146827
+    fadeTransitionWidth: 0
+    renderers: []
+  m_Enabled: 1

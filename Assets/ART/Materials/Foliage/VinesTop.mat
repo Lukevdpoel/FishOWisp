@@ -8,10 +8,11 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: VinesTop
-  m_Shader: {fileID: -6465566751694194690, guid: 5e3033fc851eeb342bafd5eaf13e9097, type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 0704a9447d8587045a77bb47c45fe40b, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _SHADOWS_SOFT
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -24,6 +25,14 @@ Material:
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
+    - _Albedo:
+        m_Texture: {fileID: 2800000, guid: 11072b744d8148c4bb93f0ec1d9af983, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _Alpha_map:
+        m_Texture: {fileID: 2800000, guid: 575f06a875096cf429a9b29fb0655921, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _BaseMap:
         m_Texture: {fileID: 2800000, guid: 8d38b7611ddb83f4496c8d6fa1937037, type: 3}
         m_Scale: {x: 1, y: 1}
@@ -93,10 +102,13 @@ Material:
     - _AddPrecomputedVelocity: 0
     - _AlphaClip: 1
     - _AlphaToMask: 1
+    - _AmbientValue: 0
     - _AngleThreshold: -0.5
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
+    - _CellEdge: 0
+    - _Cellshaded: 1
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
     - _Cull: 2
@@ -117,6 +129,7 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
+    - _SHADOWS_SOFT: 1
     - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -128,8 +141,9 @@ Material:
     - _isGrounded: 0
     - _seethroughdistance: 0
     m_Colors:
+    - _AmbientColor: {r: 0, g: 0, b: 0, a: 0}
     - _BaseColor: {r: 0.51063544, g: 0.7075472, b: 0.5110734, a: 1}
-    - _Color: {r: 0.5106354, g: 0.7075471, b: 0.5110734, a: 1}
+    - _Color: {r: 0.7254902, g: 0.85882354, b: 0.78039217, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _baseColor: {r: 0.627451, g: 1, b: 0.8980392, a: 0}

@@ -1,0 +1,58 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: Shell Lit Moss 1
+  m_Shader: {fileID: 4800000, guid: 589ea0397284e0e42b1985a0455d66b2, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: 441be1a2eb824c24b914562e107b5ea2, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _FurMap:
+        m_Texture: {fileID: 2800000, guid: c22fc16178bfeb94cb1b5985380c4287, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NormalMap:
+        m_Texture: {fileID: 2800000, guid: 376acec26d7e74a40b4b2bda2b456a37, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AlphaCutout: 0.172
+    - _FurScale: 0.28
+    - _Metallic: 0
+    - _NormalScale: 0.048
+    - _Occlusion: 0
+    - _RimLightIntensity: 0
+    - _RimLightPower: 1
+    - _ShadowExtraBias: -0.211
+    - _ShellAmount: 8
+    - _ShellStep: 0.0068
+    - _Smoothness: 0.089
+    m_Colors:
+    - _AmbientColor: {r: 0.015782593, g: 0.100765854, b: 0.13207549, a: 1}
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BaseMove: {r: 0, g: 0, b: 0, a: 1}
+    - _WindFreq: {r: 0.4, g: 0.4, b: 0.4, a: 1}
+    - _WindMove: {r: 0.4, g: 0.4, b: 0.2, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
