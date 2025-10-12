@@ -2,40 +2,51 @@ using UnityEngine;
 
 public class FishBoid : MonoBehaviour
 {
+    // ----- NEW: A direct reference to this fish's specific manager -----
+    public FlockManager myManager;
+    // -----------------------------------------------------------------
+
     private float speed;
-    private Rigidbody rb;
+    private float lockedYPosition;
 
     void Start()
     {
-        rb = GetComponent<Rigidbody>();
-        speed = Random.Range(FlockManager.FM.minSpeed, FlockManager.FM.maxSpeed);
+        lockedYPosition = transform.position.y;
+        // All settings are now pulled from the personal manager reference
+        speed = Random.Range(myManager.minSpeed, myManager.maxSpeed);
     }
 
     void Update()
     {
-        // Keep fish within the manager's bounds
-        if (Vector3.Distance(transform.position, FlockManager.FM.transform.position) >= FlockManager.FM.spawnBounds.x)
+        // Replace every instance of FlockManager.FM with myManager
+        if (Vector3.Distance(transform.position, myManager.transform.position) >= myManager.spawnBounds.x)
         {
-            // Steer back towards the center
-            Vector3 directionToCenter = (FlockManager.FM.transform.position - transform.position).normalized;
+            Vector3 directionToCenter = (myManager.transform.position - transform.position).normalized;
+            if (myManager.lockYAxis)
+            {
+                directionToCenter.y = 0;
+            }
             transform.rotation = Quaternion.Slerp(transform.rotation,
                                                  Quaternion.LookRotation(directionToCenter),
                                                  Time.deltaTime * 2f);
         }
         else
         {
-            // Randomly change speed sometimes
             if (Random.Range(0, 100) < 10)
             {
-                speed = Random.Range(FlockManager.FM.minSpeed, FlockManager.FM.maxSpeed);
+                speed = Random.Range(myManager.minSpeed, myManager.maxSpeed);
             }
-
-            // Apply the flocking rules
             ApplyRules();
         }
-
-        // Move the fish forward
         transform.Translate(0, 0, Time.deltaTime * speed);
+    }
+
+    void LateUpdate()
+    {
+        if (myManager.lockYAxis)
+        {
+            transform.position = new Vector3(transform.position.x, lockedYPosition, transform.position.z);
+        }
     }
 
     void ApplyRules()
@@ -45,27 +56,20 @@ public class FishBoid : MonoBehaviour
         Vector3 alignmentVector = Vector3.zero;
         int neighborsFound = 0;
 
-        foreach (GameObject fish in FlockManager.FM.allFish)
+        // The fish now only checks against the list of fish from its own manager
+        foreach (GameObject fish in myManager.allFish)
         {
             if (fish != this.gameObject)
             {
                 float distance = Vector3.Distance(fish.transform.position, this.transform.position);
-
-                // Is the fish a neighbor?
-                if (distance <= FlockManager.FM.perceptionRadius)
+                if (distance <= myManager.perceptionRadius)
                 {
-                    // --- Cohesion ---
                     cohesionVector += fish.transform.position;
-
-                    // --- Separation ---
-                    if (distance < FlockManager.FM.avoidanceRadius)
+                    if (distance < myManager.avoidanceRadius)
                     {
                         separationVector -= (fish.transform.position - this.transform.position);
                     }
-
-                    // --- Alignment ---
                     alignmentVector += fish.GetComponent<FishBoid>().transform.forward;
-
                     neighborsFound++;
                 }
             }
@@ -73,17 +77,17 @@ public class FishBoid : MonoBehaviour
 
         if (neighborsFound > 0)
         {
-            // Calculate average vectors
             cohesionVector /= neighborsFound;
             alignmentVector /= neighborsFound;
-
-            // Create a direction vector towards the center of the flock
             cohesionVector = (cohesionVector - this.transform.position).normalized;
 
-            // Combine the rules into one steering vector
             Vector3 steering = (cohesionVector + separationVector + alignmentVector).normalized;
 
-            // Smoothly rotate the fish towards the new direction
+            if (myManager.lockYAxis)
+            {
+                steering.y = 0;
+            }
+
             if (steering != Vector3.zero)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(steering);

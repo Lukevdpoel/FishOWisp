@@ -163,26 +163,19 @@ public class FishingRodController : MonoBehaviour
         StartCoroutine(FailRoutine());
     }
 
-    // MODIFIED: This routine now resets the bobber first, then handles the animation and cooldown.
     private IEnumerator FailRoutine()
     {
-        // Immediately fire the cancel event. This will destroy the bobber.
         FishingEvents.OnCancelFishing?.Invoke();
-
-        // Set the state to Cooldown to prevent input.
         currentState = FishingState.Cooldown;
         Debug.Log("State: Cooldown");
 
-        // Trigger the fail animation.
         if (playerAnimator != null && !string.IsNullOrEmpty(failAnimationTrigger))
         {
             playerAnimator.SetTrigger(failAnimationTrigger);
         }
 
-        // Wait for the specified cooldown period.
         yield return new WaitForSeconds(failCooldown);
 
-        // Manually set the state back to Idle to allow casting again.
         currentState = FishingState.Idle;
         danglingBobber?.SetActive(true);
         Debug.Log("State: Idle (Reset from Cooldown)");
@@ -212,6 +205,10 @@ public class FishingRodController : MonoBehaviour
             StopCoroutine(fishFightCoroutine);
             fishFightCoroutine = null;
         }
+
+        // --- THIS IS THE ADDED LINE ---
+        PlayerInventory.Instance.AddFish(activeBobber.HookedFish);
+        // --- END ADDED LINE ---
 
         if (wasReelingLastFrame)
         {
@@ -247,8 +244,6 @@ public class FishingRodController : MonoBehaviour
 
     private void CancelFishingAction()
     {
-        // This is called by the OnCancelFishing event. We let the FailRoutine handle the state changes
-        // in a failure case, so we only want this to run if we are NOT in the Cooldown state.
         if (currentState != FishingState.Cooldown)
         {
             ResetFishingState();
@@ -265,8 +260,6 @@ public class FishingRodController : MonoBehaviour
             wasReelingLastFrame = false;
         }
 
-        // MODIFIED: We no longer stop all coroutines here, so the FailRoutine isn't interrupted.
-        // StopAllCoroutines(); 
         fishFightCoroutine = null;
         fishEscapeCoroutine = null;
         activeBobber = null;

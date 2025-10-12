@@ -12,6 +12,7 @@ public class FishEntryUI : MonoBehaviour
     public TextMeshProUGUI largestCaughtText;
     public TextMeshProUGUI smallestCaughtText;
     public TextMeshProUGUI basePriceText;
+    public TextMeshProUGUI pricePerCmText; // New UI element
     public TextMeshProUGUI baitText;
     public TextMeshProUGUI weatherText;
 
@@ -26,7 +27,7 @@ public class FishEntryUI : MonoBehaviour
         rarityText.text = preset.rarity.ToString();
         caughtText.text = entry.hasCaught.ToString();
 
-        if (entry.hasCaught >= 0)
+        if (entry.hasCaught > 0)
         {
             largestCaughtText.text = $"{entry.largestCaught:F1} cm";
             smallestCaughtText.text = $"{entry.smallestCaught:F1} cm";
@@ -38,6 +39,8 @@ public class FishEntryUI : MonoBehaviour
         }
 
         basePriceText.text = $"{preset.basePrice} coins";
+        // Populate the new text field to show the value-per-cm
+        pricePerCmText.text = $"+{preset.pricePerCm:F1} / cm";
         baitText.text = preset.preferredBait.ToString();
         weatherText.text = preset.preferredWeather.ToString();
     }

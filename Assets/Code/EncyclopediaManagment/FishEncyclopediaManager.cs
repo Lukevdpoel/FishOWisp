@@ -13,7 +13,7 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
     [ToggleLeft]
     public bool deleteOnStart = false;
 
-    public List<FishPreset> allFishPresets; 
+    public List<FishPreset> allFishPresets;
     public List<FishEncyclopediaEntry> encyclopediaEntries = new List<FishEncyclopediaEntry>();
 
     private void Awake()
@@ -45,6 +45,10 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
         var entry = GetOrCreateEntry(preset);
         entry.RegisterCatch(length);
         SaveEncyclopedia();
+
+        // --- THE ONLY ADDED LINE ---
+        // This tells the player's current inventory to add an instance of the fish.
+        PlayerInventory.Instance.AddFish(preset);
     }
 
     private FishEncyclopediaEntry GetOrCreateEntry(FishPreset preset)
@@ -139,7 +143,7 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
             return;
         }
 
-        if(encyclopediaEntries != null && encyclopediaEntries.Count > 0)
+        if (encyclopediaEntries != null && encyclopediaEntries.Count > 0)
             entryUI.Populate(encyclopediaEntries[currentIndex]);
     }
 
@@ -154,5 +158,4 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
         encyclopediaEntries.Clear();
         currentIndex = 0;
     }
-
 }
