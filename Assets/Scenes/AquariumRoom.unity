@@ -430,6 +430,7 @@ GameObject:
   - component: {fileID: 210380852}
   - component: {fileID: 210380851}
   - component: {fileID: 210380853}
+  - component: {fileID: 210380854}
   m_Layer: 0
   m_Name: Donker
   m_TagString: Untagged
@@ -565,6 +566,20 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 2.7113588, y: 2, z: 2.8107433}
   m_Center: {x: 0.03812235, y: 0, z: -0.022299685}
+--- !u!114 &210380854
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 210380846}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f017f4efb0208a14db49f2083ba5f497, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::VendorController
+  interactionKey: 101
+  interactionPrompt: {fileID: 1459636181}
 --- !u!1001 &211955782
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -6051,24 +6066,29 @@ PrefabInstance:
       propertyPath: m_AnchorMax.y
       value: 0
       objectReference: {fileID: 0}
-    - target: {fileID: 5370226613007293846, guid: 6d34ed879cdd0fb479284eeef682a28e, type: 3}
-      propertyPath: m_LocalPosition.x
-      value: 15.31
-      objectReference: {fileID: 0}
-    - target: {fileID: 5370226613007293846, guid: 6d34ed879cdd0fb479284eeef682a28e, type: 3}
-      propertyPath: m_LocalPosition.z
-      value: 14.88
-      objectReference: {fileID: 0}
     - target: {fileID: 6486140192997381234, guid: 6d34ed879cdd0fb479284eeef682a28e, type: 3}
       propertyPath: m_Name
       value: PlayerMaster
+      objectReference: {fileID: 0}
+    - target: {fileID: 8631211821989060609, guid: 6d34ed879cdd0fb479284eeef682a28e, type: 3}
+      propertyPath: caughtFishes.Array.size
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8631211821989060609, guid: 6d34ed879cdd0fb479284eeef682a28e, type: 3}
+      propertyPath: caughtFishes.Array.data[0].preset
+      value: 
+      objectReference: {fileID: 11400000, guid: 599c32615c33e93438130c3b94c4393e, type: 2}
+    - target: {fileID: 8631211821989060609, guid: 6d34ed879cdd0fb479284eeef682a28e, type: 3}
+      propertyPath: caughtFishes.Array.data[0].lengthCm
+      value: 20
       objectReference: {fileID: 0}
     - target: {fileID: 8687867935514308881, guid: 6d34ed879cdd0fb479284eeef682a28e, type: 3}
       propertyPath: m_AnchorMax.x
       value: 0
       objectReference: {fileID: 0}
     m_RemovedComponents: []
-    m_RemovedGameObjects: []
+    m_RemovedGameObjects:
+    - {fileID: 3578356913240130536, guid: 6d34ed879cdd0fb479284eeef682a28e, type: 3}
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 6d34ed879cdd0fb479284eeef682a28e, type: 3}

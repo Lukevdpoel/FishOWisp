@@ -10,7 +10,7 @@ public class PlayerInventory : MonoBehaviour
 
     [Header("Inventory Settings")]
     public int inventorySize = 24;
-    public int currentCurrency = 0; // The player's starting money
+    public int currentCurrency = 100; // Set a starting currency
 
     public List<CaughtFish> caughtFishes = new List<CaughtFish>();
 
@@ -29,9 +29,6 @@ public class PlayerInventory : MonoBehaviour
         }
         if (fishToAdd == null) return;
         caughtFishes.Add(fishToAdd);
-        Debug.Log($"Added {fishToAdd.GetDisplayName()} to inventory.");
-
-        // We let the InventoryUI handle the update when it's opened.
     }
 
     public void AddFish(FishPreset preset)
@@ -41,33 +38,36 @@ public class PlayerInventory : MonoBehaviour
         AddFish(newFish);
     }
 
-    // --- NEW CURRENCY METHODS ---
-    public void AddCurrency(int amount)
+    // --- NEW SELLING LOGIC ---
+    public void SellFish(CaughtFish fishToSell)
     {
-        currentCurrency += amount;
-        // Notify the UI that the currency has changed
-        if (inventoryUI != null)
+        if (fishToSell != null && caughtFishes.Contains(fishToSell))
         {
-            inventoryUI.UpdateCurrencyDisplay();
+            currentCurrency += fishToSell.GetValue();
+            caughtFishes.Remove(fishToSell);
+            // After selling, tell the UI to refresh
+            if (inventoryUI != null)
+            {
+                inventoryUI.UpdateDisplay();
+            }
         }
     }
 
-    public bool RemoveCurrency(int amount)
+    public void SellAllFish()
     {
-        if (currentCurrency >= amount)
+        if (caughtFishes.Count == 0) return;
+
+        int totalValue = 0;
+        foreach (CaughtFish fish in caughtFishes)
         {
-            currentCurrency -= amount;
-            // Notify the UI that the currency has changed
-            if (inventoryUI != null)
-            {
-                inventoryUI.UpdateCurrencyDisplay();
-            }
-            return true; // Transaction successful
+            totalValue += fish.GetValue();
         }
-        else
+        currentCurrency += totalValue;
+        caughtFishes.Clear();
+
+        if (inventoryUI != null)
         {
-            Debug.Log("Not enough currency!");
-            return false; // Transaction failed
+            inventoryUI.UpdateDisplay();
         }
     }
 }

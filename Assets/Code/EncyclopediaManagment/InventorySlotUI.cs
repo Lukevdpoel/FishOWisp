@@ -1,17 +1,16 @@
 using UnityEngine;
 using TMPro;
+using UnityEngine.EventSystems; // Required for click events
 
-public class InventorySlotUI : MonoBehaviour
+public class InventorySlotUI : MonoBehaviour, IPointerClickHandler
 {
     [Header("UI References")]
-    [Tooltip("The text element that displays the fish's name and size.")]
     public TextMeshProUGUI fishNameText;
-
-    [Header("Selection Visuals")]
-    [Tooltip("A visual element (like a border) that appears when this slot is selected.")]
+    public TextMeshProUGUI fishValueText; // Add a text field for the value
     public GameObject selectionHighlight;
 
-    // It's good practice to disable the highlight when the slot is first created.
+    public CaughtFish CurrentFish { get; private set; }
+
     private void Awake()
     {
         if (selectionHighlight != null)
@@ -22,19 +21,28 @@ public class InventorySlotUI : MonoBehaviour
 
     public void Populate(CaughtFish fish)
     {
+        CurrentFish = fish;
         fishNameText.gameObject.SetActive(true);
         fishNameText.text = fish.GetDisplayName();
+
+        // Show the value text
+        if (fishValueText != null)
+        {
+            fishValueText.gameObject.SetActive(true);
+            fishValueText.text = $"{fish.GetValue()} coins";
+        }
     }
 
     public void Clear()
     {
+        CurrentFish = null;
         fishNameText.gameObject.SetActive(false);
+        if (fishValueText != null)
+        {
+            fishValueText.gameObject.SetActive(false);
+        }
     }
 
-    // --- NEW METHODS FOR SELECTION ---
-    /// <summary>
-    /// Activates the visual highlight for this slot.
-    /// </summary>
     public void Select()
     {
         if (selectionHighlight != null)
@@ -43,15 +51,19 @@ public class InventorySlotUI : MonoBehaviour
         }
     }
 
-    /// <summary>
-    /// Deactivates the visual highlight for this slot.
-    /// </summary>
     public void Deselect()
     {
         if (selectionHighlight != null)
         {
             selectionHighlight.SetActive(false);
         }
+    }
+
+    // --- NEW: Handle Clicks ---
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        // Tell the main UI controller that this slot was clicked
+        InventoryUI.Instance.SelectSlot(this);
     }
 }
 
