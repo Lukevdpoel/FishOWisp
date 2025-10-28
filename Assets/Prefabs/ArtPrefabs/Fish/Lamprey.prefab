@@ -9,7 +9,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 4417866064606170319}
-  m_Layer: 0
+  m_Layer: 17
   m_Name: Lamprey
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -25,7 +25,7 @@ Transform:
   m_GameObject: {fileID: 705496109340386506}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 62.477997, y: 2.3630002, z: 34.22}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -96,6 +96,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Visual
       objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: b5ec6b4207746e549a351df484b9035b, type: 3}
+      propertyPath: m_Layer
+      value: 17
+      objectReference: {fileID: 0}
     - target: {fileID: 3889214709471430063, guid: b5ec6b4207746e549a351df484b9035b, type: 3}
       propertyPath: m_Materials.Array.size
       value: 2
@@ -108,6 +112,18 @@ PrefabInstance:
       propertyPath: 'm_Materials.Array.data[1]'
       value: 
       objectReference: {fileID: 2100000, guid: 90b3d34adaac72b48927d8ec06ec4d58, type: 2}
+    - target: {fileID: 4364141078262766566, guid: b5ec6b4207746e549a351df484b9035b, type: 3}
+      propertyPath: m_Layer
+      value: 17
+      objectReference: {fileID: 0}
+    - target: {fileID: 5172371381503217487, guid: b5ec6b4207746e549a351df484b9035b, type: 3}
+      propertyPath: m_Layer
+      value: 17
+      objectReference: {fileID: 0}
+    - target: {fileID: 6033839074551460300, guid: b5ec6b4207746e549a351df484b9035b, type: 3}
+      propertyPath: m_Layer
+      value: 17
+      objectReference: {fileID: 0}
     - target: {fileID: 6748119502704916316, guid: b5ec6b4207746e549a351df484b9035b, type: 3}
       propertyPath: m_Materials.Array.size
       value: 2

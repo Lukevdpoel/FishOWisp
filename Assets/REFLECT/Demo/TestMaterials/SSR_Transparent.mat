@@ -20,12 +20,16 @@ Material:
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
-  m_LockedProperties: 
+  m_LockedProperties: _FoamSlider
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
     - _Diffuse:
         m_Texture: {fileID: 2800000, guid: d26d16a517dc10349929ce23e083dc66, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _FoamTex:
+        m_Texture: {fileID: 2800000, guid: d7e9a0b2a3edde642a79e63009242bef, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MetallicMap:
@@ -69,6 +73,12 @@ Material:
     - _Alpha: 0.5
     - _BinarySamples: 6
     - _DepthFade: 4.75
+    - _FoamDirection: 1
+    - _FoamScale: 1
+    - _FoamSlider: 1
+    - _FoamSlider2: 1
+    - _FoamSlider3: 0.34
+    - _FoamSpeed: 0.1
     - _Metallic: 0
     - _NormalStrength: 1
     - _QueueControl: 0
@@ -86,6 +96,7 @@ Material:
     m_Colors:
     - _Albedo: {r: 0.22745055, g: 0.18502212, b: 0.09803883, a: 0.43137255}
     - _Color: {r: 0.087887116, g: 0.23584902, b: 0.21612075, a: 1}
+    - _FoamColor: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &4043035887456062214
