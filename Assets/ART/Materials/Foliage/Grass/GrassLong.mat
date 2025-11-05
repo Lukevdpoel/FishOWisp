@@ -120,6 +120,10 @@ Material:
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
+    - _FadeEndDistance: 0
+    - _FadeStartDistance: 0
+    - _FlattenRadius: 1
+    - _FlattenStrength: 0
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
@@ -153,7 +157,8 @@ Material:
     - _FarColor: {r: 0.22414559, g: 0.6886792, b: 0.48867166, a: 0}
     - _NearColor: {r: 0.3143537, g: 0.8962264, b: 0.15641688, a: 0}
     - _NearFarRange: {r: 23.7, g: 45.99, b: 0, a: 0}
-    - _ShadowColor: {r: 1, g: 1, b: 1, a: 0}
+    - _PlayerPosition: {r: 0, g: 0, b: 0, a: 0}
+    - _ShadowColor: {r: 0.6509434, g: 0.6509434, b: 0.6509434, a: 0}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _WindNoiseContrast: {r: 0.09, g: 1.4, b: 0, a: 0}
     - _WindNoiseScale: {r: 40, g: 100, b: 0, a: 0}
