@@ -30,7 +30,7 @@ Material:
   m_InvalidKeywords: []
   m_LightmapFlags: 2
   m_EnableInstancingVariants: 0
-  m_DoubleSidedGI: 0
+  m_DoubleSidedGI: 1
   m_CustomRenderQueue: 2450
   stringTagMap:
     RenderType: TransparentCutout
@@ -97,7 +97,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Thickness_Map:
-        m_Texture: {fileID: 2800000, guid: 3cb37521118a22245bb76b528a2a14b4, type: 3}
+        m_Texture: {fileID: 2800000, guid: cdc3d744336e6a14a8c64d39f5dd8c8d, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _baseMap:
@@ -125,12 +125,13 @@ Material:
     - _AngleThreshold: -0.5
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
+    - _BlendOp: 0
     - _BumpScale: 1
     - _CellEdge: 0.064
     - _Cellshaded: 1
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
-    - _Cull: 2
+    - _Cull: 0
     - _Cutoff: 0.5
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
@@ -150,6 +151,7 @@ Material:
     - _QueueOffset: 0
     - _ReceiveShadows: 1
     - _SHADOWS_SOFT: 1
+    - _SampleGI: 0
     - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
     - _SpecularHighlights: 1
@@ -163,11 +165,11 @@ Material:
     - _seethroughdistance: 0
     m_Colors:
     - _AmbientColor: {r: 0, g: 0, b: 0, a: 0}
-    - _BaseColor: {r: 0, g: 1, b: 0.7877617, a: 1}
-    - _Color: {r: 0, g: 1, b: 0.7877617, a: 1}
-    - _EmissionColor: {r: 0.031372543, g: 0.36078432, b: 0.06979736, a: 1}
-    - _ScatterColor: {r: 0, g: 0.15389305, b: 0.016407281, a: 1}
+    - _BaseColor: {r: 0.58453494, g: 1, b: 0.5613208, a: 1}
+    - _Color: {r: 0.58453494, g: 1, b: 0.5613207, a: 1}
+    - _EmissionColor: {r: 0.013225934, g: 0.15209828, b: 0.023798238, a: 1}
+    - _ScatterColor: {r: 0.00003268862, g: 0.000098248136, b: 0.0000004634357, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _baseColor: {r: 0, g: 0.5477988, b: 0.6320754, a: 1}
+    - _baseColor: {r: 0.4292453, g: 1, b: 0.58938456, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
