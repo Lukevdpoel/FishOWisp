@@ -1,45 +1,58 @@
 using UnityEngine;
 
-// These ensure the Rigidbody and Collider are present,
-// just like PlayerInventory.cs adds them.
 [RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(Collider))]
 public class PhysicalFish : MonoBehaviour
 {
-    // This holds the data (like name and value) for this 3D model
     public CaughtFish CurrentFish { get; private set; }
 
+    // This variable will be assigned *the first time* it's needed
     private Rigidbody rb;
 
-    private void Awake()
+    // --- NEW HELPER FUNCTION ---
+    // This will get the Rigidbody and store it.
+    // If it's already stored, it just returns it.
+    private Rigidbody GetRb()
     {
-        rb = GetComponent<Rigidbody>();
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+        return rb;
     }
 
-    // Called by PlayerInventory.cs when spawned
     public void Initialize(CaughtFish fish)
     {
         CurrentFish = fish;
     }
 
-    // Called by BucketSwarm.cs when added to the swarm
     public void EnableSwarmMode()
     {
-        rb.isKinematic = true;
-        rb.useGravity = false;
+        // Use the helper to safely get the Rigidbody
+        Rigidbody myRb = GetRb();
+        myRb.isKinematic = true;
+        myRb.useGravity = false;
+
+        Collider col = GetComponent<Collider>();
+        if (col != null)
+        {
+            col.enabled = true;
+        }
     }
 
-    // Called by our new FishDragger script
     public void EnableDragMode()
     {
-        rb.isKinematic = true;
-        rb.useGravity = false;
+        // Use the helper here too
+        Rigidbody myRb = GetRb();
+        myRb.isKinematic = true;
+        myRb.useGravity = false;
     }
 
-    // Called when the fish is dropped somewhere *other* than the sell zone
     public void EnablePhysicsMode()
     {
-        rb.isKinematic = false;
-        rb.useGravity = true;
+        // And here
+        Rigidbody myRb = GetRb();
+        myRb.isKinematic = false;
+        myRb.useGravity = true;
     }
 }

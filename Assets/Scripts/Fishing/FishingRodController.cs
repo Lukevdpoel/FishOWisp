@@ -13,15 +13,13 @@ public class FishingRodController : MonoBehaviour
     public GameObject danglingBobber;
 
     [Header("Animation & Cooldowns")]
-    [Tooltip("The animator for the player/rod.")]
     public Animator playerAnimator;
-    [Tooltip("The name of the trigger parameter in the animator for the fail animation.")]
     public string failAnimationTrigger = "FailHook";
-    [Tooltip("How many seconds casting is disabled after failing to hook a fish.")]
     public float failCooldown = 2.0f;
+    [Tooltip("How many seconds the reel-in animation takes.")]
+    public float reelInDuration = 1.5f;
 
     [Header("Timing")]
-    [Tooltip("How many seconds the player has to react to a bite.")]
     public float reactionTime = 1.5f;
 
     [Header("Fish Fight Mini-Game")]
@@ -40,12 +38,13 @@ public class FishingRodController : MonoBehaviour
     private bool isFishInStrugglePhase;
     private bool wasReelingLastFrame = false;
 
+    private FishPreset caughtFishPreset = null;
+
     private void OnEnable()
     {
         FishingEvents.OnThrowBobber += HandleThrow;
         FishingEvents.OnFishBite += HandleFishBite;
         FishingEvents.OnCancelFishing += CancelFishingAction;
-        FishingEvents.OnReelingCompleted += ResetFishingState;
     }
 
     private void OnDisable()
@@ -53,7 +52,6 @@ public class FishingRodController : MonoBehaviour
         FishingEvents.OnThrowBobber -= HandleThrow;
         FishingEvents.OnFishBite -= HandleFishBite;
         FishingEvents.OnCancelFishing -= CancelFishingAction;
-        FishingEvents.OnReelingCompleted -= ResetFishingState;
     }
 
     void Update()
@@ -62,18 +60,15 @@ public class FishingRodController : MonoBehaviour
 
         if (currentState == FishingState.FightingFish)
         {
+            // ... (No change here) ...
             bool isPressingReel = Input.GetKey(KeyCode.Mouse0);
             bool canReel = !isFishInStrugglePhase;
             bool isReelingThisFrame = isPressingReel && canReel;
 
             if (isReelingThisFrame && !wasReelingLastFrame)
-            {
                 FishingEvents.OnStartReelingDuringFight?.Invoke();
-            }
             else if (!isReelingThisFrame && wasReelingLastFrame)
-            {
                 FishingEvents.OnStopReelingDuringFight?.Invoke();
-            }
 
             wasReelingLastFrame = isReelingThisFrame;
         }
@@ -81,19 +76,10 @@ public class FishingRodController : MonoBehaviour
 
     private void HandleInput()
     {
-        // --- THIS IS THE NEW, BETTER CHECK ---
-        // If the game is paused (which means our inventory is open),
-        // don't process any fishing input at all.
-        if (Time.timeScale == 0f)
-        {
-            return;
-        }
-        // --- END OF CHECK ---
+        if (Time.timeScale == 0f) return;
 
         if (Input.GetKeyDown(KeyCode.Mouse0))
         {
-            // (You can now remove the EventSystem check completely)
-
             switch (currentState)
             {
                 case FishingState.Idle:
@@ -102,7 +88,7 @@ public class FishingRodController : MonoBehaviour
                 case FishingState.WaitingForBite:
                     Debug.Log("Reeling back the line.");
                     currentState = FishingState.Reeling;
-                    FishingEvents.OnStartReeling?.Invoke();
+                    StartCoroutine(ReelInBobberRoutine(null));
                     break;
                 case FishingState.FishOnTheLine:
                     HookFishAndStartFight();
@@ -117,22 +103,17 @@ public class FishingRodController : MonoBehaviour
 
         if (currentState == FishingState.FightingFish && Input.GetKey(KeyCode.Mouse0))
         {
+            // ... (No change here) ...
             if (isFishInStrugglePhase)
-            {
                 currentFightProgress -= strugglePenaltyRate * Time.deltaTime;
-            }
             else
-            {
                 currentFightProgress += reelInRate * Time.deltaTime;
-            }
 
             currentFightProgress = Mathf.Clamp(currentFightProgress, 0, maxFightProgress);
             FishingEvents.OnFishFightProgressUpdate?.Invoke(currentFightProgress, maxFightProgress);
 
             if (currentFightProgress >= maxFightProgress)
-            {
                 WinFishFight();
-            }
         }
     }
 
@@ -151,7 +132,6 @@ public class FishingRodController : MonoBehaviour
     private void HandleFishBite(BobberController bobber)
     {
         if (currentState != FishingState.WaitingForBite) return;
-
         currentState = FishingState.FishOnTheLine;
         activeBobber = bobber;
         Debug.Log("A fish is biting! Hook it now!");
@@ -182,9 +162,7 @@ public class FishingRodController : MonoBehaviour
         Debug.Log("State: Cooldown");
 
         if (playerAnimator != null && !string.IsNullOrEmpty(failAnimationTrigger))
-        {
             playerAnimator.SetTrigger(failAnimationTrigger);
-        }
 
         yield return new WaitForSeconds(failCooldown);
 
@@ -212,12 +190,7 @@ public class FishingRodController : MonoBehaviour
 
     private void WinFishFight()
     {
-        // --- THIS IS THE FIX ---
-        // Change the state IMMEDIATELY.
-        // This stops the HandleInput() method from calling WinFishFight()
-        // on the very next frame.
         currentState = FishingState.Reeling;
-        // ---
 
         if (fishFightCoroutine != null)
         {
@@ -225,7 +198,7 @@ public class FishingRodController : MonoBehaviour
             fishFightCoroutine = null;
         }
 
-        PlayerInventory.Instance.AddFish(activeBobber.HookedFish.preset);
+        caughtFishPreset = activeBobber.HookedFish.preset;
 
         if (wasReelingLastFrame)
         {
@@ -233,10 +206,44 @@ public class FishingRodController : MonoBehaviour
             wasReelingLastFrame = false;
         }
 
-        activeBobber.SetStruggleActive(false);
+        // --- THIS IS THE FIX ---
+        // We REMOVE this line. Calling this was likely hiding the fish model.
+        // activeBobber.SetStruggleActive(false); // <-- REMOVED
+        // --- END OF FIX ---
+
         FishingEvents.OnFishFightEnd?.Invoke(true);
-        // currentState = FishingState.Reeling; // <-- Moved to the top
+
+        StartCoroutine(ReelInBobberRoutine(caughtFishPreset));
+    }
+
+    private IEnumerator ReelInBobberRoutine(FishPreset fishToInventory)
+    {
         FishingEvents.OnStartReeling?.Invoke();
+
+        if (activeBobber != null && danglingBobber != null)
+        {
+            Transform bobberToReel = activeBobber.transform;
+            Transform target = danglingBobber.transform;
+            Vector3 startPos = bobberToReel.position;
+
+            float elapsed = 0f;
+            while (elapsed < reelInDuration)
+            {
+                if (bobberToReel != null)
+                {
+                    bobberToReel.position = Vector3.Lerp(startPos, target.position, elapsed / reelInDuration);
+                }
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            if (bobberToReel != null)
+            {
+                Destroy(bobberToReel.gameObject);
+            }
+        }
+
+        HandleReelingCompleted(fishToInventory);
     }
 
     private IEnumerator FishFightRoutine()
@@ -263,13 +270,23 @@ public class FishingRodController : MonoBehaviour
     {
         if (currentState != FishingState.Cooldown)
         {
-            ResetFishingState();
+            ResetFishingState(null);
         }
     }
 
-    private void ResetFishingState()
+    private void HandleReelingCompleted(FishPreset fishToInventory)
     {
-        if (currentState == FishingState.Idle) return;
+        ResetFishingState(fishToInventory);
+    }
+
+    private void ResetFishingState(FishPreset fishToInventory)
+    {
+        if (currentState == FishingState.Idle && fishToInventory == null) return;
+
+        if (fishToInventory != null)
+        {
+            PlayerInventory.Instance.AddFish(fishToInventory);
+        }
 
         if (wasReelingLastFrame)
         {
@@ -280,6 +297,7 @@ public class FishingRodController : MonoBehaviour
         fishFightCoroutine = null;
         fishEscapeCoroutine = null;
         activeBobber = null;
+        caughtFishPreset = null;
         currentState = FishingState.Idle;
         danglingBobber?.SetActive(true);
         Debug.Log("State: Idle (Reset)");

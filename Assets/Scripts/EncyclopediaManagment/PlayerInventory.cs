@@ -15,7 +15,7 @@ public class PlayerInventory : MonoBehaviour
     [Header("Physical References")]
     public Transform bucketFishContainer;
     public GameObject defaultFishPrefab;
-    public BucketSwarm bucketSwarm; // <-- NEW LINE
+    public FishEscalator fishEscalator;
 
     // This new dictionary links the data to the 3D model
     private Dictionary<CaughtFish, GameObject> physicalFishMap = new Dictionary<CaughtFish, GameObject>();
@@ -99,7 +99,7 @@ public class PlayerInventory : MonoBehaviour
 
         // --- NEW LINE ---
         // Tell the swarm controller to add this new fish
-        if (bucketSwarm != null) bucketSwarm.AddFish(fishGO.transform);
+        if (fishEscalator != null) fishEscalator.AddFish(fishGO.transform);
         // ---
 
         // 3. Add to our tracking dictionary
@@ -118,7 +118,7 @@ public class PlayerInventory : MonoBehaviour
             {
                 // --- NEW LINE ---
                 // Tell the swarm controller to remove this fish
-                if (bucketSwarm != null) bucketSwarm.RemoveFish(fishGO.transform);
+                if (fishEscalator != null) fishEscalator.RemoveFish(fishGO.transform);
                 // ---
 
                 Destroy(fishGO);
