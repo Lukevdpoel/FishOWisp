@@ -5,13 +5,8 @@ using UnityEngine;
 public class PhysicalFish : MonoBehaviour
 {
     public CaughtFish CurrentFish { get; private set; }
-
-    // This variable will be assigned *the first time* it's needed
     private Rigidbody rb;
 
-    // --- NEW HELPER FUNCTION ---
-    // This will get the Rigidbody and store it.
-    // If it's already stored, it just returns it.
     private Rigidbody GetRb()
     {
         if (rb == null)
@@ -26,9 +21,10 @@ public class PhysicalFish : MonoBehaviour
         CurrentFish = fish;
     }
 
-    public void EnableSwarmMode()
+    // --- NEW METHOD ---
+    // This is the state for when the InventoryBoid script is in control
+    public void EnableFlockMode()
     {
-        // Use the helper to safely get the Rigidbody
         Rigidbody myRb = GetRb();
         myRb.isKinematic = true;
         myRb.useGravity = false;
@@ -36,13 +32,12 @@ public class PhysicalFish : MonoBehaviour
         Collider col = GetComponent<Collider>();
         if (col != null)
         {
-            col.enabled = true;
+            col.enabled = true; // Keep collider on for raycasting
         }
     }
 
     public void EnableDragMode()
     {
-        // Use the helper here too
         Rigidbody myRb = GetRb();
         myRb.isKinematic = true;
         myRb.useGravity = false;
@@ -50,7 +45,7 @@ public class PhysicalFish : MonoBehaviour
 
     public void EnablePhysicsMode()
     {
-        // And here
+        // This probably won't be used, but good to keep
         Rigidbody myRb = GetRb();
         myRb.isKinematic = false;
         myRb.useGravity = true;

@@ -29,7 +29,7 @@ public class FishPreset : ScriptableObject
     public WeatherType preferredWeather;
     public float cameraviewdistance = 1;
 
-    public GameObject physicalModelPrefab;
+    // --- MODIFIED: Removed the extra 'physicalModelPrefab' line ---
 }
 
 // These enums define the possible options for the fields above.

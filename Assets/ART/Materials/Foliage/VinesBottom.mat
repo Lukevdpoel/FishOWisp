@@ -102,13 +102,13 @@ Material:
     - _AddPrecomputedVelocity: 0
     - _AlphaClip: 1
     - _AlphaToMask: 1
-    - _AmbientValue: 0.219
+    - _AmbientValue: 0.189
     - _AngleThreshold: -0.5
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
-    - _CellEdge: 0.09
-    - _Cellshaded: 1
+    - _CellEdge: 0.454
+    - _Cellshaded: 0
     - _ClearCoatMask: 0
     - _ClearCoatSmoothness: 0
     - _Cull: 2
@@ -132,6 +132,7 @@ Material:
     - _SHADOWS_SOFT: 1
     - _Smoothness: 0
     - _SmoothnessTextureChannel: 0
+    - _Smoothstep: 0
     - _SpecularHighlights: 1
     - _SrcBlend: 1
     - _SrcBlendAlpha: 1
@@ -142,9 +143,9 @@ Material:
     - _isGrounded: 0
     - _seethroughdistance: 0
     m_Colors:
-    - _AmbientColor: {r: 0.094918124, g: 0.254717, b: 0.09976051, a: 0}
+    - _AmbientColor: {r: 0.036356356, g: 0.17924526, b: 0.03984145, a: 1}
     - _BaseColor: {r: 0.47218764, g: 0.764151, b: 0.5599423, a: 1}
-    - _Color: {r: 0.7248576, g: 0.8584906, b: 0.7794174, a: 1}
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _baseColor: {r: 0.6273585, g: 1, b: 0.8964608, a: 0}

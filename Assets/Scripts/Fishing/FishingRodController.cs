@@ -11,6 +11,8 @@ public class FishingRodController : MonoBehaviour
 
     [Header("Object References")]
     public GameObject danglingBobber;
+    [Tooltip("The transform of the player's body. The fish will be reeled to this point.")]
+    public Transform playerModel;
 
     [Header("Animation & Cooldowns")]
     public Animator playerAnimator;
@@ -18,6 +20,9 @@ public class FishingRodController : MonoBehaviour
     public float failCooldown = 2.0f;
     [Tooltip("How many seconds the reel-in animation takes.")]
     public float reelInDuration = 1.5f;
+
+    [Tooltip("How high (in world units) the arc of the fish reel-in should be.")]
+    public float reelInArcHeight = 5.0f;
 
     [Header("Timing")]
     public float reactionTime = 1.5f;
@@ -33,7 +38,10 @@ public class FishingRodController : MonoBehaviour
 
     private Coroutine fishFightCoroutine;
     private Coroutine fishEscapeCoroutine;
+
+    private BobberController bobberInWater;
     private BobberController activeBobber;
+
     private float currentFightProgress;
     private bool isFishInStrugglePhase;
     private bool wasReelingLastFrame = false;
@@ -45,6 +53,7 @@ public class FishingRodController : MonoBehaviour
         FishingEvents.OnThrowBobber += HandleThrow;
         FishingEvents.OnFishBite += HandleFishBite;
         FishingEvents.OnCancelFishing += CancelFishingAction;
+        FishingEvents.OnBobberLandedInWater += HandleBobberLanded;
     }
 
     private void OnDisable()
@@ -52,6 +61,16 @@ public class FishingRodController : MonoBehaviour
         FishingEvents.OnThrowBobber -= HandleThrow;
         FishingEvents.OnFishBite -= HandleFishBite;
         FishingEvents.OnCancelFishing -= CancelFishingAction;
+        FishingEvents.OnBobberLandedInWater -= HandleBobberLanded;
+    }
+
+    private void HandleBobberLanded(BobberController bobber)
+    {
+        if (bobberInWater != null && bobberInWater != bobber)
+        {
+            Destroy(bobberInWater.gameObject);
+        }
+        bobberInWater = bobber;
     }
 
     void Update()
@@ -60,7 +79,6 @@ public class FishingRodController : MonoBehaviour
 
         if (currentState == FishingState.FightingFish)
         {
-            // ... (No change here) ...
             bool isPressingReel = Input.GetKey(KeyCode.Mouse0);
             bool canReel = !isFishInStrugglePhase;
             bool isReelingThisFrame = isPressingReel && canReel;
@@ -103,7 +121,6 @@ public class FishingRodController : MonoBehaviour
 
         if (currentState == FishingState.FightingFish && Input.GetKey(KeyCode.Mouse0))
         {
-            // ... (No change here) ...
             if (isFishInStrugglePhase)
                 currentFightProgress -= strugglePenaltyRate * Time.deltaTime;
             else
@@ -131,7 +148,8 @@ public class FishingRodController : MonoBehaviour
 
     private void HandleFishBite(BobberController bobber)
     {
-        if (currentState != FishingState.WaitingForBite) return;
+        if (currentState != FishingState.WaitingForBite || bobber != bobberInWater) return;
+
         currentState = FishingState.FishOnTheLine;
         activeBobber = bobber;
         Debug.Log("A fish is biting! Hook it now!");
@@ -157,6 +175,11 @@ public class FishingRodController : MonoBehaviour
 
     private IEnumerator FailRoutine()
     {
+        if (bobberInWater != null)
+        {
+            Destroy(bobberInWater.gameObject);
+        }
+
         FishingEvents.OnCancelFishing?.Invoke();
         currentState = FishingState.Cooldown;
         Debug.Log("State: Cooldown");
@@ -206,12 +229,14 @@ public class FishingRodController : MonoBehaviour
             wasReelingLastFrame = false;
         }
 
-        // --- THIS IS THE FIX ---
-        // We REMOVE this line. Calling this was likely hiding the fish model.
-        // activeBobber.SetStruggleActive(false); // <-- REMOVED
-        // --- END OF FIX ---
+        // activeBobber.SetStruggleActive(false); // <-- REMOVED (from your original script)
 
         FishingEvents.OnFishFightEnd?.Invoke(true);
+
+        if (activeBobber != null)
+        {
+            activeBobber.SwapBobberForFishModel();
+        }
 
         StartCoroutine(ReelInBobberRoutine(caughtFishPreset));
     }
@@ -220,26 +245,78 @@ public class FishingRodController : MonoBehaviour
     {
         FishingEvents.OnStartReeling?.Invoke();
 
-        if (activeBobber != null && danglingBobber != null)
+        // 1. Find the correct bobber to reel in
+        BobberController bobberToReelController = null;
+        if (activeBobber != null)
         {
-            Transform bobberToReel = activeBobber.transform;
-            Transform target = danglingBobber.transform;
-            Vector3 startPos = bobberToReel.position;
+            bobberToReelController = activeBobber;
+        }
+        else if (bobberInWater != null)
+        {
+            bobberToReelController = bobberInWater;
+        }
 
+        // 2. Check if we found a bobber
+        if (bobberToReelController != null)
+        {
+            // 3. Disable the bobber's script and physics
+            bobberToReelController.enabled = false;
+            Rigidbody bobberRb = bobberToReelController.GetComponent<Rigidbody>();
+            if (bobberRb != null)
+            {
+                bobberRb.isKinematic = true;
+            }
+
+            Transform target;
+            if (playerModel != null)
+            {
+                target = playerModel; // Use player model if assigned
+            }
+            else
+            {
+                Debug.LogWarning("Player Model not assigned in FishingRodController! Reeling in to danglingBobber.");
+                target = danglingBobber.transform; // Default fallback
+            }
+
+            // 4. Set up points for the Bezier curve
+            Transform bobberToReelTransform = bobberToReelController.transform;
+            Vector3 startPos = bobberToReelTransform.position;   // Start point (P0)
+
+            // Calculate the midpoint in X and Z only
+            Vector3 controlPoint = (startPos + target.position) * 0.5f;
+
+            // Set the height relative to the *highest* of the two points
+            float highestY = Mathf.Max(startPos.y, target.position.y);
+            controlPoint.y = highestY + reelInArcHeight;
+
+            // 5. Move along the curve over time
             float elapsed = 0f;
             while (elapsed < reelInDuration)
             {
-                if (bobberToReel != null)
+                if (bobberToReelTransform != null)
                 {
-                    bobberToReel.position = Vector3.Lerp(startPos, target.position, elapsed / reelInDuration);
+                    // Calculate linear 't' (0 to 1)
+                    float t = elapsed / reelInDuration;
+
+                    // Apply the Smoothstep formula to 't' to get an eased value
+                    float easedT = t * t * (3f - 2f * t);
+                    float oneMinusEasedT = 1f - easedT;
+
+                    // Use 'easedT' in the Bezier formula instead of 't'
+                    Vector3 position = (oneMinusEasedT * oneMinusEasedT * startPos) +
+                                       (2f * oneMinusEasedT * easedT * controlPoint) +
+                                       (easedT * easedT * target.position);
+
+                    bobberToReelTransform.position = position;
                 }
                 elapsed += Time.deltaTime;
                 yield return null;
             }
 
-            if (bobberToReel != null)
+            // 6. Clean up the bobber
+            if (bobberToReelTransform != null)
             {
-                Destroy(bobberToReel.gameObject);
+                Destroy(bobberToReelTransform.gameObject);
             }
         }
 
@@ -270,24 +347,36 @@ public class FishingRodController : MonoBehaviour
     {
         if (currentState != FishingState.Cooldown)
         {
+            if (bobberInWater != null)
+            {
+                Destroy(bobberInWater.gameObject);
+            }
+            // --- MODIFICATION: Changed back to a direct void call ---
             ResetFishingState(null);
         }
     }
 
     private void HandleReelingCompleted(FishPreset fishToInventory)
     {
+        // --- MODIFICATION: Changed back to a direct void call ---
         ResetFishingState(fishToInventory);
     }
 
+    // --- MODIFICATION: This is now a 'void' method again, not a coroutine ---
     private void ResetFishingState(FishPreset fishToInventory)
     {
-        if (currentState == FishingState.Idle && fishToInventory == null) return;
-
-        if (fishToInventory != null)
+        // Guard clause: If we are already Idle and this is just a cleanup call (no fish), exit.
+        if (currentState == FishingState.Idle && fishToInventory == null)
         {
-            PlayerInventory.Instance.AddFish(fishToInventory);
+            return;
         }
 
+        // 1. Reset the state and show the bobber.
+        currentState = FishingState.Idle;
+        danglingBobber?.SetActive(true);
+        Debug.Log("State: Idle (Reset)");
+
+        // 2. Clean up all event listeners and state variables.
         if (wasReelingLastFrame)
         {
             FishingEvents.OnStopReelingDuringFight?.Invoke();
@@ -297,9 +386,15 @@ public class FishingRodController : MonoBehaviour
         fishFightCoroutine = null;
         fishEscapeCoroutine = null;
         activeBobber = null;
+        bobberInWater = null;
         caughtFishPreset = null;
-        currentState = FishingState.Idle;
-        danglingBobber?.SetActive(true);
-        Debug.Log("State: Idle (Reset)");
+
+        // 3. Add the fish to the inventory.
+        // If this PlayerInventory.Instance.AddFish() call is slow,
+        // it *will* freeze the game for a moment.
+        if (fishToInventory != null)
+        {
+            PlayerInventory.Instance.AddFish(fishToInventory);
+        }
     }
 }
