@@ -3,7 +3,9 @@ using UnityEngine;
 public class SaveRenderTexture : MonoBehaviour
 {
     public RenderTexture TextureToSave;
-    public string Path = "Assets/ART/Textures/";
+
+    // Change this from just a folder to a full file path (without the extension)
+    public string SavePath = "Assets/ART/Textures/MySavedImage"; // Example path
 
     void LateUpdate()
     {
@@ -13,10 +15,10 @@ public class SaveRenderTexture : MonoBehaviour
         }
     }
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void SaveImage()
     {
-        Debug.Log("Saved image with path: " + Path);
-        SaveTextureToFileUtility.SaveRenderTextureToFile(TextureToSave, Path);
+        // Use the new SavePath variable here
+        Debug.Log("Saved image with path: " + SavePath);
+        SaveTextureToFileUtility.SaveRenderTextureToFile(TextureToSave, SavePath);
     }
 }
