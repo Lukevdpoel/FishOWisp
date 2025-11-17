@@ -62,12 +62,20 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -462739111556720123, guid: ce14a6430fd9b4b4f9d0e68de7caa790, type: 3}
       propertyPath: m_CastShadows
-      value: 0
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -462739111556720123, guid: ce14a6430fd9b4b4f9d0e68de7caa790, type: 3}
+      propertyPath: m_StaticShadowCaster
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -462739111556720123, guid: ce14a6430fd9b4b4f9d0e68de7caa790, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
       objectReference: {fileID: 2100000, guid: 952c6a17cf43a484b922765f870f76f0, type: 2}
+    - target: {fileID: -324132720735501463, guid: ce14a6430fd9b4b4f9d0e68de7caa790, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: ce14a6430fd9b4b4f9d0e68de7caa790, type: 3}
       propertyPath: m_Name
       value: Rock6Low (1)

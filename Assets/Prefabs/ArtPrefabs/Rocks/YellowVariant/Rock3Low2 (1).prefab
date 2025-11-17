@@ -62,7 +62,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -1941335440839555407, guid: 43de60811ef61394eb5d03182faf907f, type: 3}
       propertyPath: m_CastShadows
-      value: 0
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -1941335440839555407, guid: 43de60811ef61394eb5d03182faf907f, type: 3}
+      propertyPath: m_StaticShadowCaster
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -1941335440839555407, guid: 43de60811ef61394eb5d03182faf907f, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
@@ -71,6 +75,10 @@ PrefabInstance:
     - target: {fileID: 919132149155446097, guid: 43de60811ef61394eb5d03182faf907f, type: 3}
       propertyPath: m_Name
       value: Rock3Low2 (1)
+      objectReference: {fileID: 0}
+    - target: {fileID: 2009332956407701906, guid: 43de60811ef61394eb5d03182faf907f, type: 3}
+      propertyPath: m_StaticEditorFlags
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
