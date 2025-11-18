@@ -21,7 +21,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Bush1 3
-  m_Shader: {fileID: -6465566751694194690, guid: 5e3033fc851eeb342bafd5eaf13e9097, type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 1f451c2525369e94191aabf44bedc2f8, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -83,6 +83,10 @@ Material:
         m_Offset: {x: 0, y: 0}
     - _SpecGlossMap:
         m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ThicknessTexture:
+        m_Texture: {fileID: 2800000, guid: 1da6d3fa2f7798d4b97fee6c460bbf0c, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Thickness_Map:
@@ -163,6 +167,7 @@ Material:
     - _GlossyReflections: 0
     - _Metallic: 0
     - _MovementDepth: 0.17
+    - _NormalInfluence: -0.03
     - _NormalStrength: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.005
@@ -171,6 +176,8 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
+    - _SSSIntensity: 0.91
+    - _SSSPower: 5
     - _SSS_Size: 0
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
@@ -195,14 +202,14 @@ Material:
     - _seethroughdistance: 2.6
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _BottomColor: {r: 0, g: 0.754717, b: 0.6237257, a: 1}
+    - _BottomColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _PlayerPosition: {r: 0, g: 0, b: 0, a: 0}
     - _ScatterColor: {r: 0.0013833221, g: 0.0682356, b: 0, a: 1}
-    - _Scatter_Color: {r: 0, g: 0.06698584, b: 0.010531059, a: 1}
+    - _Scatter_Color: {r: 0.4896379, g: 1.498039, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _TopColor: {r: 0.0141509175, g: 1, b: 0.77550244, a: 1}
+    - _TopColor: {r: 1, g: 1, b: 1, a: 1}
     - _baseColor: {r: 1, g: 1, b: 1, a: 0}
     - _emission: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []

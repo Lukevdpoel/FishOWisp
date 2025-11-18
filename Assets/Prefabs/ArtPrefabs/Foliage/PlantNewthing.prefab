@@ -74,10 +74,14 @@ PrefabInstance:
       objectReference: {fileID: 2100000, guid: ae966bf8954f31c4c926a9342ece9287, type: 2}
     - target: {fileID: -1918821482870630018, guid: fc09a914b9a52884e80bce5490ed4d8a, type: 3}
       propertyPath: m_StaticEditorFlags
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 134004696511679129, guid: fc09a914b9a52884e80bce5490ed4d8a, type: 3}
       propertyPath: m_DynamicOccludee
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 134004696511679129, guid: fc09a914b9a52884e80bce5490ed4d8a, type: 3}
+      propertyPath: m_StaticShadowCaster
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 134004696511679129, guid: fc09a914b9a52884e80bce5490ed4d8a, type: 3}

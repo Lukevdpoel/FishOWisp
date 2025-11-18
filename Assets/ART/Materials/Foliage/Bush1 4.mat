@@ -21,7 +21,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: Bush1 4
-  m_Shader: {fileID: -6465566751694194690, guid: 5e3033fc851eeb342bafd5eaf13e9097, type: 3}
+  m_Shader: {fileID: -6465566751694194690, guid: 1f451c2525369e94191aabf44bedc2f8, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -29,7 +29,7 @@ Material:
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: 3000
+  m_CustomRenderQueue: -1
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
@@ -83,6 +83,10 @@ Material:
         m_Offset: {x: 0, y: 0}
     - _SpecGlossMap:
         m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ThicknessTexture:
+        m_Texture: {fileID: 2800000, guid: 040cbc372eb9cb84c9e591be4c7f402c, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Thickness_Map:
@@ -162,12 +166,17 @@ Material:
     - _GlossyReflections: 0
     - _Metallic: 0
     - _MovementDepth: 0.17
+    - _NormalInfluence: 0.33
     - _NormalStrength: 1
     - _OcclusionStrength: 1
     - _Parallax: 0.005
+    - _PushRadius: 0
+    - _PushStrength: 1
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
+    - _SSSIntensity: 0.5
+    - _SSSPower: 33.81
     - _SSS_Size: 0
     - _Smoothness: 0.5
     - _SmoothnessTextureChannel: 0
@@ -192,11 +201,15 @@ Material:
     - _seethroughdistance: 3.7
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BottomColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
+    - _PlayerPosition: {r: 0, g: -1000, b: 0, a: 0}
     - _ScatterColor: {r: 0.011442462, g: 0.02720471, b: 0, a: 1}
+    - _Scatter_Color: {r: 5.456103, g: 11.984312, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
-    - _baseColor: {r: 0.8018868, g: 0.8018868, b: 0.8018868, a: 0}
+    - _TopColor: {r: 1, g: 1, b: 1, a: 1}
+    - _baseColor: {r: 1, g: 1, b: 1, a: 0}
     - _emission: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
