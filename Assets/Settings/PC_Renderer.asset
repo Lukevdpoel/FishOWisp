@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6b3d386ba5cd94485973aee1479b272e, type: 3}
   m_Name: RenderObjects
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
   settings:
     passTag: RenderObjects
     Event: 300
@@ -91,7 +91,8 @@ MonoBehaviour:
   - {fileID: 7833122117494664109}
   - {fileID: -3645586558223233748}
   - {fileID: -2130659816663937646}
-  m_RendererFeatureMap: ad6b866f10d7b46c2c4d2a27574668cd920d8c7a2f606ee2
+  - {fileID: 5194472116383182668}
+  m_RendererFeatureMap: ad6b866f10d7b46c2c4d2a27574668cd920d8c7a2f606ee24cefb04cde781648
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -120,6 +121,29 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+--- !u!114 &5194472116383182668
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e3059ae7893fb1b44bfa2bee3a7919e0, type: 3}
+  m_Name: VolumetricLightScattering
+  m_EditorClassIdentifier: Assembly-CSharp::VolumetricLightScattering
+  m_Active: 1
+  settings:
+    renderPassEvent: 1000
+    resolutionScale: 0.5
+    intensity: 1
+    blurWidth: 0.85
+    numSamples: 16
+    lightSource: {fileID: 0}
+    occluderMask:
+      serializedVersion: 2
+      m_Bits: 16777217
 --- !u!114 &7833122117494664109
 MonoBehaviour:
   m_ObjectHideFlags: 0

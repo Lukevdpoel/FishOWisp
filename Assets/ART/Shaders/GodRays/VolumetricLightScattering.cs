@@ -20,7 +20,6 @@ public class VolumetricLightScattering : ScriptableRendererFeature
     }
 
     public Settings settings = new Settings();
-
     private VolumetricLightScatteringPass m_ScriptablePass;
 
     public override void Create()
@@ -32,16 +31,22 @@ public class VolumetricLightScattering : ScriptableRendererFeature
     public override void AddRenderPasses(ScriptableRenderer renderer, ref RenderingData renderingData)
     {
         if (settings.lightSource == null) return;
-        m_ScriptablePass.Setup(renderer.cameraColorTargetHandle);
+
+        // FIXED: We do NOT call Setup() here anymore. 
+        // We just add the pass. The pass will grab the camera target itself later.
         renderer.EnqueuePass(m_ScriptablePass);
     }
 
-    // --- THE PASS LOGIC ---
+    // ------------------------------------------------------------------------
+    // THE RENDER PASS
+    // ------------------------------------------------------------------------
     class VolumetricLightScatteringPass : ScriptableRenderPass
     {
         private readonly Settings m_Settings;
         private RTHandle m_OccludersTarget;
-        private RTHandle m_CameraColorTarget;
+
+        // FIXED: We remove the manual "Setup" method.
+        // We will access the camera target directly in Execute/OnCameraSetup.
 
         private readonly Material m_OccludersMaterial;
         private readonly Material m_RadialBlurMaterial;
@@ -54,19 +59,15 @@ public class VolumetricLightScattering : ScriptableRendererFeature
             m_Settings = settings;
 
             var occluderShader = Shader.Find("Hidden/UnlitBlack");
-            m_OccludersMaterial = new Material(occluderShader);
+            if (occluderShader != null) m_OccludersMaterial = new Material(occluderShader);
 
             var blurShader = Shader.Find("Hidden/RadialBlur");
-            m_RadialBlurMaterial = new Material(blurShader);
+            if (blurShader != null) m_RadialBlurMaterial = new Material(blurShader);
 
             m_FilteringSettings = new FilteringSettings(RenderQueueRange.opaque, settings.occluderMask);
         }
 
-        public void Setup(RTHandle cameraColorTarget)
-        {
-            m_CameraColorTarget = cameraColorTarget;
-        }
-
+        [System.Obsolete]
         public override void OnCameraSetup(CommandBuffer cmd, ref RenderingData renderingData)
         {
             RenderTextureDescriptor descriptor = renderingData.cameraData.cameraTargetDescriptor;
@@ -75,15 +76,19 @@ public class VolumetricLightScattering : ScriptableRendererFeature
             descriptor.colorFormat = RenderTextureFormat.Default;
             descriptor.depthBufferBits = 0;
 
-            RenderingUtils.ReAllocateIfNeeded(ref m_OccludersTarget, descriptor, FilterMode.Bilinear, TextureWrapMode.Clamp, name: "_OccludersMap");
+            RenderingUtils.ReAllocateHandleIfNeeded(ref m_OccludersTarget, descriptor, FilterMode.Bilinear, TextureWrapMode.Clamp, name: "_OccludersMap");
         }
 
+        [System.Obsolete]
         public override void Execute(ScriptableRenderContext context, ref RenderingData renderingData)
         {
             if (m_OccludersMaterial == null || m_RadialBlurMaterial == null || m_Settings.lightSource == null) return;
 
             CommandBuffer cmd = CommandBufferPool.Get("Volumetric Light Scattering");
             Camera camera = renderingData.cameraData.camera;
+
+            // FIXED: Access the Camera Target here, inside the scope
+            RTHandle cameraColorTarget = renderingData.cameraData.renderer.cameraColorTargetHandle;
 
             Vector3 lightPos = camera.WorldToViewportPoint(m_Settings.lightSource.position);
             bool isLightInFront = lightPos.z > 0;
@@ -95,6 +100,7 @@ public class VolumetricLightScattering : ScriptableRendererFeature
                 m_RadialBlurMaterial.SetFloat("_BlurWidth", m_Settings.blurWidth);
                 m_RadialBlurMaterial.SetInt("_NumSamples", m_Settings.numSamples);
 
+                // 1. Draw Occluders
                 cmd.SetRenderTarget(m_OccludersTarget);
                 cmd.ClearRenderTarget(false, true, Color.white);
 
@@ -102,9 +108,11 @@ public class VolumetricLightScattering : ScriptableRendererFeature
                 drawingSettings.overrideMaterial = m_OccludersMaterial;
                 drawingSettings.overrideMaterialPassIndex = 0;
 
-                context.DrawRenderers(renderingData.cullResults, ref m_FilteringSettings, ref drawingSettings);
+                context.DrawRenderers(renderingData.cullResults, ref drawingSettings, ref m_FilteringSettings);
 
-                cmd.Blit(m_OccludersTarget, m_CameraColorTarget, m_RadialBlurMaterial);
+                // 2. Blur and Blit to Screen
+                // Using the locally acquired cameraColorTarget
+                cmd.Blit(m_OccludersTarget, cameraColorTarget, m_RadialBlurMaterial);
             }
 
             context.ExecuteCommandBuffer(cmd);

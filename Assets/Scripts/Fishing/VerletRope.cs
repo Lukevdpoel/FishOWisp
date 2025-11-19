@@ -86,6 +86,15 @@ public class VerletRope : MonoBehaviour
     {
         if (!isInitialized) return;
 
+        // --- FIXED: Added Safety Check ---
+        // If the bobber or rod has been destroyed, stop immediately to prevent MissingReferenceException.
+        if (bobber == null || rodTip == null)
+        {
+            DeactivateRope();
+            return;
+        }
+        // ---------------------------------
+
         if (isLineTight)
         {
             DrawTightLine();
@@ -99,10 +108,10 @@ public class VerletRope : MonoBehaviour
 
     private void Simulate()
     {
+        // Safety check is now handled in LateUpdate, so we can access .position safely here
         float currentRopeLength = Vector3.Distance(rodTip.position, bobber.position);
         segmentLength = currentRopeLength / segmentCount;
 
-        // Technical explanation: Using Time.deltaTime because this logic now runs in LateUpdate, which is tied to the frame rate, not the fixed physics step.
         float deltaTime = Time.deltaTime;
 
         for (int i = 0; i < ropePoints.Count; i++)

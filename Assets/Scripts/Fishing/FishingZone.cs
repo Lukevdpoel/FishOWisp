@@ -18,6 +18,16 @@ public class FishingZone : MonoBehaviour
     {
         if (other.TryGetComponent<BobberController>(out var bobber))
         {
+            // --- FIX STARTS HERE ---
+            // If the bobber is kinematic, it means it's being reeled in by the FishingLine script.
+            // We should ignore it so we don't start a new fishing sequence mid-air.
+            Rigidbody bobberRb = bobber.GetComponent<Rigidbody>();
+            if (bobberRb != null && bobberRb.isKinematic)
+            {
+                return;
+            }
+            // --- FIX ENDS HERE ---
+
             Debug.Log($"Bobber entered pool: {fishPool.poolName}");
             currentBobber = bobber;
             if (catchRoutine == null)
@@ -55,10 +65,15 @@ public class FishingZone : MonoBehaviour
         Debug.Log($"Something is interested... A {fishToCatch.fishName} will start nibbling in {waitTime:F1} seconds...");
         yield return new WaitForSeconds(waitTime);
 
+        // Additional safety check: Ensure bobber is still valid and not being reeled in
         if (currentBobber != null)
         {
-            // Instead of hooking the fish, start the nibble sequence on the bobber.
-            currentBobber.StartNibbleSequence(fishToCatch);
+            Rigidbody bobberRb = currentBobber.GetComponent<Rigidbody>();
+            if (bobberRb != null && !bobberRb.isKinematic)
+            {
+                // Instead of hooking the fish, start the nibble sequence on the bobber.
+                currentBobber.StartNibbleSequence(fishToCatch);
+            }
         }
 
         catchRoutine = null;

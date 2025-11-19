@@ -89,6 +89,10 @@ Material:
         m_Texture: {fileID: 2800000, guid: b5b8ccb2f1049134fa119dbc6c24e64e, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _Thickness_Map:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     - _WindTexture:
         m_Texture: {fileID: 2800000, guid: b8606dbcbd5e49f4a9f37e735499f8de, type: 3}
         m_Scale: {x: 1, y: 1}
@@ -115,6 +119,7 @@ Material:
     - _AlphaClip: 1
     - _AlphaThreshold: 0.5
     - _AlphaToMask: 1
+    - _AngleThreshold: -0.5
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
     - _BumpScale: 1
@@ -127,6 +132,7 @@ Material:
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
+    - _Fresneleffect: 1
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
@@ -164,10 +170,11 @@ Material:
     - _FarColor: {r: 0.22414556, g: 0.6886792, b: 0.48867166, a: 1}
     - _NearColor: {r: 0.31435367, g: 0.8962264, b: 0.15641683, a: 1}
     - _NearFarRange: {r: 23.7, g: 45.99, b: 0, a: 0}
+    - _ScatterColor: {r: 0, g: 0, b: 0, a: 1}
     - _ShadowColor: {r: 0.27358484, g: 0.27358484, b: 0.27358484, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _WindNoiseContrast: {r: 0.09, g: 1.4, b: 0, a: 0}
     - _WindNoiseScale: {r: 40, g: 100, b: 0, a: 0}
-    - _baseColor: {r: 0.27656636, g: 0.51886785, b: 0.27938378, a: 1}
+    - _baseColor: {r: 0.20465466, g: 0.6886792, b: 0.3535853, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
