@@ -21,17 +21,17 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: PlantPot
-  m_Shader: {fileID: -6465566751694194690, guid: 0704a9447d8587045a77bb47c45fe40b, type: 3}
+  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords:
-  - _SHADOWS_SOFT
+  m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap: {}
+  stringTagMap:
+    RenderType: Opaque
   disabledShaderPasses:
   - MOTIONVECTORS
   m_LockedProperties: 
@@ -157,7 +157,7 @@ Material:
     m_Colors:
     - _AmbientColor: {r: 0, g: 0, b: 0, a: 0}
     - _BaseColor: {r: 0.754717, g: 0.754717, b: 0.754717, a: 1}
-    - _Color: {r: 0.6604664, g: 0.7735849, b: 0.70978105, a: 1}
+    - _Color: {r: 0.75471693, g: 0.75471693, b: 0.75471693, a: 1}
     - _Color1: {r: 0.5283019, g: 0.33641863, b: 0.33641863, a: 0}
     - _Color2: {r: 0.044143796, g: 0.30188674, b: 0.22320735, a: 0}
     - _Color3: {r: 1, g: 1, b: 1, a: 0}
