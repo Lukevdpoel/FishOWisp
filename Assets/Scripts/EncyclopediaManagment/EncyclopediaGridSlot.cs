@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 
-public class EncyclopediaGridSlot : MonoBehaviour, IPointerClickHandler
+public class EncyclopediaGridSlot : MonoBehaviour
 {
     [Header("UI References")]
     public Image iconImage;
@@ -11,7 +11,7 @@ public class EncyclopediaGridSlot : MonoBehaviour, IPointerClickHandler
     [Tooltip("An overlay (like a black panel or question mark) enabled when fish is not caught.")]
     public GameObject unknownOverlay;
 
-    private FishEncyclopediaEntry myEntry;
+    public FishEncyclopediaEntry myEntry;
     private EncyclopediaUIController controller;
 
     public void Setup(FishEncyclopediaEntry entry, EncyclopediaUIController uiController)
@@ -41,7 +41,7 @@ public class EncyclopediaGridSlot : MonoBehaviour, IPointerClickHandler
     }
 
     // Detects the click and notifies the Controller
-    public void OnPointerClick(PointerEventData eventData)
+    public void OnClicked()
     {
         if (controller != null)
         {

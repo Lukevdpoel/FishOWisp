@@ -24,24 +24,37 @@ public class FishEntryUI : MonoBehaviour
 
         //fishImage.sprite = preset.fishImage;
         fishNameText.text = preset.fishName;
-        rarityText.text = preset.rarity.ToString();
-        caughtText.text = entry.hasCaught.ToString();
+        if(rarityText != null )
+            rarityText.text = preset.rarity.ToString();
+        if( caughtText != null )
+            caughtText.text = entry.hasCaught.ToString();
 
         if (entry.hasCaught > 0)
         {
-            largestCaughtText.text = $"{entry.largestCaught:F1} cm";
-            smallestCaughtText.text = $"{entry.smallestCaught:F1} cm";
+            if(largestCaughtText != null)
+                largestCaughtText.text = $"{entry.largestCaught:F1} cm";
+            if (smallestCaughtText != null)
+                smallestCaughtText.text = $"{entry.smallestCaught:F1} cm";
         }
         else
         {
-            largestCaughtText.text = "—";
-            smallestCaughtText.text = "—";
+            if (largestCaughtText != null)
+                largestCaughtText.text = "—";
+            if (smallestCaughtText != null)
+                smallestCaughtText.text = "—";
         }
 
-        basePriceText.text = $"{preset.basePrice} coins";
+        if (basePriceText != null)
+            basePriceText.text = $"{preset.basePrice} coins";
         // Populate the new text field to show the value-per-cm
-        pricePerCmText.text = $"+{preset.pricePerCm:F1} / cm";
-        baitText.text = preset.preferredBait.ToString();
-        weatherText.text = preset.preferredWeather.ToString();
+
+        if (pricePerCmText != null)
+            pricePerCmText.text = $"+{preset.pricePerCm:F1} / cm";
+
+        if (baitText != null)
+            baitText.text = preset.preferredBait.ToString();
+
+        if (weatherText != null)
+            weatherText.text = preset.preferredWeather.ToString();
     }
 }

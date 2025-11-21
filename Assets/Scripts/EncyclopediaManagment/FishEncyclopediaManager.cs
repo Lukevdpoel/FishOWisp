@@ -40,15 +40,11 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
         UpdateUI();
     }
 
-    public void RegisterCaughtFish(FishPreset preset, float length)
+    public void RegisterCaughtFish(CaughtFish caughtFish)
     {
-        var entry = GetOrCreateEntry(preset);
-        entry.RegisterCatch(length);
+        var entry = GetOrCreateEntry(caughtFish.preset);
+        entry.RegisterCatch(caughtFish.lengthCm);
         SaveEncyclopedia();
-
-        // --- THE ONLY ADDED LINE ---
-        // This tells the player's current inventory to add an instance of the fish.
-        PlayerInventory.Instance.AddFish(preset);
     }
 
     private FishEncyclopediaEntry GetOrCreateEntry(FishPreset preset)

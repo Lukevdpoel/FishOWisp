@@ -1,8 +1,7 @@
 using UnityEngine;
 
-public class ModelViewer : MonoBehaviour
+public class ModelViewer : GenericSingleton<ModelViewer>
 {
-    public static ModelViewer Instance { get; private set; }
 
     [Header("Setup")]
     public Transform modelContainer;
@@ -10,17 +9,6 @@ public class ModelViewer : MonoBehaviour
 
     private GameObject currentModel;
 
-    void Awake()
-    {
-        // Singleton enforcements
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-
-        Instance = this;
-    }
 
     /// <summary>
     /// Swap the model being displayed by instantiating the provided prefab.
@@ -32,7 +20,9 @@ public class ModelViewer : MonoBehaviour
         {
             Destroy(currentModel);
         }
-
+        
+        Debug.Log(prefab.ToString());
+        Debug.Log(camera.ToString());
         camera.transform.localPosition = new Vector3(0, 0, -prefab.cameraviewdistance);
 
         // Instantiate new model as child of container
@@ -41,5 +31,12 @@ public class ModelViewer : MonoBehaviour
         currentModel.transform.localPosition = Vector3.zero;
         currentModel.transform.localRotation = Quaternion.identity;
         currentModel.transform.localScale = Vector3.one;
+        MeshRenderer[] renderers = currentModel.GetComponentsInChildren<MeshRenderer>();
+
+        foreach (MeshRenderer renderer in renderers)
+        {
+            renderer.gameObject.layer = 22;
+        }
+
     }
 }

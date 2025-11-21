@@ -1,9 +1,11 @@
+using Sirenix.OdinInspector;
 using UnityEngine;
 
 public class PauseManager : GenericSingleton<PauseManager>
 {
     private bool isPaused = false;
     //private event onPausedStateChanged<bool>();
+    [Button]
     public void SetPaused(bool paused, bool forceScale = false)
     {
         isPaused = paused;

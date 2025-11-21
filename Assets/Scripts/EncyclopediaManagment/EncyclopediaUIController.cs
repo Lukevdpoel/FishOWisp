@@ -33,9 +33,10 @@ public class EncyclopediaUIController : MonoBehaviour
         {
             GenerateRaster();
 
-            // Start with details hidden until player clicks a specific fish
-            if (detailsUI != null) detailsUI.gameObject.SetActive(false);
-            if (fish3DPreview != null) fish3DPreview.gameObject.SetActive(false);
+            if(spawnedSlots.Count > 0)
+            {
+                OnSlotClicked(spawnedSlots[0].myEntry, spawnedSlots[0]);
+            }
         }
     }
 

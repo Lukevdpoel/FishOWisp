@@ -18,11 +18,11 @@ public class DebugFishCatcher : MonoBehaviour
 
         // Choose random fish
         FishPreset preset = fishPool.availableFish[Random.Range(0, fishPool.availableFish.Count)];
-        float length = Random.Range(preset.minLengthCm, preset.maxLengthCm);
+        CaughtFish caughtFish = new CaughtFish(preset);
 
         // Register the catch
-        FishEncyclopediaManager.Instance.RegisterCaughtFish(preset, length);
+        FishEncyclopediaManager.Instance.RegisterCaughtFish(caughtFish);
 
-        Debug.Log($"Caught from {fishPool.poolName}: {preset.fishName} ({length:F1} cm)");
+        Debug.Log($"Caught from {fishPool.poolName}: {preset.fishName} ({caughtFish.lengthCm:F1} cm)");
     }
 }

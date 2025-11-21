@@ -29,6 +29,7 @@ public class PlayerInventory : MonoBehaviour
 
     public void AddFish(CaughtFish fishToAdd, GameObject physicalPrefab = null) // physicalPrefab argument is ignored
     {
+        FishEncyclopediaManager.Instance.RegisterCaughtFish(fishToAdd);
         if (caughtFishes.Count >= inventorySize)
         {
             Debug.Log("Inventory is full! Cannot add fish.");

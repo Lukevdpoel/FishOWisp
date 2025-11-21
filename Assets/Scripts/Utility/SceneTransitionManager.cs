@@ -1,7 +1,4 @@
-// File: SceneTransitionManager.cs
-// REVISED SCRIPT
-
-using System.Threading.Tasks; // Required for Task
+using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -9,8 +6,9 @@ public class SceneTransitionManager : GenericSingleton<SceneTransitionManager>
 {
     [Header("Transition Settings")]
     public Animator transition;
-    [Tooltip("This should match the exact length of your fade-out animation clip.")]
     public float transitionTime = 1f;
+
+    private bool isTransitioning = false;
 
     protected override void Awake()
     {
@@ -35,22 +33,28 @@ public class SceneTransitionManager : GenericSingleton<SceneTransitionManager>
     {
         if (transition != null)
         {
-            // You can simplify the fade-in logic
+            Debug.Log("SceneTransitionManager: Setting trigger End");
             transition.SetTrigger("End");
+            transition.ResetTrigger("Start");
         }
         else
         {
             Debug.LogWarning("SceneTransitionManager: No animator assigned for transitions.");
         }
+
+        isTransitioning = false;
     }
 
-    // REVISED: This method now calls the new async version.
     public void LoadScene(string sceneName)
     {
+        if (isTransitioning)
+        {
+            return;
+        }
+
         if (transition != null)
         {
-            // Fire and forget the async method.
-            // The '_' discard tells the compiler we intentionally aren't awaiting the result here.
+            isTransitioning = true;
             _ = LoadSceneAsync(sceneName);
         }
         else
@@ -60,22 +64,15 @@ public class SceneTransitionManager : GenericSingleton<SceneTransitionManager>
         }
     }
 
-    // NEW: The async method that replaces the coroutine.
     private async Task LoadSceneAsync(string sceneName)
     {
-        // Trigger the fade-out animation.
+        Debug.Log("SceneTransitionManager: Setting trigger Start");
         transition.SetTrigger("Start");
 
-        // Wait for the duration of the animation using Task.Delay.
-        // Task.Delay expects milliseconds, so we multiply by 1000.
         await Task.Delay((int)(transitionTime * 1000));
 
-        // Start loading the next scene in the background.
         AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName);
 
-        // You could do other things here while the scene loads.
-        // By default, the scene will activate as soon as it's ready.
-        // We await the operation to ensure the task completes.
         await asyncLoad;
     }
 }

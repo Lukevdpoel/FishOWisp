@@ -50,7 +50,7 @@ public class NoteMenu : MonoBehaviour
         // 2. Pause Logic (Matches your PauseMenu.cs)
         Cursor.lockState = CursorLockMode.None; // Unlock mouse so player can click grid
         Cursor.visible = true;                  // Show cursor
-        Time.timeScale = 0f;                    // Freeze game physics/time
+        PauseManager.Instance.SetPaused(true);
 
         // 3. Show the Encyclopedia Raster (Grid)
         // We use a Coroutine to wait for the book to open slightly before showing UI
@@ -68,7 +68,7 @@ public class NoteMenu : MonoBehaviour
         // 2. Resume Logic
         Cursor.lockState = CursorLockMode.Locked; // Lock mouse back to center
         Cursor.visible = false;                   // Hide cursor
-        Time.timeScale = 1f;                      // Unfreeze game
+        PauseManager.Instance.SetPaused(false);
 
         // 3. Hide UI Immediately
         StopAllCoroutines();
