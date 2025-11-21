@@ -1,58 +1,85 @@
 using UnityEngine;
+using System.Collections;
 
 public class NoteMenu : MonoBehaviour
 {
-    // Drag your 3D object that has the Animator component here
-    [Tooltip("The Animator component on the object to be animated.")]
+    [Header("Animation")]
+    [Tooltip("The Animator component on the 3D notebook object.")]
     public Animator noteAnimator;
+    private int isOpenAnimHash;
+
+    [Header("UI Integration")]
+    [Tooltip("Drag the object with EncyclopediaUIController here.")]
+    public EncyclopediaUIController encyclopediaUI;
+    [Tooltip("How long to wait (in real seconds) for the book to open before showing the grid.")]
+    public float uiDelay = 0.5f;
 
     private bool isNoteOpen = false;
 
-    // This is the name of the parameter you will create in the Animator window
-    private int isOpenAnimHash;
-
     void Start()
     {
-        // Set the hash for the "IsOpen" parameter
         isOpenAnimHash = Animator.StringToHash("IsOpen");
 
-        // Ensure the animator starts in the closed state
-        noteAnimator.SetBool(isOpenAnimHash, false);
+        // Ensure we start closed and resumed
+        if (noteAnimator != null) noteAnimator.SetBool(isOpenAnimHash, false);
+        if (encyclopediaUI != null) encyclopediaUI.SetUIState(false);
     }
 
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.Tab))
         {
-            // Toggle the boolean state
-            isNoteOpen = !isNoteOpen;
-
-            // Tell the animator to change state
-            noteAnimator.SetBool(isOpenAnimHash, isNoteOpen);
-
-            // Call your Pause/Resume logic
-            // This will pause the game *as soon as* the open animation starts
-            // and resume *as soon as* the close animation starts.
             if (isNoteOpen)
             {
-                Pause();
+                CloseNotebook();
             }
             else
             {
-                Resume();
+                OpenNotebook();
             }
         }
     }
 
-    public void Resume()
+    void OpenNotebook()
     {
-        // You no longer need to manually SetActive(false)
-        PauseManager.Instance.SetPaused(false, true);
+        isNoteOpen = true;
+
+        // 1. Animate the book
+        if (noteAnimator != null) noteAnimator.SetBool(isOpenAnimHash, true);
+
+        // 2. Pause Logic (Matches your PauseMenu.cs)
+        Cursor.lockState = CursorLockMode.None; // Unlock mouse so player can click grid
+        Cursor.visible = true;                  // Show cursor
+        Time.timeScale = 0f;                    // Freeze game physics/time
+
+        // 3. Show the Encyclopedia Raster (Grid)
+        // We use a Coroutine to wait for the book to open slightly before showing UI
+        StopAllCoroutines();
+        StartCoroutine(ShowUIRoutine());
     }
 
-    void Pause()
+    void CloseNotebook()
     {
-        // You no longer need to manually SetActive(true)
-        PauseManager.Instance.SetPaused(true, true);
+        isNoteOpen = false;
+
+        // 1. Animate the book closed
+        if (noteAnimator != null) noteAnimator.SetBool(isOpenAnimHash, false);
+
+        // 2. Resume Logic
+        Cursor.lockState = CursorLockMode.Locked; // Lock mouse back to center
+        Cursor.visible = false;                   // Hide cursor
+        Time.timeScale = 1f;                      // Unfreeze game
+
+        // 3. Hide UI Immediately
+        StopAllCoroutines();
+        if (encyclopediaUI != null) encyclopediaUI.SetUIState(false);
+    }
+
+    IEnumerator ShowUIRoutine()
+    {
+        // We must use WaitForSecondsRealtime because Time.timeScale is 0!
+        yield return new WaitForSecondsRealtime(uiDelay);
+
+        if (encyclopediaUI != null) encyclopediaUI.SetUIState(true);
     }
 }
