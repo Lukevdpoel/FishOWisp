@@ -1622,7 +1622,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 7964376155891415272, guid: 6d34ed879cdd0fb479284eeef682a28e, type: 3}
       propertyPath: cameraSpeed
-      value: 300
+      value: 600
       objectReference: {fileID: 0}
     - target: {fileID: 8687867935514308881, guid: 6d34ed879cdd0fb479284eeef682a28e, type: 3}
       propertyPath: m_AnchorMax.x
@@ -9033,7 +9033,7 @@ AudioSource:
   Mute: 0
   Spatialize: 0
   SpatializePostEffects: 0
-  Priority: 128
+  Priority: 94
   DopplerLevel: 1
   MinDistance: 1
   MaxDistance: 500
@@ -26235,9 +26235,9 @@ AudioSource:
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
   m_audioClip: {fileID: 0}
-  m_Resource: {fileID: 8300000, guid: 47d350561e4cafc429241522678b440f, type: 3}
+  m_Resource: {fileID: 8300000, guid: 10c6c706aad1d324c9d7583d7743897e, type: 3}
   m_PlayOnAwake: 1
-  m_Volume: 0.028
+  m_Volume: 0.275
   m_Pitch: 1
   Loop: 1
   Mute: 0

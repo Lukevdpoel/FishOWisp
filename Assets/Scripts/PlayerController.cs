@@ -13,6 +13,9 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float rotationSpeed = 15f;
     [SerializeField] private float gravity = -20f;
 
+    // NEW: Jump Animation Setting
+    [SerializeField] private string jumpAnimTrigger = "Jump";
+
     [Header("Fishing Animations")]
     [SerializeField] private string startChargingAnim = "StartCharging";
     [SerializeField] private string throwAnim = "Throw";
@@ -132,6 +135,10 @@ public class PlayerController : MonoBehaviour
         HandleMovement();
         HandleRotation();
         HandleGravity();
+
+        // NEW: Check for jump input
+        HandleJumpInput();
+
         HandleAnimation();
         HandleIdleAnimation();
         HandleCursorLocking();
@@ -148,18 +155,49 @@ public class PlayerController : MonoBehaviour
     private void HandleRotation() { if (new Vector3(targetVelocity.x, 0, targetVelocity.z).magnitude > 0.1f) { Vector3 lookDirection = new Vector3(targetVelocity.x, 0, targetVelocity.z); Quaternion targetRotation = Quaternion.LookRotation(lookDirection); playerModel.rotation = Quaternion.Slerp(playerModel.rotation, targetRotation, rotationSpeed * Time.deltaTime); } }
     private void HandleGravity() { if (characterController.isGrounded && targetVelocity.y < 0f) targetVelocity.y = -2f; else targetVelocity.y += gravity * Time.deltaTime; }
     private void HandleAnimation() { bool isWalking = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f; animator.SetBool("Walk", isWalking); }
-    private void HandleIdleAnimation() { bool isMoving = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f; bool isRotatingCamera = Input.GetMouseButton(1); if (isMoving || isRotatingCamera) { NotifyOfAction(); } else { idleTimer += Time.deltaTime; } if (idleTimer >= sitDownHoldTime && allowSitdown) { animator.SetTrigger("Sitdown"); allowSitdown = false; } }
+
+    // MODIFIED: Resets idle timer if we jump
+    private void HandleIdleAnimation()
+    {
+        bool isMoving = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f;
+        bool isRotatingCamera = Input.GetMouseButton(1);
+
+        if (isMoving || isRotatingCamera)
+        {
+            NotifyOfAction();
+        }
+        else
+        {
+            idleTimer += Time.deltaTime;
+        }
+
+        if (idleTimer >= sitDownHoldTime && allowSitdown)
+        {
+            animator.SetTrigger("Sitdown");
+            allowSitdown = false;
+        }
+    }
+
     public void NotifyOfAction() { idleTimer = 0f; allowSitdown = true; }
 
-    // ===================================================================
-    // MODIFIED METHODS BELOW
-    // ===================================================================
+    // NEW METHOD: Handles Input to play animation without physics
+    private void HandleJumpInput()
+    {
+        // Check if we are on the ground and the user presses Space (Jump)
+        if (characterController.isGrounded && Input.GetButtonDown("Jump"))
+        {
+            if (animator && !string.IsNullOrEmpty(jumpAnimTrigger))
+            {
+                animator.SetTrigger(jumpAnimTrigger);
+                NotifyOfAction(); // Reset the "Sit Down" timer
+            }
+        }
+    }
 
     private void HandleCamera()
     {
         if (!cameraTransform || !playerModel) return;
 
-        // Camera rotation is no longer dependent on holding a mouse button
         float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
         float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
         cameraXAngle += mouseX;
@@ -209,13 +247,10 @@ public class PlayerController : MonoBehaviour
 
     private void HandleCursorLocking()
     {
-        // Only lock the cursor if the game is not paused
         if (Time.timeScale > 0f)
         {
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
-        // When the game IS paused (Time.timeScale = 0), this script will
-        // no longer interfere, allowing your InventoryUI to show the cursor.
     }
 }

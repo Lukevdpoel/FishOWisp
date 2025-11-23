@@ -20,7 +20,7 @@ public class NoteMenu : MonoBehaviour
     {
         isOpenAnimHash = Animator.StringToHash("IsOpen");
 
-        // Ensure we start closed and resumed
+        // Ensure we start closed
         if (noteAnimator != null) noteAnimator.SetBool(isOpenAnimHash, false);
         if (encyclopediaUI != null) encyclopediaUI.SetUIState(false);
     }
@@ -47,13 +47,14 @@ public class NoteMenu : MonoBehaviour
         // 1. Animate the book
         if (noteAnimator != null) noteAnimator.SetBool(isOpenAnimHash, true);
 
-        // 2. Pause Logic (Matches your PauseMenu.cs)
-        Cursor.lockState = CursorLockMode.None; // Unlock mouse so player can click grid
+        // 2. Pause Logic 
+        Cursor.lockState = CursorLockMode.None; // Unlock mouse
         Cursor.visible = true;                  // Show cursor
-        PauseManager.Instance.SetPaused(true);
 
-        // 3. Show the Encyclopedia Raster (Grid)
-        // We use a Coroutine to wait for the book to open slightly before showing UI
+        if (PauseManager.Instance != null)
+            PauseManager.Instance.SetPaused(true);
+
+        // 3. Show the Encyclopedia UI
         StopAllCoroutines();
         StartCoroutine(ShowUIRoutine());
     }
@@ -66,9 +67,11 @@ public class NoteMenu : MonoBehaviour
         if (noteAnimator != null) noteAnimator.SetBool(isOpenAnimHash, false);
 
         // 2. Resume Logic
-        Cursor.lockState = CursorLockMode.Locked; // Lock mouse back to center
+        Cursor.lockState = CursorLockMode.Locked; // Lock mouse
         Cursor.visible = false;                   // Hide cursor
-        PauseManager.Instance.SetPaused(false);
+
+        if (PauseManager.Instance != null)
+            PauseManager.Instance.SetPaused(false);
 
         // 3. Hide UI Immediately
         StopAllCoroutines();
@@ -77,7 +80,7 @@ public class NoteMenu : MonoBehaviour
 
     IEnumerator ShowUIRoutine()
     {
-        // We must use WaitForSecondsRealtime because Time.timeScale is 0!
+        // IMPORTANT: WaitForSecondsRealtime works even when Time.timeScale is 0
         yield return new WaitForSecondsRealtime(uiDelay);
 
         if (encyclopediaUI != null) encyclopediaUI.SetUIState(true);

@@ -1,8 +1,9 @@
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems;
+using UnityEngine.EventSystems; // Required for clicking
 
-public class EncyclopediaGridSlot : MonoBehaviour
+// Added IPointerClickHandler interface
+public class EncyclopediaGridSlot : MonoBehaviour, IPointerClickHandler
 {
     [Header("UI References")]
     public Image iconImage;
@@ -33,19 +34,31 @@ public class EncyclopediaGridSlot : MonoBehaviour
             unknownOverlay.SetActive(!isCaught);
         }
 
-        // Optional: Darken the icon if not caught (silhouette effect)
-        iconImage.color = isCaught ? Color.white : Color.black;
+        // Optional: Darken the icon if not caught
+        if (iconImage != null)
+        {
+            iconImage.color = isCaught ? Color.white : Color.black;
+        }
 
         // Start deselected
         Deselect();
     }
 
-    // Detects the click and notifies the Controller
+    // --- NEW: This automatically detects clicks ---
+    public void OnPointerClick(PointerEventData eventData)
+    {
+        OnClicked();
+    }
+
     public void OnClicked()
     {
         if (controller != null)
         {
             controller.OnSlotClicked(myEntry, this);
+        }
+        else
+        {
+            Debug.LogError("Grid Slot clicked, but Controller is null!");
         }
     }
 

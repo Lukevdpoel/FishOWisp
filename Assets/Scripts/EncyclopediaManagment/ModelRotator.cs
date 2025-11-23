@@ -7,17 +7,22 @@ public class ModelRotator : MonoBehaviour
 
     void Update()
     {
+        // 1. Reset last position on the frame the button is clicked
         if (Input.GetMouseButtonDown(0))
         {
             lastMousePosition = Input.mousePosition;
         }
 
+        // 2. Calculate rotation while holding the button
         if (Input.GetMouseButton(0))
         {
             Vector3 delta = Input.mousePosition - lastMousePosition;
-            float rotX = delta.y * rotationSpeed * Time.deltaTime;
-            float rotY = -delta.x * rotationSpeed * Time.deltaTime;
 
+            // CHANGE: Use unscaledDeltaTime so it works while Paused
+            float rotX = delta.y * rotationSpeed * Time.unscaledDeltaTime;
+            float rotY = -delta.x * rotationSpeed * Time.unscaledDeltaTime;
+
+            // Apply rotation
             transform.Rotate(Vector3.up, rotY, Space.World);
             transform.Rotate(Vector3.right, rotX, Space.World);
 
