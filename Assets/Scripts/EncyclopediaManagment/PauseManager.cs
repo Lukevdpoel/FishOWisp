@@ -4,7 +4,7 @@ using UnityEngine;
 public class PauseManager : GenericSingleton<PauseManager>
 {
     private bool isPaused = false;
-    //private event onPausedStateChanged<bool>();
+
     [Button]
     public void SetPaused(bool paused, bool forceScale = false)
     {
@@ -17,9 +17,10 @@ public class PauseManager : GenericSingleton<PauseManager>
         {
             Time.timeScale = 1f;
         }
-        if(forceScale == true)
+
+        if (forceScale == true)
         {
-            Time.timeScale = 1;
+            Time.timeScale = 1f;
         }
     }
 

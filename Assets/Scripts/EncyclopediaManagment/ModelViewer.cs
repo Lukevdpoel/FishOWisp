@@ -20,8 +20,12 @@ public class ModelViewer : GenericSingleton<ModelViewer>
         {
             Destroy(currentModel);
         }
-        
-        Debug.Log(prefab.ToString());
+
+        if (prefab == null)
+        {
+            return;
+        }
+            Debug.Log(prefab.ToString());
         Debug.Log(camera.ToString());
         camera.transform.localPosition = new Vector3(0, 0, -prefab.cameraviewdistance);
 

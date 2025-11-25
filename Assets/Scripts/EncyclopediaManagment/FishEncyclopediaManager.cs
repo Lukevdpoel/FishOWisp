@@ -34,7 +34,6 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
         }
     }
 
-
     private void OnEnable()
     {
         UpdateUI();
@@ -49,7 +48,8 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
 
     private FishEncyclopediaEntry GetOrCreateEntry(FishPreset preset)
     {
-        var entry = encyclopediaEntries.Find(e => e.preset.fishName == preset.fishName);
+        // FIX: Added "e.preset != null" check to prevent crash if save data is corrupted
+        var entry = encyclopediaEntries.Find(e => e.preset != null && e.preset.fishName == preset.fishName);
         if (entry == null)
         {
             entry = new FishEncyclopediaEntry { preset = preset };
@@ -70,30 +70,31 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
         {
             string json = File.ReadAllText(SavePath);
             EncyclopediaDataWrapper wrapper = JsonUtility.FromJson<EncyclopediaDataWrapper>(json);
-            encyclopediaEntries = wrapper.entries;
+            encyclopediaEntries = wrapper.entries ?? new List<FishEncyclopediaEntry>();
+
+            // FIX: Remove any entries that lost their ScriptableObject reference during load
+            // This prevents the NullReferenceException later
+            encyclopediaEntries.RemoveAll(e => e.preset == null);
         }
         else
         {
             encyclopediaEntries = new List<FishEncyclopediaEntry>();
         }
-        return;
+
+        // FIX: Removed the "return;" that was here. It was preventing the code below from running.
+
         foreach (var preset in allFishPresets)
         {
+            if (preset == null) continue;
+
             // Add missing presets to encyclopedia
-            if (!encyclopediaEntries.Exists(e => e.preset.fishName == preset.fishName))
+            // FIX: Added "e.preset != null" safety check
+            if (!encyclopediaEntries.Exists(e => e.preset != null && e.preset.fishName == preset.fishName))
             {
                 encyclopediaEntries.Add(new FishEncyclopediaEntry { preset = preset });
             }
-
-            // Re-link any entries where preset might have become null
-            var entry = encyclopediaEntries.Find(e => e.preset != null && e.preset.fishName == preset.fishName);
-            if (entry != null && entry.preset == null)
-            {
-                entry.preset = preset;
-            }
         }
     }
-
 
     [System.Serializable]
     private class EncyclopediaDataWrapper
@@ -105,27 +106,19 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
             this.entries = entries;
         }
     }
+
     [Button]
     public void NextEntry()
     {
-        if (encyclopediaEntries.Count == 0)
-        {
-            Debug.LogWarning("No entries in encyclopedia.");
-            return;
-        }
-
+        if (encyclopediaEntries.Count == 0) return;
         currentIndex = (currentIndex + 1) % encyclopediaEntries.Count;
         UpdateUI();
     }
+
     [Button]
     public void PreviousEntry()
     {
-        if (encyclopediaEntries.Count == 0)
-        {
-            Debug.LogWarning("No entries in encyclopedia.");
-            return;
-        }
-
+        if (encyclopediaEntries.Count == 0) return;
         currentIndex = (currentIndex - 1 + encyclopediaEntries.Count) % encyclopediaEntries.Count;
         UpdateUI();
     }
@@ -133,14 +126,17 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
     private void UpdateUI()
     {
         FishEntryUI entryUI = GetComponentInChildren<FishEntryUI>(true);
-        if (entryUI == null)
-        {
-            Debug.LogWarning("FishEntryUI component not found in children.");
-            return;
-        }
+        if (entryUI == null) return;
 
         if (encyclopediaEntries != null && encyclopediaEntries.Count > 0)
-            entryUI.Populate(encyclopediaEntries[currentIndex]);
+        {
+            // Safety check for UI
+            if (currentIndex >= encyclopediaEntries.Count) currentIndex = 0;
+            if (encyclopediaEntries[currentIndex].preset != null)
+            {
+                entryUI.Populate(encyclopediaEntries[currentIndex]);
+            }
+        }
     }
 
     [Button(ButtonSizes.Medium)]
@@ -153,5 +149,8 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
         }
         encyclopediaEntries.Clear();
         currentIndex = 0;
+
+        // Reload to repopulate the empty list from presets
+        LoadEncyclopedia();
     }
 }

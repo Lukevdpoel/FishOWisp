@@ -1,15 +1,12 @@
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems; // Required for clicking
+using UnityEngine.EventSystems;
 
-// Added IPointerClickHandler interface
 public class EncyclopediaGridSlot : MonoBehaviour, IPointerClickHandler
 {
     [Header("UI References")]
     public Image iconImage;
-    [Tooltip("An image (like a yellow border) enabled when selected.")]
     public GameObject selectionHighlight;
-    [Tooltip("An overlay (like a black panel or question mark) enabled when fish is not caught.")]
     public GameObject unknownOverlay;
 
     public FishEncyclopediaEntry myEntry;
@@ -20,13 +17,11 @@ public class EncyclopediaGridSlot : MonoBehaviour, IPointerClickHandler
         myEntry = entry;
         controller = uiController;
 
-        // 1. Set the icon based on the Preset data
         if (entry.preset != null)
         {
             iconImage.sprite = entry.preset.fishImage;
         }
 
-        // 2. Handle "Unknown" state visuals
         bool isCaught = entry.hasCaught > 0;
 
         if (unknownOverlay != null)
@@ -34,17 +29,14 @@ public class EncyclopediaGridSlot : MonoBehaviour, IPointerClickHandler
             unknownOverlay.SetActive(!isCaught);
         }
 
-        // Optional: Darken the icon if not caught
         if (iconImage != null)
         {
             iconImage.color = isCaught ? Color.white : Color.black;
         }
 
-        // Start deselected
         Deselect();
     }
 
-    // --- NEW: This automatically detects clicks ---
     public void OnPointerClick(PointerEventData eventData)
     {
         OnClicked();
@@ -55,10 +47,6 @@ public class EncyclopediaGridSlot : MonoBehaviour, IPointerClickHandler
         if (controller != null)
         {
             controller.OnSlotClicked(myEntry, this);
-        }
-        else
-        {
-            Debug.LogError("Grid Slot clicked, but Controller is null!");
         }
     }
 

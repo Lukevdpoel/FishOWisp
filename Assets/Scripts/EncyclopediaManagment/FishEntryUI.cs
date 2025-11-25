@@ -19,6 +19,10 @@ public class FishEntryUI : MonoBehaviour
     [Button]
     public void Populate(FishEncyclopediaEntry entry)
     {
+        if (entry == null)
+        {
+            return;
+        }
         var preset = entry.preset;
         ModelViewer.Instance.ShowModel(preset);
 

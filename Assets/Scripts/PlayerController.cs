@@ -13,7 +13,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float rotationSpeed = 15f;
     [SerializeField] private float gravity = -20f;
 
-    // NEW: Jump Animation Setting
+    [Header("Jump Animation")]
     [SerializeField] private string jumpAnimTrigger = "Jump";
 
     [Header("Fishing Animations")]
@@ -46,6 +46,7 @@ public class PlayerController : MonoBehaviour
     private Vector3 targetVelocity;
     private float idleTimer;
     private bool allowSitdown = true;
+    // State variables for smoothing
     private float startDistance, cameraXAngle, cameraYAngle, smoothXAngle, smoothYAngle, xVel, yVel;
     private Camera cam;
     private float currentCameraDistance, distanceVelocity;
@@ -128,35 +129,94 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    void Start() { characterController = GetComponent<CharacterController>(); if (cameraTransform && playerModel) { startDistance = Vector3.Distance(cameraTransform.position, playerModel.position); currentCameraDistance = startDistance; Vector3 initialCameraAngles = cameraTransform.eulerAngles; cameraXAngle = initialCameraAngles.y; cameraYAngle = initialCameraAngles.x; smoothXAngle = cameraXAngle; smoothYAngle = cameraYAngle; cam = cameraTransform.GetComponent<Camera>(); } if (framingTarget == null) framingTarget = playerModel; }
+    void Start()
+    {
+        characterController = GetComponent<CharacterController>();
+        if (cameraTransform && playerModel)
+        {
+            startDistance = Vector3.Distance(cameraTransform.position, playerModel.position);
+            currentCameraDistance = startDistance;
+            Vector3 initialCameraAngles = cameraTransform.eulerAngles;
+            cameraXAngle = initialCameraAngles.y;
+            cameraYAngle = initialCameraAngles.x;
+            smoothXAngle = cameraXAngle;
+            smoothYAngle = cameraYAngle;
+            cam = cameraTransform.GetComponent<Camera>();
+        }
+        if (framingTarget == null) framingTarget = playerModel;
+    }
 
     void Update()
     {
         HandleMovement();
         HandleRotation();
         HandleGravity();
-
-        // NEW: Check for jump input
         HandleJumpInput();
-
         HandleAnimation();
         HandleIdleAnimation();
         HandleCursorLocking();
         characterController?.Move(targetVelocity * Time.deltaTime);
     }
 
-    void LateUpdate() { HandleCamera(); }
+    // --- FIXED LATE UPDATE ---
+    void LateUpdate()
+    {
+        // CRITICAL FIX: If the game is paused or deltaTime is effectively zero,
+        // do NOT try to run camera smoothing. This prevents the NaN error.
+        if (Time.timeScale == 0f || Time.deltaTime <= 0.0001f)
+        {
+            return;
+        }
+
+        HandleCamera();
+    }
+
     private void PlayStartChargingAnim() { if (animator && !string.IsNullOrEmpty(startChargingAnim)) animator.SetTrigger(startChargingAnim); }
     private void PlayThrowAnim(Vector3 direction, float force) { if (animator && !string.IsNullOrEmpty(throwAnim)) animator.SetTrigger(throwAnim); }
     private void StartFightingAnimation(FishPreset fish) { if (animator && !string.IsNullOrEmpty(isFightingAnimBool)) { animator.SetBool(isFightingAnimBool, true); } }
     private void StopFightingAnimation() { if (animator && !string.IsNullOrEmpty(isFightingAnimBool)) { animator.SetBool(isFightingAnimBool, false); } }
     private void HandleSuccessfulCatchAnimation() { StopFightingAnimation(); PlayReelInAnim(); }
-    private void HandleMovement() { float yVelocity = targetVelocity.y; float h = Input.GetAxisRaw("Horizontal"); float v = Input.GetAxisRaw("Vertical"); Vector3 camForward = cameraTransform.forward; Vector3 camRight = cameraTransform.right; camForward.y = 0f; camRight.y = 0f; camForward.Normalize(); camRight.Normalize(); Vector3 moveDirection = (camForward * v + camRight * h).normalized; targetVelocity = moveDirection * moveSpeed; targetVelocity.y = yVelocity; }
-    private void HandleRotation() { if (new Vector3(targetVelocity.x, 0, targetVelocity.z).magnitude > 0.1f) { Vector3 lookDirection = new Vector3(targetVelocity.x, 0, targetVelocity.z); Quaternion targetRotation = Quaternion.LookRotation(lookDirection); playerModel.rotation = Quaternion.Slerp(playerModel.rotation, targetRotation, rotationSpeed * Time.deltaTime); } }
-    private void HandleGravity() { if (characterController.isGrounded && targetVelocity.y < 0f) targetVelocity.y = -2f; else targetVelocity.y += gravity * Time.deltaTime; }
-    private void HandleAnimation() { bool isWalking = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f; animator.SetBool("Walk", isWalking); }
 
-    // MODIFIED: Resets idle timer if we jump
+    private void HandleMovement()
+    {
+        float yVelocity = targetVelocity.y;
+        float h = Input.GetAxisRaw("Horizontal");
+        float v = Input.GetAxisRaw("Vertical");
+        Vector3 camForward = cameraTransform.forward;
+        Vector3 camRight = cameraTransform.right;
+        camForward.y = 0f;
+        camRight.y = 0f;
+        camForward.Normalize();
+        camRight.Normalize();
+        Vector3 moveDirection = (camForward * v + camRight * h).normalized;
+        targetVelocity = moveDirection * moveSpeed;
+        targetVelocity.y = yVelocity;
+    }
+
+    private void HandleRotation()
+    {
+        if (new Vector3(targetVelocity.x, 0, targetVelocity.z).magnitude > 0.1f)
+        {
+            Vector3 lookDirection = new Vector3(targetVelocity.x, 0, targetVelocity.z);
+            Quaternion targetRotation = Quaternion.LookRotation(lookDirection);
+            playerModel.rotation = Quaternion.Slerp(playerModel.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+        }
+    }
+
+    private void HandleGravity()
+    {
+        if (characterController.isGrounded && targetVelocity.y < 0f)
+            targetVelocity.y = -2f;
+        else
+            targetVelocity.y += gravity * Time.deltaTime;
+    }
+
+    private void HandleAnimation()
+    {
+        bool isWalking = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f;
+        animator.SetBool("Walk", isWalking);
+    }
+
     private void HandleIdleAnimation()
     {
         bool isMoving = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f;
@@ -180,16 +240,14 @@ public class PlayerController : MonoBehaviour
 
     public void NotifyOfAction() { idleTimer = 0f; allowSitdown = true; }
 
-    // NEW METHOD: Handles Input to play animation without physics
     private void HandleJumpInput()
     {
-        // Check if we are on the ground and the user presses Space (Jump)
         if (characterController.isGrounded && Input.GetButtonDown("Jump"))
         {
             if (animator && !string.IsNullOrEmpty(jumpAnimTrigger))
             {
                 animator.SetTrigger(jumpAnimTrigger);
-                NotifyOfAction(); // Reset the "Sit Down" timer
+                NotifyOfAction();
             }
         }
     }
@@ -197,6 +255,15 @@ public class PlayerController : MonoBehaviour
     private void HandleCamera()
     {
         if (!cameraTransform || !playerModel) return;
+
+        // --- FIXED SAFETY CHECK ---
+        // If velocities are corrupted (NaN) due to a previous pause glitch, reset them.
+        if (float.IsNaN(xVel) || float.IsNaN(yVel) || float.IsNaN(distanceVelocity))
+        {
+            xVel = 0f;
+            yVel = 0f;
+            distanceVelocity = 0f;
+        }
 
         float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
         float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
@@ -235,8 +302,14 @@ public class PlayerController : MonoBehaviour
             float tanFov = Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
             float yNdcTarget = Mathf.Clamp(screenYTarget, 0.05f, 0.95f) * 2f - 1f;
             float s = yCam0 - yNdcTarget * zCam0 * tanFov;
-            cameraTransform.position = pos0 + u * s;
-            cameraTransform.rotation = rotation;
+
+            // Final safety check before assigning
+            Vector3 finalPos = pos0 + u * s;
+            if (!float.IsNaN(finalPos.x))
+            {
+                cameraTransform.position = finalPos;
+                cameraTransform.rotation = rotation;
+            }
         }
         else
         {
