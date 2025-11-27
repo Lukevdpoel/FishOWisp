@@ -1,61 +1,81 @@
 using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.EventSystems;
+using System;
 using TMPro;
 
-public class InventorySlotUI : MonoBehaviour
+public class InventorySlotUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
 {
     [Header("UI References")]
-    public TextMeshProUGUI fishNameText;
-    public TextMeshProUGUI fishValueText; // Add a text field for the value
+    public Image iconImage;
     public GameObject selectionHighlight;
 
     public CaughtFish CurrentFish { get; private set; }
 
-    private void Awake()
-    {
-        if (selectionHighlight != null)
-        {
-            selectionHighlight.SetActive(false);
-        }
-    }
+    // Callbacks
+    private Action<CaughtFish, RectTransform> onHoverEnter;
+    private Action onHoverExit;
+    private Action<CaughtFish> onDragOut; // New callback for pulling the fish out
 
-    public void Populate(CaughtFish fish)
+    private bool isPressed = false;
+
+    public void Populate(CaughtFish fish, Action<CaughtFish, RectTransform> onEnter, Action onExit, Action<CaughtFish> onDrag)
     {
         CurrentFish = fish;
-        fishNameText.gameObject.SetActive(true);
-        fishNameText.text = fish.GetDisplayName();
+        onHoverEnter = onEnter;
+        onHoverExit = onExit;
+        onDragOut = onDrag;
 
-        // Show the value text
-        if (fishValueText != null)
+        // Setup Icon
+        if (iconImage != null && fish.preset != null)
         {
-            fishValueText.gameObject.SetActive(true);
-            fishValueText.text = $"{fish.GetValue()} coins";
+            iconImage.gameObject.SetActive(true);
+            iconImage.sprite = fish.preset.fishImage;
+        }
+
+        Deselect();
+    }
+
+    public void OnPointerEnter(PointerEventData eventData)
+    {
+        if (CurrentFish != null)
+        {
+            onHoverEnter?.Invoke(CurrentFish, GetComponent<RectTransform>());
+            Select();
         }
     }
 
-    public void Clear()
+    public void OnPointerExit(PointerEventData eventData)
     {
-        CurrentFish = null;
-        fishNameText.gameObject.SetActive(false);
-        if (fishValueText != null)
+        // 1. Always hide tooltip when leaving
+        onHoverExit?.Invoke();
+        Deselect();
+
+        // 2. Logic: If we are holding the mouse down AND we leave the button area...
+        if (isPressed && CurrentFish != null)
         {
-            fishValueText.gameObject.SetActive(false);
+            // ...Trigger the "Pull Out" 3D model event
+            onDragOut?.Invoke(CurrentFish);
         }
     }
 
-    public void Select()
+    public void OnPointerDown(PointerEventData eventData)
     {
-        if (selectionHighlight != null)
-        {
-            selectionHighlight.SetActive(true);
-        }
+        isPressed = true;
     }
 
-    public void Deselect()
+    public void OnPointerUp(PointerEventData eventData)
     {
-        if (selectionHighlight != null)
-        {
-            selectionHighlight.SetActive(false);
-        }
+        isPressed = false;
+    }
+
+    private void Select()
+    {
+        if (selectionHighlight != null) selectionHighlight.SetActive(true);
+    }
+
+    private void Deselect()
+    {
+        if (selectionHighlight != null) selectionHighlight.SetActive(false);
     }
 }
-

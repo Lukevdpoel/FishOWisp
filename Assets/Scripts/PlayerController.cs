@@ -180,8 +180,11 @@ public class PlayerController : MonoBehaviour
     private void HandleMovement()
     {
         float yVelocity = targetVelocity.y;
-        float h = Input.GetAxisRaw("Horizontal");
-        float v = Input.GetAxisRaw("Vertical");
+
+        // FIX: If inventory is open, force input to 0, but keep gravity (yVelocity) logic running.
+        float h = InventoryUI.IsInventoryOpen ? 0f : Input.GetAxisRaw("Horizontal");
+        float v = InventoryUI.IsInventoryOpen ? 0f : Input.GetAxisRaw("Vertical");
+
         Vector3 camForward = cameraTransform.forward;
         Vector3 camRight = cameraTransform.right;
         camForward.y = 0f;
@@ -214,13 +217,28 @@ public class PlayerController : MonoBehaviour
     private void HandleAnimation()
     {
         bool isWalking = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f;
+
+        // Prevent walking animation if inventory is open
+        if (InventoryUI.IsInventoryOpen) isWalking = false;
+
         animator.SetBool("Walk", isWalking);
     }
 
     private void HandleIdleAnimation()
     {
+        // If inventory is open, we consider the player 'busy', so we reset idle timer 
+        // OR you can let them idle. Here we prevent idle timer reset from movement input since movement is 0.
+
         bool isMoving = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f;
         bool isRotatingCamera = Input.GetMouseButton(1);
+
+        if (InventoryUI.IsInventoryOpen)
+        {
+            // If inventory is open, we don't count input as "action" for idle purposes,
+            // effectively allowing the idle animation to play while looking at inventory if desired.
+            isMoving = false;
+            isRotatingCamera = false;
+        }
 
         if (isMoving || isRotatingCamera)
         {
@@ -242,6 +260,9 @@ public class PlayerController : MonoBehaviour
 
     private void HandleJumpInput()
     {
+        // FIX: Disable jump if inventory is open
+        if (InventoryUI.IsInventoryOpen) return;
+
         if (characterController.isGrounded && Input.GetButtonDown("Jump"))
         {
             if (animator && !string.IsNullOrEmpty(jumpAnimTrigger))
@@ -255,6 +276,9 @@ public class PlayerController : MonoBehaviour
     private void HandleCamera()
     {
         if (!cameraTransform || !playerModel) return;
+
+        // FIX: Stop camera rotation if inventory is open
+        if (InventoryUI.IsInventoryOpen) return;
 
         // --- FIXED SAFETY CHECK ---
         // If velocities are corrupted (NaN) due to a previous pause glitch, reset them.
@@ -320,6 +344,12 @@ public class PlayerController : MonoBehaviour
 
     private void HandleCursorLocking()
     {
+        // FIX: If inventory is open, do not override the cursor state.
+        if (InventoryUI.IsInventoryOpen)
+        {
+            return;
+        }
+
         if (Time.timeScale > 0f)
         {
             Cursor.lockState = CursorLockMode.Locked;

@@ -46,7 +46,8 @@ public class FishingRodController : MonoBehaviour
     private bool isFishInStrugglePhase;
     private bool wasReelingLastFrame = false;
 
-    private FishPreset caughtFishPreset = null;
+    // --- MODIFIED: Store the actual fish object, not just the preset ---
+    private CaughtFish caughtFishInstance = null;
 
     private void OnEnable()
     {
@@ -221,15 +222,14 @@ public class FishingRodController : MonoBehaviour
             fishFightCoroutine = null;
         }
 
-        caughtFishPreset = activeBobber.HookedFish.preset;
+        // --- MODIFIED: Capture the specific CaughtFish instance ---
+        caughtFishInstance = activeBobber.HookedFish;
 
         if (wasReelingLastFrame)
         {
             FishingEvents.OnStopReelingDuringFight?.Invoke();
             wasReelingLastFrame = false;
         }
-
-        // activeBobber.SetStruggleActive(false); // <-- REMOVED (from your original script)
 
         FishingEvents.OnFishFightEnd?.Invoke(true);
 
@@ -238,14 +238,14 @@ public class FishingRodController : MonoBehaviour
             activeBobber.SwapBobberForFishModel();
         }
 
-        StartCoroutine(ReelInBobberRoutine(caughtFishPreset));
+        StartCoroutine(ReelInBobberRoutine(caughtFishInstance));
     }
 
-    private IEnumerator ReelInBobberRoutine(FishPreset fishToInventory)
+    // --- MODIFIED: Accepts CaughtFish instead of FishPreset ---
+    private IEnumerator ReelInBobberRoutine(CaughtFish fishToInventory)
     {
         FishingEvents.OnStartReeling?.Invoke();
 
-        // 1. Find the correct bobber to reel in
         BobberController bobberToReelController = null;
         if (activeBobber != null)
         {
@@ -256,10 +256,8 @@ public class FishingRodController : MonoBehaviour
             bobberToReelController = bobberInWater;
         }
 
-        // 2. Check if we found a bobber
         if (bobberToReelController != null)
         {
-            // 3. Disable the bobber's script and physics
             bobberToReelController.enabled = false;
             Rigidbody bobberRb = bobberToReelController.GetComponent<Rigidbody>();
             if (bobberRb != null)
@@ -270,39 +268,28 @@ public class FishingRodController : MonoBehaviour
             Transform target;
             if (playerModel != null)
             {
-                target = playerModel; // Use player model if assigned
+                target = playerModel;
             }
             else
             {
                 Debug.LogWarning("Player Model not assigned in FishingRodController! Reeling in to danglingBobber.");
-                target = danglingBobber.transform; // Default fallback
+                target = danglingBobber.transform;
             }
 
-            // 4. Set up points for the Bezier curve
             Transform bobberToReelTransform = bobberToReelController.transform;
-            Vector3 startPos = bobberToReelTransform.position;   // Start point (P0)
-
-            // Calculate the midpoint in X and Z only
+            Vector3 startPos = bobberToReelTransform.position;
             Vector3 controlPoint = (startPos + target.position) * 0.5f;
-
-            // Set the height relative to the *highest* of the two points
             float highestY = Mathf.Max(startPos.y, target.position.y);
             controlPoint.y = highestY + reelInArcHeight;
 
-            // 5. Move along the curve over time
             float elapsed = 0f;
             while (elapsed < reelInDuration)
             {
                 if (bobberToReelTransform != null)
                 {
-                    // Calculate linear 't' (0 to 1)
                     float t = elapsed / reelInDuration;
-
-                    // Apply the Smoothstep formula to 't' to get an eased value
                     float easedT = t * t * (3f - 2f * t);
                     float oneMinusEasedT = 1f - easedT;
-
-                    // Use 'easedT' in the Bezier formula instead of 't'
                     Vector3 position = (oneMinusEasedT * oneMinusEasedT * startPos) +
                                        (2f * oneMinusEasedT * easedT * controlPoint) +
                                        (easedT * easedT * target.position);
@@ -313,7 +300,6 @@ public class FishingRodController : MonoBehaviour
                 yield return null;
             }
 
-            // 6. Clean up the bobber
             if (bobberToReelTransform != null)
             {
                 Destroy(bobberToReelTransform.gameObject);
@@ -351,32 +337,28 @@ public class FishingRodController : MonoBehaviour
             {
                 Destroy(bobberInWater.gameObject);
             }
-            // --- MODIFICATION: Changed back to a direct void call ---
             ResetFishingState(null);
         }
     }
 
-    private void HandleReelingCompleted(FishPreset fishToInventory)
+    // --- MODIFIED: Accepts CaughtFish ---
+    private void HandleReelingCompleted(CaughtFish fishToInventory)
     {
-        // --- MODIFICATION: Changed back to a direct void call ---
         ResetFishingState(fishToInventory);
     }
 
-    // --- MODIFICATION: This is now a 'void' method again, not a coroutine ---
-    private void ResetFishingState(FishPreset fishToInventory)
+    // --- MODIFIED: Accepts CaughtFish ---
+    private void ResetFishingState(CaughtFish fishToInventory)
     {
-        // Guard clause: If we are already Idle and this is just a cleanup call (no fish), exit.
         if (currentState == FishingState.Idle && fishToInventory == null)
         {
             return;
         }
 
-        // 1. Reset the state and show the bobber.
         currentState = FishingState.Idle;
         danglingBobber?.SetActive(true);
         Debug.Log("State: Idle (Reset)");
 
-        // 2. Clean up all event listeners and state variables.
         if (wasReelingLastFrame)
         {
             FishingEvents.OnStopReelingDuringFight?.Invoke();
@@ -387,11 +369,10 @@ public class FishingRodController : MonoBehaviour
         fishEscapeCoroutine = null;
         activeBobber = null;
         bobberInWater = null;
-        caughtFishPreset = null;
+        caughtFishInstance = null; // Clear local reference
 
         // 3. Add the fish to the inventory.
-        // If this PlayerInventory.Instance.AddFish() call is slow,
-        // it *will* freeze the game for a moment.
+        // --- MODIFIED: Calls the overload that takes the existing CaughtFish instance ---
         if (fishToInventory != null)
         {
             PlayerInventory.Instance.AddFish(fishToInventory);
