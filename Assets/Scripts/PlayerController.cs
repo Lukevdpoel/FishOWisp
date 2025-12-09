@@ -46,12 +46,17 @@ public class PlayerController : MonoBehaviour
     private Vector3 targetVelocity;
     private float idleTimer;
     private bool allowSitdown = true;
+
     // State variables for smoothing
     private float startDistance, cameraXAngle, cameraYAngle, smoothXAngle, smoothYAngle, xVel, yVel;
     private Camera cam;
     private float currentCameraDistance, distanceVelocity;
 
     private bool isCasting = false;
+
+    // --- NEW: Bobber Tracking ---
+    private Transform activeBobberTransform;
+    private bool isFightingFish = false;
 
     private void OnEnable()
     {
@@ -63,6 +68,7 @@ public class PlayerController : MonoBehaviour
         // Sustained fighting animation
         FishingEvents.OnFishFightBegin += StartFightingAnimation;
         FishingEvents.OnCancelFishing += StopFightingAnimation;
+        FishingEvents.OnFishFightEnd += OnFishFightEnd; // NEW: To stop tracking
 
         // Special handler for successful catch
         FishingEvents.OnStartReeling += HandleSuccessfulCatchAnimation;
@@ -76,6 +82,9 @@ public class PlayerController : MonoBehaviour
         // Fish Fight Reeling Animation Events
         FishingEvents.OnStartReelingDuringFight += StartReelingDuringFightAnim;
         FishingEvents.OnStopReelingDuringFight += StopReelingDuringFightAnim;
+
+        // Bobber Tracking
+        FishingEvents.OnBobberLandedInWater += OnBobberLanded;
     }
 
     private void OnDisable()
@@ -86,6 +95,7 @@ public class PlayerController : MonoBehaviour
 
         FishingEvents.OnFishFightBegin -= StartFightingAnimation;
         FishingEvents.OnCancelFishing -= StopFightingAnimation;
+        FishingEvents.OnFishFightEnd -= OnFishFightEnd;
 
         FishingEvents.OnStartReeling -= HandleSuccessfulCatchAnimation;
 
@@ -98,11 +108,15 @@ public class PlayerController : MonoBehaviour
         // Fish Fight Reeling Animation Events
         FishingEvents.OnStartReelingDuringFight -= StartReelingDuringFightAnim;
         FishingEvents.OnStopReelingDuringFight -= StopReelingDuringFightAnim;
+
+        FishingEvents.OnBobberLandedInWater -= OnBobberLanded;
     }
 
     private void OnCastStart() => isCasting = true;
-    private void OnCastEnd() => isCasting = false;
+    private void OnCastEnd() { isCasting = false; isFightingFish = false; }
     private void OnThrowBobber(Vector3 direction, float force) => isCasting = false;
+    private void OnBobberLanded(BobberController bobber) { activeBobberTransform = bobber.transform; }
+    private void OnFishFightEnd(bool success) { isFightingFish = false; StopFightingAnimation(); }
 
     private void StartReelingDuringFightAnim()
     {
@@ -158,11 +172,8 @@ public class PlayerController : MonoBehaviour
         characterController?.Move(targetVelocity * Time.deltaTime);
     }
 
-    // --- FIXED LATE UPDATE ---
     void LateUpdate()
     {
-        // CRITICAL FIX: If the game is paused or deltaTime is effectively zero,
-        // do NOT try to run camera smoothing. This prevents the NaN error.
         if (Time.timeScale == 0f || Time.deltaTime <= 0.0001f)
         {
             return;
@@ -173,8 +184,25 @@ public class PlayerController : MonoBehaviour
 
     private void PlayStartChargingAnim() { if (animator && !string.IsNullOrEmpty(startChargingAnim)) animator.SetTrigger(startChargingAnim); }
     private void PlayThrowAnim(Vector3 direction, float force) { if (animator && !string.IsNullOrEmpty(throwAnim)) animator.SetTrigger(throwAnim); }
-    private void StartFightingAnimation(FishPreset fish) { if (animator && !string.IsNullOrEmpty(isFightingAnimBool)) { animator.SetBool(isFightingAnimBool, true); } }
-    private void StopFightingAnimation() { if (animator && !string.IsNullOrEmpty(isFightingAnimBool)) { animator.SetBool(isFightingAnimBool, false); } }
+
+    private void StartFightingAnimation(FishPreset fish)
+    {
+        isFightingFish = true; // Flag for Camera Logic
+        if (animator && !string.IsNullOrEmpty(isFightingAnimBool))
+        {
+            animator.SetBool(isFightingAnimBool, true);
+        }
+    }
+
+    private void StopFightingAnimation()
+    {
+        isFightingFish = false; // Reset Flag
+        if (animator && !string.IsNullOrEmpty(isFightingAnimBool))
+        {
+            animator.SetBool(isFightingAnimBool, false);
+        }
+    }
+
     private void HandleSuccessfulCatchAnimation() { StopFightingAnimation(); PlayReelInAnim(); }
 
     private void HandleMovement()
@@ -218,7 +246,6 @@ public class PlayerController : MonoBehaviour
     {
         bool isWalking = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f;
 
-        // Prevent walking animation if inventory is open
         if (InventoryUI.IsInventoryOpen) isWalking = false;
 
         animator.SetBool("Walk", isWalking);
@@ -226,16 +253,11 @@ public class PlayerController : MonoBehaviour
 
     private void HandleIdleAnimation()
     {
-        // If inventory is open, we consider the player 'busy', so we reset idle timer 
-        // OR you can let them idle. Here we prevent idle timer reset from movement input since movement is 0.
-
         bool isMoving = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f;
         bool isRotatingCamera = Input.GetMouseButton(1);
 
         if (InventoryUI.IsInventoryOpen)
         {
-            // If inventory is open, we don't count input as "action" for idle purposes,
-            // effectively allowing the idle animation to play while looking at inventory if desired.
             isMoving = false;
             isRotatingCamera = false;
         }
@@ -260,7 +282,6 @@ public class PlayerController : MonoBehaviour
 
     private void HandleJumpInput()
     {
-        // FIX: Disable jump if inventory is open
         if (InventoryUI.IsInventoryOpen) return;
 
         if (characterController.isGrounded && Input.GetButtonDown("Jump"))
@@ -277,11 +298,8 @@ public class PlayerController : MonoBehaviour
     {
         if (!cameraTransform || !playerModel) return;
 
-        // FIX: Stop camera rotation if inventory is open
         if (InventoryUI.IsInventoryOpen) return;
 
-        // --- FIXED SAFETY CHECK ---
-        // If velocities are corrupted (NaN) due to a previous pause glitch, reset them.
         if (float.IsNaN(xVel) || float.IsNaN(yVel) || float.IsNaN(distanceVelocity))
         {
             xVel = 0f;
@@ -289,11 +307,32 @@ public class PlayerController : MonoBehaviour
             distanceVelocity = 0f;
         }
 
-        float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
-        float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
-        cameraXAngle += mouseX;
-        cameraYAngle -= mouseY;
-        cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
+        // --- NEW: Camera Input Logic ---
+        // If we are fighting a fish, LOCK the camera rotation so dragging the mouse 
+        // controls the minigame instead of spinning the view.
+        if (!isFightingFish)
+        {
+            float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
+            float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
+            cameraXAngle += mouseX;
+            cameraYAngle -= mouseY;
+            cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
+        }
+        // else: Do NOT read mouse input, keeping angles frozen where they are
+        else if (activeBobberTransform != null)
+        {
+            // Smoothly rotate the camera towards the bobber
+            Vector3 directionToBobber = (activeBobberTransform.position - playerModel.position).normalized;
+
+            // Calculate target angles from direction
+            // Note: This logic assumes simple Y rotation. 
+            // For a full robust LookAt, we'd calculate Quaternion.LookRotation and extract euler angles.
+            Quaternion targetRot = Quaternion.LookRotation(directionToBobber);
+            float targetYAngle = targetRot.eulerAngles.y;
+
+            // Smoothly adjust cameraXAngle to face the bobber
+            cameraXAngle = Mathf.LerpAngle(cameraXAngle, targetYAngle, Time.deltaTime * 2f);
+        }
 
         smoothXAngle = Mathf.SmoothDampAngle(smoothXAngle, cameraXAngle, ref xVel, cameraSmoothTime);
         smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle, ref yVel, cameraSmoothTime);
@@ -319,15 +358,17 @@ public class PlayerController : MonoBehaviour
         {
             Vector3 f = rotation * Vector3.forward;
             Vector3 u = rotation * Vector3.up;
-            Vector3 target = (framingTarget ? framingTarget.position : playerModel.position);
-            Vector3 v0 = target - pos0;
+
+            // --- UPDATED: Always frame the player/target, never swap position to bobber ---
+            Vector3 targetPosition = (framingTarget ? framingTarget.position : playerModel.position);
+
+            Vector3 v0 = targetPosition - pos0;
             float yCam0 = Vector3.Dot(v0, u);
             float zCam0 = Mathf.Max(0.0001f, Vector3.Dot(v0, f));
             float tanFov = Mathf.Tan(cam.fieldOfView * 0.5f * Mathf.Deg2Rad);
             float yNdcTarget = Mathf.Clamp(screenYTarget, 0.05f, 0.95f) * 2f - 1f;
             float s = yCam0 - yNdcTarget * zCam0 * tanFov;
 
-            // Final safety check before assigning
             Vector3 finalPos = pos0 + u * s;
             if (!float.IsNaN(finalPos.x))
             {
@@ -344,7 +385,6 @@ public class PlayerController : MonoBehaviour
 
     private void HandleCursorLocking()
     {
-        // FIX: If inventory is open, do not override the cursor state.
         if (InventoryUI.IsInventoryOpen)
         {
             return;

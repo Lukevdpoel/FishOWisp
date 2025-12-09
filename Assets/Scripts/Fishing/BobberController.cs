@@ -72,6 +72,9 @@ public class BobberController : MonoBehaviour
     public CaughtFish HookedFish => hookedFish;
     public GameObject ActiveFishModel => activeFishModel;
 
+    // --- NEW: Public accessor for the struggle direction ---
+    public Vector3 StruggleDirection => struggleDirection;
+
     void Awake()
     {
         rb = GetComponent<Rigidbody>();
@@ -212,6 +215,16 @@ public class BobberController : MonoBehaviour
     void OnDestroy()
     {
         StopAllCoroutines();
+
+        // --- FIX: Cleanup orphaned effects immediately ---
+        if (activeStruggleEffect != null)
+        {
+            Destroy(activeStruggleEffect.gameObject);
+        }
+
+        // Also cleanup bite effects if they are still running
+        if (biteMainInstance != null) Destroy(biteMainInstance.gameObject);
+        if (biteSecondaryInstance != null) Destroy(biteSecondaryInstance.gameObject);
     }
 
     void OnTriggerEnter(Collider other)
@@ -391,7 +404,6 @@ public class BobberController : MonoBehaviour
         if (biteMainInstance != null)
         {
             biteMainInstance.Stop(true, ParticleSystemStopBehavior.StopEmitting);
-            // This is the corrected line
             Destroy(biteMainInstance.gameObject, 3f);
         }
 

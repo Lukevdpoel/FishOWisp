@@ -1,18 +1,17 @@
 using UnityEngine;
-using UnityEngine.UI; // Required for UI elements like Slider
-using TMPro; // Required if you use TextMeshPro for text
+using UnityEngine.UI;
+using TMPro;
 
 public class FishingUIController : MonoBehaviour
 {
     [Header("Fight UI")]
-    public GameObject fightUIPanel; // The parent object of all fight UI elements
-    public Slider progressBar;      // The slider to show catch progress
-    public TextMeshProUGUI fishNameText; // Optional: Text to show the fish's name
+    public GameObject fightUIPanel;
+    public Slider progressBar;
+    public TextMeshProUGUI fishNameText;
 
-    // NEW: Header and variables for the charge UI
     [Header("Charge UI")]
-    public GameObject chargeUIPanel; // The parent object for the charge slider
-    public Slider chargeSlider;      // The slider for casting power
+    public GameObject chargeUIPanel;
+    public Slider chargeSlider;
 
     private void OnEnable()
     {
@@ -21,38 +20,38 @@ public class FishingUIController : MonoBehaviour
         FishingEvents.OnFishFightEnd += HideFightUI;
         FishingEvents.OnFishFightProgressUpdate += UpdateProgress;
 
-        // NEW: Charge UI Events
+        // FIX: Also hide UI when fishing is cancelled (e.g. line snap / fail)
+        FishingEvents.OnCancelFishing += HideFightUIOnCancel;
+
+        // Charge UI Events
         FishingEvents.OnToggleChargeUI += ToggleChargeUI;
         FishingEvents.OnUpdateChargeUI += UpdateChargeSlider;
     }
 
     private void OnDisable()
     {
-        // Fight UI Events
         FishingEvents.OnFishFightBegin -= ShowFightUI;
         FishingEvents.OnFishFightEnd -= HideFightUI;
         FishingEvents.OnFishFightProgressUpdate -= UpdateProgress;
 
-        // NEW: Unsubscribe from Charge UI Events
+        FishingEvents.OnCancelFishing -= HideFightUIOnCancel;
+
         FishingEvents.OnToggleChargeUI -= ToggleChargeUI;
         FishingEvents.OnUpdateChargeUI -= UpdateChargeSlider;
     }
 
     void Start()
     {
-        // Start with both UI panels hidden
         if (fightUIPanel != null)
         {
             fightUIPanel.SetActive(false);
         }
-        // NEW: Hide the charge UI at the start
         if (chargeUIPanel != null)
         {
             chargeUIPanel.SetActive(false);
         }
     }
 
-    // Renamed from ShowUI to be more specific
     private void ShowFightUI(FishPreset fish)
     {
         if (fightUIPanel != null)
@@ -66,8 +65,16 @@ public class FishingUIController : MonoBehaviour
         }
     }
 
-    // Renamed from HideUI to be more specific
     private void HideFightUI(bool success)
+    {
+        if (fightUIPanel != null)
+        {
+            fightUIPanel.SetActive(false);
+        }
+    }
+
+    // Helper method for the OnCancelFishing event which has no arguments
+    private void HideFightUIOnCancel()
     {
         if (fightUIPanel != null)
         {
@@ -84,7 +91,6 @@ public class FishingUIController : MonoBehaviour
         }
     }
 
-    // NEW: Method to show or hide the entire charge UI panel
     private void ToggleChargeUI(bool show)
     {
         if (chargeUIPanel != null)
@@ -93,14 +99,12 @@ public class FishingUIController : MonoBehaviour
         }
     }
 
-    // NEW: Method to update the charge slider's value
     private void UpdateChargeSlider(float current, float max)
     {
         if (chargeSlider != null)
         {
             chargeSlider.maxValue = max;
             chargeSlider.value = current;
-            Debug.Log("chargeSliderCalled");
         }
     }
 }

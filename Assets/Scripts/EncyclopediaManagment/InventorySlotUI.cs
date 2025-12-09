@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using System;
+using System.Collections.Generic; // Added for Raycasting logic
 using TMPro;
 
 public class InventorySlotUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
@@ -15,7 +16,7 @@ public class InventorySlotUI : MonoBehaviour, IPointerEnterHandler, IPointerExit
     // Callbacks
     private Action<CaughtFish, RectTransform> onHoverEnter;
     private Action onHoverExit;
-    private Action<CaughtFish> onDragOut; // New callback for pulling the fish out
+    private Action<CaughtFish> onDragOut;
 
     private bool isPressed = false;
 
@@ -34,6 +35,34 @@ public class InventorySlotUI : MonoBehaviour, IPointerEnterHandler, IPointerExit
         }
 
         Deselect();
+
+        // --- FIX: Check for immediate hover on spawn ---
+        // If the mouse is already over this slot when it spawns, OnPointerEnter won't fire automatically.
+        // We manually check if the pointer is over this object.
+        CheckInitialHover();
+    }
+
+    private void CheckInitialHover()
+    {
+        if (EventSystem.current == null) return;
+
+        PointerEventData pointerData = new PointerEventData(EventSystem.current)
+        {
+            position = Input.mousePosition
+        };
+
+        List<RaycastResult> results = new List<RaycastResult>();
+        EventSystem.current.RaycastAll(pointerData, results);
+
+        foreach (var result in results)
+        {
+            if (result.gameObject == this.gameObject || result.gameObject.transform.IsChildOf(this.transform))
+            {
+                // We are under the mouse! Trigger hover.
+                OnPointerEnter(pointerData);
+                return;
+            }
+        }
     }
 
     public void OnPointerEnter(PointerEventData eventData)
@@ -47,14 +76,11 @@ public class InventorySlotUI : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
     public void OnPointerExit(PointerEventData eventData)
     {
-        // 1. Always hide tooltip when leaving
         onHoverExit?.Invoke();
         Deselect();
 
-        // 2. Logic: If we are holding the mouse down AND we leave the button area...
         if (isPressed && CurrentFish != null)
         {
-            // ...Trigger the "Pull Out" 3D model event
             onDragOut?.Invoke(CurrentFish);
         }
     }

@@ -66,6 +66,14 @@ public class NoteMenu : MonoBehaviour
 
         StopAllCoroutines();
         if (encyclopediaUI != null) encyclopediaUI.SetUIState(false);
+
+        // --- NEW CODE ADDED BELOW ---
+        // Access the singleton and tell it to hide the viewer (which disables the camera)
+        if (ModelViewer.Instance != null)
+        {
+            ModelViewer.Instance.HideViewer();
+        }
+        // ----------------------------
     }
 
     IEnumerator ShowUIRoutine()
