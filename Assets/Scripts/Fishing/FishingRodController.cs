@@ -135,30 +135,24 @@ public class FishingRodController : MonoBehaviour
 
     private IEnumerator FailRoutine()
     {
-        // 1. Ensure Minigame UI is hidden immediately
         if (minigameUI != null) minigameUI.Deactivate();
 
-        // 2. Destroy Bobber
         if (bobberInWater != null)
         {
             Destroy(bobberInWater.gameObject);
             bobberInWater = null;
         }
-        activeBobber = null; // Clear active reference
+        activeBobber = null;
 
-        // 3. Reset Logic
         FishingEvents.OnCancelFishing?.Invoke();
         currentState = FishingState.Cooldown;
         Debug.Log("State: Cooldown (Failed)");
 
-        // 4. Play Fail Animation
         if (playerAnimator != null && !string.IsNullOrEmpty(failAnimationTrigger))
             playerAnimator.SetTrigger(failAnimationTrigger);
 
-        // 5. Wait Cooldown
         yield return new WaitForSeconds(failCooldown);
 
-        // 6. Return to Idle
         currentState = FishingState.Idle;
         danglingBobber?.SetActive(true);
         Debug.Log("State: Idle (Reset from Cooldown)");
@@ -178,21 +172,19 @@ public class FishingRodController : MonoBehaviour
 
         Debug.Log("Hooked! State: Fighting Fish (Directional Mode)!");
 
-        // --- FIX: Ensure bobber is physically simulated for struggle movement ---
         if (activeBobber != null)
         {
             Rigidbody rb = activeBobber.GetComponent<Rigidbody>();
             if (rb != null)
             {
-                rb.isKinematic = false; // Make sure physics can move it
-                activeBobber.SetStruggleActive(true); // Tell bobber to start applying forces
+                rb.isKinematic = false;
+                activeBobber.SetStruggleActive(true);
             }
         }
 
         if (minigameUI != null)
         {
             minigameUI.Activate();
-            // --- NEW: Tell the UI which object to follow ---
             if (activeBobber != null)
             {
                 minigameUI.SetTrackingTarget(activeBobber.transform);
@@ -213,7 +205,6 @@ public class FishingRodController : MonoBehaviour
             fishFightCoroutine = null;
         }
 
-        // Stop struggling physics before reeling in
         if (activeBobber != null)
         {
             activeBobber.SetStruggleActive(false);
@@ -283,22 +274,24 @@ public class FishingRodController : MonoBehaviour
 
     private IEnumerator FishFightRoutine()
     {
-        // Loop runs as long as progress is > 0 and < Max
         while (currentFightProgress < maxFightProgress && currentFightProgress > 0)
         {
             if (minigameUI != null)
             {
-                // --- FIX: Update direction from Bobber ---
                 if (activeBobber != null)
                 {
+                    // Update direction
                     minigameUI.SetFishDirectionFromVector(activeBobber.StruggleDirection);
+
+                    // --- NEW: Toggle bobber struggling based on rest state ---
+                    activeBobber.SetStruggleActive(!minigameUI.IsResting);
                 }
 
                 currentFightProgress = minigameUI.UpdateMinigame(currentFightProgress, maxFightProgress);
             }
             else
             {
-                // Fallback if no minigame assigned (auto-win logic for testing)
+                // Fallback auto-win if no UI
                 currentFightProgress += Time.deltaTime * 10f;
             }
 
@@ -306,14 +299,12 @@ public class FishingRodController : MonoBehaviour
             yield return null;
         }
 
-        // Loop exited: Check why
         if (currentFightProgress >= maxFightProgress)
         {
             WinFishFight();
         }
         else
         {
-            // Progress dropped to 0 -> FAILURE
             Debug.Log("Fish escaped during fight (Progress reached 0)!");
             if (minigameUI != null) minigameUI.Deactivate();
             StartCoroutine(FailRoutine());

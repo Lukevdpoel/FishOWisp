@@ -48,8 +48,6 @@ public class PlayerController : MonoBehaviour
     [Tooltip("Optional: Drag an empty GameObject here to define exactly where the static camera should sit.")]
     [SerializeField] private Transform staticCameraTarget;
 
-    // --- NEW: Master Control Lock ---
-    // This allows CameraTrigger.cs to freeze the player when looking at something.
     [HideInInspector]
     public bool areControlsLocked = false;
 
@@ -139,7 +137,6 @@ public class PlayerController : MonoBehaviour
     {
         if (animator && !string.IsNullOrEmpty(reelInAnim))
         {
-            Debug.Log("ANIMATION TRIGGERED: ReelIn at " + Time.time);
             animator.SetTrigger(reelInAnim);
         }
     }
@@ -210,15 +207,11 @@ public class PlayerController : MonoBehaviour
     {
         float yVelocity = targetVelocity.y;
 
-        // --- MASTER LOCK CHECK ---
-        // If Inventory is open OR Controls are Locked, input is zero.
         bool inputDisabled = InventoryUI.IsInventoryOpen || areControlsLocked;
 
         float h = inputDisabled ? 0f : Input.GetAxisRaw("Horizontal");
         float v = inputDisabled ? 0f : Input.GetAxisRaw("Vertical");
 
-        // --- ORIGINAL LOGIC ---
-        // Uses cameraTransform (Orbit Camera) only. No sticky movement. No Camera.main switching.
         Vector3 camForward = cameraTransform.forward;
         Vector3 camRight = cameraTransform.right;
 
@@ -230,7 +223,6 @@ public class PlayerController : MonoBehaviour
         Vector3 moveDirection = (camForward * v + camRight * h).normalized;
         targetVelocity = moveDirection * moveSpeed;
 
-        // Restore Gravity
         targetVelocity.y = yVelocity;
     }
 
@@ -254,7 +246,6 @@ public class PlayerController : MonoBehaviour
 
     private void HandleAnimation()
     {
-        // Don't play walk anim if controls are locked
         bool isWalking = !areControlsLocked && !InventoryUI.IsInventoryOpen &&
                          (new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f);
 
@@ -310,8 +301,6 @@ public class PlayerController : MonoBehaviour
     {
         if (!cameraTransform || !playerModel) return;
 
-        // If controls are locked (by CameraTrigger), do not orbit the camera
-        // (InventoryUI check is already inside here via "IsInventoryOpen" return below)
         if (areControlsLocked) return;
 
         if (InventoryUI.IsInventoryOpen) return;
@@ -399,8 +388,14 @@ public class PlayerController : MonoBehaviour
 
     private void HandleCursorLocking()
     {
-        if (InventoryUI.IsInventoryOpen)
+        // Don't lock cursor if inventory is open OR if we are fighting a fish
+        if (InventoryUI.IsInventoryOpen || isFightingFish)
         {
+            if (isFightingFish && Cursor.lockState != CursorLockMode.None)
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+            }
             return;
         }
 
