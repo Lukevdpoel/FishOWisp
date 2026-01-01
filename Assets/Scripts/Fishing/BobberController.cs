@@ -5,14 +5,50 @@ using System.Collections;
 [RequireComponent(typeof(AudioSource))]
 public class BobberController : MonoBehaviour
 {
-    // ... (Headers kept same as previous) ...
-    [Header("Visuals & Effects")]
-    public GameObject bobberVisuals;
-    public ParticleSystem waterSplashEffect;
-    public int splashCount = 3;
-    public float splashInterval = 0.25f;
-    public ParticleSystem followEffect;
-    public float followDuration = 2.0f;
+    // ========================================================================
+    // 1. IMPACT SPLASH (When bobber hits water)
+    // ========================================================================
+    [Header("1. Impact Splash")]
+    [Tooltip("Prefab spawned ONCE when the bobber first lands in the water.")]
+    public GameObject impactPrefab;
+    [Tooltip("How long the impact prefab lasts.")]
+    public float impactLifetime = 2.0f;
+
+    // ========================================================================
+    // 2. WAKE / TRAIL (Continuous while in water)
+    // ========================================================================
+    [Header("2. Wake / Trail")]
+    [Tooltip("Particle/Prefab that follows the bobber on the water surface.")]
+    public GameObject wakePrefab;
+
+    // ========================================================================
+    // 3. NIBBLE SPLASH (When fish touches bobber)
+    // ========================================================================
+    [Header("3. Nibble Splash")]
+    [Tooltip("Prefab spawned each time a fish nibbles.")]
+    public GameObject nibblePrefab;
+    [Tooltip("How long the nibble prefab lasts.")]
+    public float nibbleLifetime = 2.0f;
+
+    // ========================================================================
+    // 4. BITE SPLASH (When fish hooks)
+    // ========================================================================
+    [Header("4. Bite Splash")]
+    [Tooltip("Prefab spawned once when the fish actually bites/hooks.")]
+    public GameObject bitePrefab;
+    [Tooltip("How long the bite prefab lasts.")]
+    public float biteLifetime = 2.0f;
+
+    // ========================================================================
+    // 5. STRUGGLE SPLASH (When fish starts fighting)
+    // ========================================================================
+    [Header("5. Struggle Splash")]
+    [Tooltip("Prefab spawned when the fish starts struggling.")]
+    public GameObject strugglePrefab;
+    [Tooltip("How long the struggle prefab lasts.")]
+    public float struggleLifetime = 3.0f;
+
+    [Header("Audio")]
     public AudioClip waterEntrySound;
     public float waterEntryVolumeScale = 1.0f;
     public AudioClip impactSound;
@@ -30,25 +66,24 @@ public class BobberController : MonoBehaviour
     public float waterDrag = 1f;
     public float waterRotationSpeed = 2f;
 
-    [Header("Nibbling")]
-    public ParticleSystem nibbleEffect;
+    [Header("Nibble Settings")]
     public int minNibbles = 2;
     public int maxNibbles = 5;
     public float nibbleInterval = 0.75f;
     public float nibbleForce = 5f;
 
-    [Header("Biting")]
-    public ParticleSystem biteEffectMain;
-    public ParticleSystem biteEffectSecondary;
+    [Header("Bite Settings")]
     public float biteForce = 100f;
     public float biteDuration = 0.5f;
 
-    [Header("Fish Struggle")]
-    public float struggleForce = 5f; // Increased for constant movement
-    public float directionChangeInterval = 0.5f; // Faster changes
-    public ParticleSystem struggleEffectPrefab;
+    [Header("Struggle Settings")]
+    public float struggleForce = 2f;
+    public float directionChangeInterval = 1.0f;
 
-    // ... (Existing private variables) ...
+    [Header("Visuals")]
+    public GameObject bobberVisuals;
+
+    // Internal State
     private Rigidbody rb;
     private AudioSource audioSource;
     private bool isInWater = false;
@@ -57,14 +92,15 @@ public class BobberController : MonoBehaviour
     private bool hasPlayedImpactSound = false;
     private float initialLinearDamping;
     private float waterSurfaceY;
+
     private CaughtFish hookedFish;
     private GameObject activeFishModel;
+
+    // Track the active wake instance
     private GameObject activeWakeInstance;
+
     private Coroutine nibbleCoroutine;
     private Coroutine bitePhysicsCoroutine;
-    private ParticleSystem biteMainInstance;
-    private ParticleSystem biteSecondaryInstance;
-    private ParticleSystem activeStruggleEffect;
 
     private bool isStruggling = false;
     private Vector3 struggleDirection;
@@ -81,35 +117,24 @@ public class BobberController : MonoBehaviour
         initialLinearDamping = rb.linearDamping;
     }
 
-    // ... (Collision/Trigger methods kept same) ...
-    void OnCollisionEnter(Collision collision) { /* Same as before */ }
-    void OnTriggerEnter(Collider other) { if (other.CompareTag(waterTag) && !isInWater) { waterSurfaceY = other.bounds.max.y; EnterWater(); } }
-    void OnTriggerStay(Collider other) { if (other.CompareTag(waterTag) && isInWater) { waterSurfaceY = other.bounds.max.y; } }
-    void OnTriggerExit(Collider other) { if (other.CompareTag(waterTag) && isInWater) { isInWater = false; SetStruggleActive(false); rb.linearDamping = initialLinearDamping; if (activeWakeInstance != null) { Destroy(activeWakeInstance); activeWakeInstance = null; } } }
-
-    private void EnterWater()
+    void Start()
     {
-        isInWater = true;
-        rb.linearDamping = waterDrag;
-        rb.angularDamping = 2f;
-        if (!hasSplashed) { SpawnEffect(impactPrefab, impactLifetime); hasSplashed = true; }
-        if (wakePrefab != null && activeWakeInstance == null) { Vector3 wakePos = new Vector3(transform.position.x, waterSurfaceY, transform.position.z); activeWakeInstance = Instantiate(wakePrefab, wakePos, wakePrefab.transform.rotation); }
-        FishingEvents.OnBobberLandedInWater?.Invoke(this);
-        if (audioSource != null && waterEntrySound != null && !hasPlayedSplashSound) { audioSource.PlayOneShot(waterEntrySound, waterEntryVolumeScale); hasPlayedSplashSound = true; }
+        if (rb != null)
+        {
+            rb.AddTorque(Random.insideUnitSphere * airTumbleTorque, ForceMode.Impulse);
+        }
     }
-
-    void Start() { if (rb != null) rb.AddTorque(Random.insideUnitSphere * airTumbleTorque, ForceMode.Impulse); }
 
     void Update()
     {
+        // Keep the wake at the water surface, following the bobber
         if (activeWakeInstance != null && isInWater)
         {
             Vector3 wakePos = new Vector3(transform.position.x, waterSurfaceY, transform.position.z);
             activeWakeInstance.transform.position = wakePos;
-        }
-        if (isStruggling && activeStruggleEffect != null)
-        {
-            // Update struggle effect pos if needed
+
+            // Optional: If you want the wake to rotate with the bobber's Y rotation (facing direction)
+            // activeWakeInstance.transform.rotation = Quaternion.Euler(0, transform.eulerAngles.y, 0);
         }
     }
 
@@ -125,9 +150,109 @@ public class BobberController : MonoBehaviour
         }
     }
 
+    // ------------------------------------------------------------------------
+    // WATER ENTRY LOGIC
+    // ------------------------------------------------------------------------
+    void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag(waterTag) && !isInWater)
+        {
+            waterSurfaceY = other.bounds.max.y;
+            EnterWater();
+        }
+    }
+
+    void OnTriggerStay(Collider other)
+    {
+        if (other.CompareTag(waterTag) && isInWater)
+        {
+            waterSurfaceY = other.bounds.max.y;
+        }
+    }
+
+    void OnTriggerExit(Collider other)
+    {
+        if (other.CompareTag(waterTag) && isInWater)
+        {
+            isInWater = false;
+            SetStruggleActive(false);
+            rb.linearDamping = initialLinearDamping;
+
+            // Destroy Wake when leaving water
+            if (activeWakeInstance != null)
+            {
+                Destroy(activeWakeInstance);
+                activeWakeInstance = null;
+            }
+        }
+    }
+
+    void OnCollisionEnter(Collision collision)
+    {
+        if (!isInWater && !hasPlayedImpactSound)
+        {
+            if (!collision.gameObject.CompareTag(waterTag))
+            {
+                if (audioSource != null && impactSound != null)
+                {
+                    audioSource.PlayOneShot(impactSound);
+                }
+                hasPlayedImpactSound = true;
+            }
+        }
+    }
+
+    private void EnterWater()
+    {
+        isInWater = true;
+        rb.linearDamping = waterDrag;
+        rb.angularDamping = 2f;
+
+        // 1. TRIGGER IMPACT SPLASH
+        if (!hasSplashed)
+        {
+            SpawnEffect(impactPrefab, impactLifetime);
+            hasSplashed = true;
+        }
+
+        // 2. SPAWN WAKE / TRAIL
+        if (wakePrefab != null && activeWakeInstance == null)
+        {
+            Vector3 wakePos = new Vector3(transform.position.x, waterSurfaceY, transform.position.z);
+            // Instantiate with the prefab's rotation
+            activeWakeInstance = Instantiate(wakePrefab, wakePos, wakePrefab.transform.rotation);
+        }
+
+        FishingEvents.OnBobberLandedInWater?.Invoke(this);
+
+        if (audioSource != null && waterEntrySound != null && !hasPlayedSplashSound)
+        {
+            audioSource.PlayOneShot(waterEntrySound, waterEntryVolumeScale);
+            hasPlayedSplashSound = true;
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // PHYSICS & MOVEMENT
+    // ------------------------------------------------------------------------
+    private void ApplyBuoyancy()
+    {
+        float targetY = waterSurfaceY - floatHeight;
+        float depth = targetY - transform.position.y;
+
+        if (depth > 0)
+        {
+            Vector3 force = Vector3.up * (depth * buoyancyForce - rb.linearVelocity.y * bounceDamp);
+            rb.AddForce(force, ForceMode.Acceleration);
+        }
+
+        Quaternion targetRotation = Quaternion.Euler(0, rb.rotation.eulerAngles.y, 0);
+        Quaternion newRotation = Quaternion.Slerp(rb.rotation, targetRotation, waterRotationSpeed * Time.fixedDeltaTime);
+        rb.MoveRotation(newRotation);
+    }
+
     private void UpdateStruggleMovement()
     {
-        // Change direction occasionally for erratic behavior
         struggleTimer -= Time.fixedDeltaTime;
         if (struggleTimer <= 0f)
         {
@@ -136,74 +261,131 @@ public class BobberController : MonoBehaviour
             struggleTimer = directionChangeInterval;
         }
 
-        // Apply constant force (no resting phase)
         if (rb != null && !rb.isKinematic)
         {
             rb.AddForce(struggleDirection * struggleForce, ForceMode.Acceleration);
         }
     }
 
-    // ... (ApplyBuoyancy, Fishing Logic, Effects kept same) ...
-    private void ApplyBuoyancy()
+    // ------------------------------------------------------------------------
+    // FISHING LOGIC
+    // ------------------------------------------------------------------------
+    public void StartNibbleSequence(FishPreset preset)
     {
-        float targetY = waterSurfaceY - floatHeight;
-        float depth = targetY - transform.position.y;
-        if (depth > 0) { Vector3 force = Vector3.up * (depth * buoyancyForce - rb.linearVelocity.y * bounceDamp); rb.AddForce(force, ForceMode.Acceleration); }
-        Quaternion targetRotation = Quaternion.Euler(0, rb.rotation.eulerAngles.y, 0);
-        Quaternion newRotation = Quaternion.Slerp(rb.rotation, targetRotation, waterRotationSpeed * Time.fixedDeltaTime);
-        rb.MoveRotation(newRotation);
+        if (nibbleCoroutine != null) StopCoroutine(nibbleCoroutine);
+        nibbleCoroutine = StartCoroutine(NibbleRoutine(preset));
     }
 
-    // Standard fishing methods (HookFish, SetStruggleActive, etc.) - Preserved
-    public void StartNibbleSequence(FishPreset preset) { if (nibbleCoroutine != null) StopCoroutine(nibbleCoroutine); nibbleCoroutine = StartCoroutine(NibbleRoutine(preset)); }
-    public void HookFish(FishPreset fishPreset) { if (hookedFish != null) return; hookedFish = new CaughtFish(fishPreset); Debug.Log($"{hookedFish.GetDisplayName()} is on the line!"); FishingEvents.OnFishBite?.Invoke(this); SpawnEffect(bitePrefab, biteLifetime); if (bitePhysicsCoroutine != null) StopCoroutine(bitePhysicsCoroutine); bitePhysicsCoroutine = StartCoroutine(BitePhysicsRoutine()); }
+    public void HookFish(FishPreset fishPreset)
+    {
+        if (hookedFish != null) return;
+
+        hookedFish = new CaughtFish(fishPreset);
+        Debug.Log($"{hookedFish.GetDisplayName()} is on the line!");
+        FishingEvents.OnFishBite?.Invoke(this);
+
+        // 3. TRIGGER BITE SPLASH
+        SpawnEffect(bitePrefab, biteLifetime);
+
+        if (bitePhysicsCoroutine != null) StopCoroutine(bitePhysicsCoroutine);
+        bitePhysicsCoroutine = StartCoroutine(BitePhysicsRoutine());
+    }
 
     public void SetStruggleActive(bool active)
     {
+        // Prevent re-triggering if state hasn't changed
         if (isStruggling == active) return;
+
         isStruggling = active;
-        if (active) { struggleTimer = 0; SpawnEffect(strugglePrefab, struggleLifetime, true); }
+        if (active)
+        {
+            struggleTimer = 0;
+            // 4. TRIGGER STRUGGLE SPLASH
+            SpawnEffect(strugglePrefab, struggleLifetime, true);
+        }
     }
 
     public void SwapBobberForFishModel()
     {
-        if (hookedFish != null && activeFishModel == null) { if (bobberVisuals != null) bobberVisuals.SetActive(false); if (hookedFish.preset.fishPrefab != null) { activeFishModel = Instantiate(hookedFish.preset.fishPrefab, this.transform); activeFishModel.transform.localPosition = Vector3.zero; activeFishModel.transform.localRotation = Quaternion.identity; } FishingEvents.OnFishHooked?.Invoke(hookedFish); }
+        if (hookedFish != null && activeFishModel == null)
+        {
+            if (bobberVisuals != null) bobberVisuals.SetActive(false);
+
+            if (hookedFish.preset.fishPrefab != null)
+            {
+                activeFishModel = Instantiate(hookedFish.preset.fishPrefab, this.transform);
+                activeFishModel.transform.localPosition = Vector3.zero;
+                activeFishModel.transform.localRotation = Quaternion.identity;
+            }
+            FishingEvents.OnFishHooked?.Invoke(hookedFish);
+        }
     }
 
-    // Visual Helpers
+    // ------------------------------------------------------------------------
+    // EFFECT ROUTINES
+    // ------------------------------------------------------------------------
+
     private void SpawnEffect(GameObject prefab, float lifetime, bool parentToBobber = false)
     {
         if (prefab == null || !isInWater) return;
+
         Vector3 spawnPos = new Vector3(transform.position.x, waterSurfaceY, transform.position.z);
-        GameObject instance = Instantiate(prefab, spawnPos, prefab.transform.rotation);
-        if (parentToBobber) instance.transform.SetParent(this.transform);
+        Quaternion spawnRot = prefab.transform.rotation;
+
+        GameObject instance = Instantiate(prefab, spawnPos, spawnRot);
+
+        if (parentToBobber)
+        {
+            instance.transform.SetParent(this.transform);
+        }
+
         Destroy(instance, lifetime);
     }
 
-    public void StopBiteEffects() { if (bitePhysicsCoroutine != null) StopCoroutine(bitePhysicsCoroutine); }
+    private IEnumerator NibbleRoutine(FishPreset fishPreset)
+    {
+        yield return new WaitForSeconds(nibbleInterval);
+        int nibbleCount = Random.Range(minNibbles, maxNibbles + 1);
 
-    // Coroutines (Nibble, Bite) - Preserved
-    private IEnumerator NibbleRoutine(FishPreset fishPreset) { yield return new WaitForSeconds(nibbleInterval); int count = Random.Range(minNibbles, maxNibbles); for (int i = 0; i < count; i++) { if (rb != null) rb.AddForce(Vector3.down * nibbleForce, ForceMode.Impulse); SpawnEffect(nibblePrefab, nibbleLifetime); FishingEvents.OnFishNibble?.Invoke(this); yield return new WaitForSeconds(nibbleInterval); } HookFish(fishPreset); }
-    private IEnumerator BitePhysicsRoutine() { float timer = 0; while (timer < biteDuration) { if (rb != null && isInWater) rb.AddForce(Vector3.down * biteForce, ForceMode.Force); timer += Time.deltaTime; yield return null; } }
+        for (int i = 0; i < nibbleCount; i++)
+        {
+            if (rb != null) rb.AddForce(Vector3.down * nibbleForce, ForceMode.Impulse);
+
+            // 2. TRIGGER NIBBLE SPLASH
+            SpawnEffect(nibblePrefab, nibbleLifetime);
+
+            FishingEvents.OnFishNibble?.Invoke(this);
+            yield return new WaitForSeconds(nibbleInterval);
+        }
+        HookFish(fishPreset);
+    }
+
+    private IEnumerator BitePhysicsRoutine()
+    {
+        float timer = 0f;
+        while (timer < biteDuration)
+        {
+            if (rb != null && isInWater)
+            {
+                rb.AddForce(Vector3.down * biteForce, ForceMode.Force);
+            }
+            timer += Time.deltaTime;
+            yield return null;
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // CLEANUP
+    // ------------------------------------------------------------------------
+    public void StopBiteEffects()
+    {
+        if (bitePhysicsCoroutine != null) StopCoroutine(bitePhysicsCoroutine);
+    }
 
     void OnDestroy()
     {
         StopAllCoroutines();
-        if (activeStruggleEffect != null) Destroy(activeStruggleEffect.gameObject);
+        // Ensure wake is cleaned up
         if (activeWakeInstance != null) Destroy(activeWakeInstance);
-        if (biteMainInstance != null) Destroy(biteMainInstance.gameObject);
-        if (biteSecondaryInstance != null) Destroy(biteSecondaryInstance.gameObject);
     }
-
-    // Header for variables kept to prevent compilation errors for missing refs
-    [Header("Old Particle Refs (Deprecated)")]
-    public GameObject impactPrefab;
-    public float impactLifetime = 2f;
-    public GameObject wakePrefab;
-    public GameObject nibblePrefab;
-    public float nibbleLifetime = 2f;
-    public GameObject bitePrefab;
-    public float biteLifetime = 2f;
-    public GameObject strugglePrefab;
-    public float struggleLifetime = 3f;
 }
