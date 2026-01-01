@@ -12,7 +12,7 @@ public class PlayerInventory : MonoBehaviour
     public int currentCurrency = 100;
     public List<CaughtFish> caughtFishes = new List<CaughtFish>();
 
-    // Event to notify UI when inventory changes
+    // Event to notify UI (Inventory Grid AND Currency HUD) when data changes
     public event Action OnInventoryChanged;
 
     private void Awake()
@@ -21,24 +21,19 @@ public class PlayerInventory : MonoBehaviour
         else Instance = this;
     }
 
-    // Overload 1: Create a fresh fish from a preset (used for debugging/testing)
-    public void AddFish(FishPreset preset)
+    private void Start()
     {
-        if (preset == null) return;
-        CaughtFish newFish = new CaughtFish(preset);
-        AddFish(newFish);
+        // Trigger initial update so UI matches data on load
+        OnInventoryChanged?.Invoke();
     }
 
-    // Overload 2: Add an existing fish instance (used by actual fishing)
-    public void AddFish(CaughtFish fishToAdd, GameObject physicalPrefab = null)
+    public void AddFish(CaughtFish fishToAdd)
     {
-        // Update Encyclopedia (Data tracking)
         if (FishEncyclopediaManager.Instance != null)
         {
             FishEncyclopediaManager.Instance.RegisterCaughtFish(fishToAdd);
         }
 
-        // Check Capacity
         if (caughtFishes.Count >= inventorySize)
         {
             Debug.Log("Inventory is full! Cannot add fish.");
@@ -47,22 +42,25 @@ public class PlayerInventory : MonoBehaviour
 
         if (fishToAdd == null) return;
 
-        // Add to data list
         caughtFishes.Add(fishToAdd);
-
-        // Notify UI
         OnInventoryChanged?.Invoke();
     }
 
-    public void SellFish(CaughtFish fishToSell)
+    public void RemoveFish(CaughtFish fishToRemove)
     {
-        if (fishToSell != null && caughtFishes.Contains(fishToSell))
+        if (caughtFishes.Contains(fishToRemove))
         {
-            currentCurrency += fishToSell.GetValue();
-            caughtFishes.Remove(fishToSell);
-
-            // Notify UI
+            caughtFishes.Remove(fishToRemove);
             OnInventoryChanged?.Invoke();
         }
+    }
+
+    /// <summary>
+    /// Adds currency directly (used by Vendor script).
+    /// </summary>
+    public void TransactionAddCurrency(int amount)
+    {
+        currentCurrency += amount;
+        OnInventoryChanged?.Invoke();
     }
 }

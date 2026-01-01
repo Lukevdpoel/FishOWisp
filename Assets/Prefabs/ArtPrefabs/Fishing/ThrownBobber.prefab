@@ -96,12 +96,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: afd1ab2d1e0f3f5428a87c0fa10ee6bf, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  bobberVisuals: {fileID: 3855882591336779785}
-  waterSplashEffect: {fileID: 8568261835014280744, guid: 083ef2191dedfb747adc6daffe6e7c63, type: 3}
-  splashCount: 3
-  splashInterval: 0.25
-  followEffect: {fileID: 2799942127255786676, guid: c76c160a200da7541beafb148fa6be9c, type: 3}
-  followDuration: 0.3
+  impactPrefab: {fileID: 3994706279997133969, guid: 97c5836dd172ef849932d809a315539d, type: 3}
+  impactLifetime: 0.8
+  wakePrefab: {fileID: 86703556735717939, guid: f6979877153156a458266b7fffe64178, type: 3}
+  nibblePrefab: {fileID: 1370866258836361411, guid: 083ef2191dedfb747adc6daffe6e7c63, type: 3}
+  nibbleLifetime: 2
+  bitePrefab: {fileID: 2230609935683277320, guid: 148f577ce39aebe4c9011b5515a19cdc, type: 3}
+  biteLifetime: 1
+  strugglePrefab: {fileID: 0}
+  struggleLifetime: 3
   waterEntrySound: {fileID: 8300000, guid: dc4ba211051ab5f4cbbf9e2c4a95b238, type: 3}
   waterEntryVolumeScale: 2.24
   impactSound: {fileID: 8300000, guid: a6c45050064a0e648b6e521a85da2f54, type: 3}
@@ -112,18 +115,15 @@ MonoBehaviour:
   buoyancyForce: 28.4
   waterDrag: 2
   waterRotationSpeed: 5
-  nibbleEffect: {fileID: 8568261835014280744, guid: 083ef2191dedfb747adc6daffe6e7c63, type: 3}
   minNibbles: 1
   maxNibbles: 2
   nibbleInterval: 2
   nibbleForce: 175
-  biteEffectMain: {fileID: 8568261835014280744, guid: eea403f562d88cf4eb75253f5b365f55, type: 3}
-  biteEffectSecondary: {fileID: 2799942127255786676, guid: c76c160a200da7541beafb148fa6be9c, type: 3}
-  biteForce: 300
+  biteForce: 400
   biteDuration: 1
   struggleForce: 6
   directionChangeInterval: 1
-  struggleEffectPrefab: {fileID: 2799942127255786676, guid: c76c160a200da7541beafb148fa6be9c, type: 3}
+  bobberVisuals: {fileID: 3855882591336779785}
 --- !u!82 &8704116694854614809
 AudioSource:
   m_ObjectHideFlags: 0

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.EventSystems; // Added for UI Raycast checks
+using UnityEngine.EventSystems;
 using TMPro;
 
 public class InventoryUI : MonoBehaviour
@@ -29,11 +29,25 @@ public class InventoryUI : MonoBehaviour
     public float modelDistance = 3.5f;
     public float modelScale = 1.0f;
 
-    [Tooltip("The layer(s) that act as the 'return zone' (e.g. Water).")]
+    [Header("Drop Zones")]
+    [Tooltip("Layer for water (Release fish).")]
     public LayerMask waterLayerMask;
+
+    [Tooltip("Layer for vendors (Sell fish).")]
+    public LayerMask vendorLayerMask;
+
+    [Tooltip("Layer for tanks/aquariums (Display fish).")]
+    public LayerMask tankLayerMask;
 
     [Tooltip("Layers that the raycast should ignore completely (e.g. Player, UI, TriggerZones).")]
     public LayerMask raycastIgnoreLayers;
+
+    [Header("Release Visuals")]
+    [Tooltip("Prefab to spawn when releasing a fish (e.g. Splash VFX or a Fish animation).")]
+    public GameObject releasePrefab;
+
+    [Tooltip("How long (in seconds) before the release prefab is automatically destroyed.")]
+    public float releasePrefabLifetime = 3.0f;
 
     [Header("Interaction Control")]
     public List<MonoBehaviour> scriptsToDisableInput = new List<MonoBehaviour>();
@@ -92,7 +106,7 @@ public class InventoryUI : MonoBehaviour
             // 1. Release Logic
             if (Input.GetMouseButtonUp(0))
             {
-                TryReturnFishToWater();
+                TryDropFish();
                 return;
             }
 
@@ -105,17 +119,17 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
-    private void TryReturnFishToWater()
+    private void TryDropFish()
     {
         if (currentDraggedModel == null) return;
 
-        bool success = false;
+        bool actionTaken = false;
 
         // 1. Check UI Block (Is mouse over a UI element?)
         if (EventSystem.current.IsPointerOverGameObject())
         {
             Debug.Log("Released over UI. Cancelled.");
-            success = false;
+            actionTaken = false;
         }
         else
         {
@@ -123,50 +137,86 @@ public class InventoryUI : MonoBehaviour
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
 
             // Calculate mask: All layers EXCEPT the ignore list.
-            // The ~ operator flips the bits, so we hit everything NOT in 'raycastIgnoreLayers'.
             int finalMask = ~raycastIgnoreLayers.value;
 
             // We cast against this mask.
             if (Physics.Raycast(ray, out RaycastHit hit, 100f, finalMask, QueryTriggerInteraction.Collide))
             {
-                // Now we check if the FIRST thing we hit (that wasn't ignored) is Water.
-                if (((1 << hit.collider.gameObject.layer) & waterLayerMask) != 0)
+                int hitLayer = hit.collider.gameObject.layer;
+
+                // --- CASE A: HIT WATER (RELEASE) ---
+                if (((1 << hitLayer) & waterLayerMask) != 0)
                 {
-                    Debug.Log($"Hit Water directly: {hit.collider.name}");
-                    success = true;
+                    Debug.Log($"Hit Water: {hit.collider.name}. Releasing fish.");
+
+                    // --- SPAWN RELEASE PREFAB ---
+                    if (releasePrefab != null)
+                    {
+                        // Use the prefab's OWN rotation, not Quaternion.identity (which forces 0,0,0)
+                        GameObject effect = Instantiate(releasePrefab, hit.point, releasePrefab.transform.rotation);
+
+                        // Destroy it after the specified time
+                        Destroy(effect, releasePrefabLifetime);
+                    }
+                    // ----------------------------
+
+                    if (PlayerInventory.Instance != null && currentDraggedFishData != null)
+                    {
+                        PlayerInventory.Instance.RemoveFish(currentDraggedFishData);
+                        actionTaken = true;
+                    }
+                }
+                // --- CASE B: HIT VENDOR (SELL) ---
+                else if (((1 << hitLayer) & vendorLayerMask) != 0)
+                {
+                    Debug.Log($"Hit Vendor: {hit.collider.name}. Selling fish.");
+
+                    // Try to find the Vendor script on the object or its parent
+                    FishVendor vendor = hit.collider.GetComponent<FishVendor>();
+                    if (vendor == null) vendor = hit.collider.GetComponentInParent<FishVendor>();
+
+                    if (vendor != null && PlayerInventory.Instance != null)
+                    {
+                        // 1. Give money
+                        vendor.SellFishToVendor(currentDraggedFishData);
+                        // 2. Remove fish
+                        PlayerInventory.Instance.RemoveFish(currentDraggedFishData);
+                        actionTaken = true;
+                    }
+                }
+                // --- CASE C: HIT TANK (DISPLAY) ---
+                else if (((1 << hitLayer) & tankLayerMask) != 0)
+                {
+                    Debug.Log($"Hit Tank: {hit.collider.name}. Adding fish to tank.");
+
+                    // Look for the NEW DropZone script
+                    FishTankDropZone dropZone = hit.collider.GetComponent<FishTankDropZone>();
+                    if (dropZone == null) dropZone = hit.collider.GetComponentInParent<FishTankDropZone>();
+
+                    if (dropZone != null && PlayerInventory.Instance != null)
+                    {
+                        // Pass the data to the drop zone
+                        dropZone.ReceiveFish(currentDraggedFishData);
+
+                        // Remove from player inventory
+                        PlayerInventory.Instance.RemoveFish(currentDraggedFishData);
+                        actionTaken = true;
+                    }
                 }
                 else
                 {
-                    Debug.DrawLine(ray.origin, hit.point, Color.red, 2f);
-                    Debug.Log($"Blocked by Obstacle: {hit.collider.name} (Layer: {LayerMask.LayerToName(hit.collider.gameObject.layer)})");
-                    success = false;
+                    Debug.Log($"Blocked by Obstacle: {hit.collider.name} (Layer: {LayerMask.LayerToName(hitLayer)})");
                 }
             }
             else
             {
                 Debug.Log("Raycast hit nothing (skybox?).");
-                success = false;
             }
         }
 
-        if (success)
+        if (!actionTaken)
         {
-            // HIT WATER! Remove fish.
-            Debug.Log("Fish returned to water!");
-
-            if (PlayerInventory.Instance != null && currentDraggedFishData != null)
-            {
-                if (PlayerInventory.Instance.caughtFishes.Contains(currentDraggedFishData))
-                {
-                    PlayerInventory.Instance.caughtFishes.Remove(currentDraggedFishData);
-                    RefreshInventory();
-                }
-            }
-        }
-        else
-        {
-            // CANCELLED.
-            Debug.Log("Released over UI or Obstacle. Fish kept.");
+            Debug.Log("Cancelled. Fish returned to inventory.");
         }
 
         // Always cleanup the drag model
@@ -191,8 +241,7 @@ public class InventoryUI : MonoBehaviour
             currentDraggedModel.transform.rotation = Quaternion.identity;
             currentDraggedModel.transform.localScale = Vector3.one * modelScale;
 
-            // --- FIX: Recursively remove ALL colliders (children included) ---
-            // This ensures the fish model itself never blocks the raycast
+            // Remove physics components so the drag model doesn't block rays or fall
             foreach (var rb in currentDraggedModel.GetComponentsInChildren<Rigidbody>()) Destroy(rb);
             foreach (var col in currentDraggedModel.GetComponentsInChildren<Collider>()) Destroy(col);
         }
@@ -220,11 +269,6 @@ public class InventoryUI : MonoBehaviour
 
         Vector3[] corners = new Vector3[4];
         rect.GetLocalCorners(corners);
-
-        if (Vector3.Distance(corners[0], corners[2]) < 1f)
-        {
-            Debug.LogWarning("Inventory Container has 0 size. Physics items will be trapped!");
-        }
 
         Vector2[] points = new Vector2[5];
         points[0] = corners[0]; // Bottom Left

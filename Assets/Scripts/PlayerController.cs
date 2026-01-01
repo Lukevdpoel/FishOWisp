@@ -42,48 +42,51 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float collisionRadius = 0.2f;
     [SerializeField] private float zoomDampTime = 0.1f;
 
+    [Header("Static Camera Settings")]
+    [Tooltip("If true, the camera will not orbit. It will snap to the Static Camera Target (if provided) or stay where it is.")]
+    [SerializeField] private bool useStaticCamera = false;
+    [Tooltip("Optional: Drag an empty GameObject here to define exactly where the static camera should sit.")]
+    [SerializeField] private Transform staticCameraTarget;
+
+    // --- NEW: Master Control Lock ---
+    // This allows CameraTrigger.cs to freeze the player when looking at something.
+    [HideInInspector]
+    public bool areControlsLocked = false;
+
     private CharacterController characterController;
     private Vector3 targetVelocity;
     private float idleTimer;
     private bool allowSitdown = true;
 
-    // State variables for smoothing
     private float startDistance, cameraXAngle, cameraYAngle, smoothXAngle, smoothYAngle, xVel, yVel;
     private Camera cam;
     private float currentCameraDistance, distanceVelocity;
 
     private bool isCasting = false;
 
-    // --- NEW: Bobber Tracking ---
     private Transform activeBobberTransform;
     private bool isFightingFish = false;
 
     private void OnEnable()
     {
-        // One-shot animations
         FishingEvents.OnStartCharging += PlayStartChargingAnim;
         FishingEvents.OnThrowBobber += PlayThrowAnim;
         FishingEvents.OnHookFishSuccess += PlayReelInAnim;
 
-        // Sustained fighting animation
         FishingEvents.OnFishFightBegin += StartFightingAnimation;
         FishingEvents.OnCancelFishing += StopFightingAnimation;
-        FishingEvents.OnFishFightEnd += OnFishFightEnd; // NEW: To stop tracking
+        FishingEvents.OnFishFightEnd += OnFishFightEnd;
 
-        // Special handler for successful catch
         FishingEvents.OnStartReeling += HandleSuccessfulCatchAnimation;
 
-        // Cursor Management Events
         FishingEvents.OnStartCharging += OnCastStart;
         FishingEvents.OnCancelCharging += OnCastEnd;
         FishingEvents.OnCancelFishing += OnCastEnd;
         FishingEvents.OnThrowBobber += OnThrowBobber;
 
-        // Fish Fight Reeling Animation Events
         FishingEvents.OnStartReelingDuringFight += StartReelingDuringFightAnim;
         FishingEvents.OnStopReelingDuringFight += StopReelingDuringFightAnim;
 
-        // Bobber Tracking
         FishingEvents.OnBobberLandedInWater += OnBobberLanded;
     }
 
@@ -99,13 +102,11 @@ public class PlayerController : MonoBehaviour
 
         FishingEvents.OnStartReeling -= HandleSuccessfulCatchAnimation;
 
-        // Cursor Management Events
         FishingEvents.OnStartCharging -= OnCastStart;
         FishingEvents.OnCancelCharging -= OnCastEnd;
         FishingEvents.OnCancelFishing -= OnCastEnd;
         FishingEvents.OnThrowBobber -= OnThrowBobber;
 
-        // Fish Fight Reeling Animation Events
         FishingEvents.OnStartReelingDuringFight -= StartReelingDuringFightAnim;
         FishingEvents.OnStopReelingDuringFight -= StopReelingDuringFightAnim;
 
@@ -187,7 +188,7 @@ public class PlayerController : MonoBehaviour
 
     private void StartFightingAnimation(FishPreset fish)
     {
-        isFightingFish = true; // Flag for Camera Logic
+        isFightingFish = true;
         if (animator && !string.IsNullOrEmpty(isFightingAnimBool))
         {
             animator.SetBool(isFightingAnimBool, true);
@@ -196,7 +197,7 @@ public class PlayerController : MonoBehaviour
 
     private void StopFightingAnimation()
     {
-        isFightingFish = false; // Reset Flag
+        isFightingFish = false;
         if (animator && !string.IsNullOrEmpty(isFightingAnimBool))
         {
             animator.SetBool(isFightingAnimBool, false);
@@ -209,18 +210,27 @@ public class PlayerController : MonoBehaviour
     {
         float yVelocity = targetVelocity.y;
 
-        // FIX: If inventory is open, force input to 0, but keep gravity (yVelocity) logic running.
-        float h = InventoryUI.IsInventoryOpen ? 0f : Input.GetAxisRaw("Horizontal");
-        float v = InventoryUI.IsInventoryOpen ? 0f : Input.GetAxisRaw("Vertical");
+        // --- MASTER LOCK CHECK ---
+        // If Inventory is open OR Controls are Locked, input is zero.
+        bool inputDisabled = InventoryUI.IsInventoryOpen || areControlsLocked;
 
+        float h = inputDisabled ? 0f : Input.GetAxisRaw("Horizontal");
+        float v = inputDisabled ? 0f : Input.GetAxisRaw("Vertical");
+
+        // --- ORIGINAL LOGIC ---
+        // Uses cameraTransform (Orbit Camera) only. No sticky movement. No Camera.main switching.
         Vector3 camForward = cameraTransform.forward;
         Vector3 camRight = cameraTransform.right;
+
         camForward.y = 0f;
         camRight.y = 0f;
         camForward.Normalize();
         camRight.Normalize();
+
         Vector3 moveDirection = (camForward * v + camRight * h).normalized;
         targetVelocity = moveDirection * moveSpeed;
+
+        // Restore Gravity
         targetVelocity.y = yVelocity;
     }
 
@@ -244,17 +254,19 @@ public class PlayerController : MonoBehaviour
 
     private void HandleAnimation()
     {
-        bool isWalking = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f;
-
-        if (InventoryUI.IsInventoryOpen) isWalking = false;
+        // Don't play walk anim if controls are locked
+        bool isWalking = !areControlsLocked && !InventoryUI.IsInventoryOpen &&
+                         (new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f);
 
         animator.SetBool("Walk", isWalking);
     }
 
     private void HandleIdleAnimation()
     {
-        bool isMoving = new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f;
-        bool isRotatingCamera = Input.GetMouseButton(1);
+        bool isMoving = !areControlsLocked && !InventoryUI.IsInventoryOpen &&
+                        (new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f);
+
+        bool isRotatingCamera = !areControlsLocked && !InventoryUI.IsInventoryOpen && Input.GetMouseButton(1);
 
         if (InventoryUI.IsInventoryOpen)
         {
@@ -282,7 +294,7 @@ public class PlayerController : MonoBehaviour
 
     private void HandleJumpInput()
     {
-        if (InventoryUI.IsInventoryOpen) return;
+        if (InventoryUI.IsInventoryOpen || areControlsLocked) return;
 
         if (characterController.isGrounded && Input.GetButtonDown("Jump"))
         {
@@ -298,7 +310,21 @@ public class PlayerController : MonoBehaviour
     {
         if (!cameraTransform || !playerModel) return;
 
+        // If controls are locked (by CameraTrigger), do not orbit the camera
+        // (InventoryUI check is already inside here via "IsInventoryOpen" return below)
+        if (areControlsLocked) return;
+
         if (InventoryUI.IsInventoryOpen) return;
+
+        if (useStaticCamera)
+        {
+            if (staticCameraTarget != null)
+            {
+                cameraTransform.position = staticCameraTarget.position;
+                cameraTransform.rotation = staticCameraTarget.rotation;
+            }
+            return;
+        }
 
         if (float.IsNaN(xVel) || float.IsNaN(yVel) || float.IsNaN(distanceVelocity))
         {
@@ -307,9 +333,6 @@ public class PlayerController : MonoBehaviour
             distanceVelocity = 0f;
         }
 
-        // --- NEW: Camera Input Logic ---
-        // If we are fighting a fish, LOCK the camera rotation so dragging the mouse 
-        // controls the minigame instead of spinning the view.
         if (!isFightingFish)
         {
             float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
@@ -318,19 +341,11 @@ public class PlayerController : MonoBehaviour
             cameraYAngle -= mouseY;
             cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
         }
-        // else: Do NOT read mouse input, keeping angles frozen where they are
         else if (activeBobberTransform != null)
         {
-            // Smoothly rotate the camera towards the bobber
             Vector3 directionToBobber = (activeBobberTransform.position - playerModel.position).normalized;
-
-            // Calculate target angles from direction
-            // Note: This logic assumes simple Y rotation. 
-            // For a full robust LookAt, we'd calculate Quaternion.LookRotation and extract euler angles.
             Quaternion targetRot = Quaternion.LookRotation(directionToBobber);
             float targetYAngle = targetRot.eulerAngles.y;
-
-            // Smoothly adjust cameraXAngle to face the bobber
             cameraXAngle = Mathf.LerpAngle(cameraXAngle, targetYAngle, Time.deltaTime * 2f);
         }
 
@@ -359,7 +374,6 @@ public class PlayerController : MonoBehaviour
             Vector3 f = rotation * Vector3.forward;
             Vector3 u = rotation * Vector3.up;
 
-            // --- UPDATED: Always frame the player/target, never swap position to bobber ---
             Vector3 targetPosition = (framingTarget ? framingTarget.position : playerModel.position);
 
             Vector3 v0 = targetPosition - pos0;
