@@ -20,9 +20,11 @@ public class CameraTrigger : MonoBehaviour
     {
         if (zoneCamera != null)
         {
-            zoneCamera.gameObject.SetActive(false);
+            // Initial setup: Ensure the zone camera and its listener are off at the start
             var audioListener = zoneCamera.GetComponent<AudioListener>();
             if (audioListener != null) audioListener.enabled = false;
+
+            zoneCamera.gameObject.SetActive(false);
         }
     }
 
@@ -44,7 +46,6 @@ public class CameraTrigger : MonoBehaviour
             playerInZone = true;
             currentPlayer = other.GetComponent<PlayerController>();
 
-            // --- CHANGED: Pass the player's transform so the UI can follow it ---
             if (InteractionPromptUI.Instance != null)
             {
                 InteractionPromptUI.Instance.Show(other.transform, promptIcon);
@@ -84,14 +85,27 @@ public class CameraTrigger : MonoBehaviour
     {
         if (currentPlayer != null) currentPlayer.areControlsLocked = true;
 
+        // 1. Disable the current main camera (and its listener)
         if (Camera.main != null && Camera.main != zoneCamera)
-            Camera.main.gameObject.SetActive(false);
+        {
+            // Optional: You might want to disable the default listener explicitly if you don't disable the whole object
+            // var mainListener = Camera.main.GetComponent<AudioListener>();
+            // if (mainListener != null) mainListener.enabled = false;
 
+            Camera.main.gameObject.SetActive(false);
+        }
+
+        // 2. Enable the Zone Camera
         if (zoneCamera != null)
         {
             zoneCamera.gameObject.SetActive(true);
             zoneCamera.tag = "MainCamera";
             isZoneCameraActive = true;
+
+            // --- FIX: Explicitly Re-enable the AudioListener ---
+            // Even if the GameObject is active, the component might still be disabled from Start()
+            var audioListener = zoneCamera.GetComponent<AudioListener>();
+            if (audioListener != null) audioListener.enabled = true;
         }
 
         // Hide prompt while in camera mode
@@ -103,12 +117,25 @@ public class CameraTrigger : MonoBehaviour
     {
         if (currentPlayer != null) currentPlayer.areControlsLocked = false;
 
-        if (zoneCamera != null) zoneCamera.gameObject.SetActive(false);
+        // 1. Disable the Zone Camera
+        if (zoneCamera != null)
+        {
+            // --- FIX: Disable listener before deactivating object ---
+            var audioListener = zoneCamera.GetComponent<AudioListener>();
+            if (audioListener != null) audioListener.enabled = false;
 
+            zoneCamera.gameObject.SetActive(false);
+        }
+
+        // 2. Reactivate Default Camera
         if (defaultCamera != null)
         {
             defaultCamera.gameObject.SetActive(true);
             defaultCamera.tag = "MainCamera";
+
+            // --- FIX: Ensure Default Listener is active ---
+            var defaultListener = defaultCamera.GetComponent<AudioListener>();
+            if (defaultListener != null) defaultListener.enabled = true;
         }
 
         isZoneCameraActive = false;

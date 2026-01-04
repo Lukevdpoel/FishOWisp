@@ -2,8 +2,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
 using System;
-using System.Collections.Generic; // Added for Raycasting logic
-using TMPro;
+using System.Collections; // Required for IEnumerator
+using System.Collections.Generic;
 
 public class InventorySlotUI : MonoBehaviour, IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
 {
@@ -36,15 +36,20 @@ public class InventorySlotUI : MonoBehaviour, IPointerEnterHandler, IPointerExit
 
         Deselect();
 
-        // --- FIX: Check for immediate hover on spawn ---
-        // If the mouse is already over this slot when it spawns, OnPointerEnter won't fire automatically.
-        // We manually check if the pointer is over this object.
-        CheckInitialHover();
+        // --- FIX 1: Wait for end of frame before checking hover ---
+        // If we check immediately, the UI Raycaster might not be ready yet.
+        if (gameObject.activeInHierarchy)
+        {
+            StartCoroutine(CheckInitialHoverRoutine());
+        }
     }
 
-    private void CheckInitialHover()
+    private IEnumerator CheckInitialHoverRoutine()
     {
-        if (EventSystem.current == null) return;
+        // Wait 1 frame so the UI layout and Raycasters are fully rebuilt
+        yield return new WaitForEndOfFrame();
+
+        if (EventSystem.current == null) yield break;
 
         PointerEventData pointerData = new PointerEventData(EventSystem.current)
         {
@@ -60,7 +65,7 @@ public class InventorySlotUI : MonoBehaviour, IPointerEnterHandler, IPointerExit
             {
                 // We are under the mouse! Trigger hover.
                 OnPointerEnter(pointerData);
-                return;
+                break;
             }
         }
     }

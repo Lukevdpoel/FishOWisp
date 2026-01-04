@@ -388,7 +388,13 @@ public class PlayerController : MonoBehaviour
 
     private void HandleCursorLocking()
     {
-        // Don't lock cursor if inventory is open OR if we are fighting a fish
+        if (areControlsLocked)
+        {
+            Cursor.lockState = CursorLockMode.None;
+            Cursor.visible = true;
+            return;
+        }
+
         if (InventoryUI.IsInventoryOpen || isFightingFish)
         {
             if (isFightingFish && Cursor.lockState != CursorLockMode.None)

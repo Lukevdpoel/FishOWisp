@@ -12,19 +12,19 @@ public class InventoryTooltip : MonoBehaviour
     public TextMeshProUGUI valueText;
 
     [Header("Settings")]
-    public float baseDistance = 60f; // How far to push away from the slot center
+    public float baseDistance = 60f; // How far to push away from the cursor
     public bool clampToScreen = true;
 
     private RectTransform rectTransform;
     private Canvas parentCanvas;
+
+    // Nullable: If null, we are in "World Mode" (hovering 3D objects)
     private RectTransform currentTargetSlot;
 
     void Awake()
     {
         rectTransform = GetComponent<RectTransform>();
         parentCanvas = GetComponentInParent<Canvas>();
-
-        // Hide by default
         gameObject.SetActive(false);
     }
 
@@ -35,51 +35,63 @@ public class InventoryTooltip : MonoBehaviour
 
     private void FollowCursorWithAvoidance()
     {
-        if (parentCanvas == null || currentTargetSlot == null) return;
+        if (parentCanvas == null) return;
 
-        // 1. Get positions in Screen Space
         Vector2 mousePos = Input.mousePosition;
+        Vector2 finalScreenPos;
 
-        // Convert the Slot's world position to Screen Space
-        Camera cam = parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : parentCanvas.worldCamera;
-        Vector2 slotScreenPos = RectTransformUtility.WorldToScreenPoint(cam, currentTargetSlot.position);
+        // --- CHANGED: Handle cases where there is no UI slot (World Mode) ---
+        if (currentTargetSlot != null)
+        {
+            // MODE A: Inventory Slot (Push away from slot center)
+            Camera cam = parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : parentCanvas.worldCamera;
+            Vector2 slotScreenPos = RectTransformUtility.WorldToScreenPoint(cam, currentTargetSlot.position);
 
-        // 2. Calculate Direction (Slot Center -> Mouse)
-        Vector2 dirFromCenter = (mousePos - slotScreenPos).normalized;
+            Vector2 dirFromCenter = (mousePos - slotScreenPos).normalized;
+            if (dirFromCenter == Vector2.zero) dirFromCenter = new Vector2(1, 1).normalized;
 
-        // Fallback: If mouse is dead center, push up-right
-        if (dirFromCenter == Vector2.zero) dirFromCenter = new Vector2(1, 1).normalized;
+            finalScreenPos = mousePos + (dirFromCenter * baseDistance);
+        }
+        else
+        {
+            // MODE B: World Object (Just push up-right from mouse so it doesn't block the view)
+            Vector2 defaultDir = new Vector2(1, 1).normalized;
+            finalScreenPos = mousePos + (defaultDir * baseDistance);
+        }
 
-        // 3. Calculate Target Position (Mouse + Push Away)
-        // We push the tooltip away from the mouse in the same direction 
-        // that the mouse is from the center.
-        Vector2 finalScreenPos = mousePos + (dirFromCenter * baseDistance);
-
-        // 4. Convert Screen Point back to Local Point for the Tooltip's RectTransform
-        Vector2 localPoint;
+        // Convert to Local Point
+        Camera canvasCam = parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : parentCanvas.worldCamera;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
             parentCanvas.transform as RectTransform,
             finalScreenPos,
-            cam,
-            out localPoint);
+            canvasCam,
+            out Vector2 localPoint);
 
         transform.localPosition = localPoint;
     }
 
+    // Called by Inventory Slots (2D)
     public void ShowTooltip(CaughtFish fish, RectTransform slotRect)
     {
         currentTargetSlot = slotRect;
+        UpdateText(fish);
+    }
+
+    // --- NEW: Called by WorldFishHover (3D) ---
+    public void ShowWorldTooltip(CaughtFish fish)
+    {
+        currentTargetSlot = null; // Indicates we are in World Mode
+        UpdateText(fish);
+    }
+
+    private void UpdateText(CaughtFish fish)
+    {
         gameObject.SetActive(true);
-        transform.SetAsLastSibling(); // Ensure it renders on top
+        transform.SetAsLastSibling(); // Render on top
 
-        if (headerText != null)
-            headerText.text = fish.preset.fishName;
-
-        if (bodyText != null)
-            bodyText.text = $"{fish.lengthCm:F1} cm\n<size=80%><color=#CCCCCC>{fish.preset.description}</color></size>";
-
-        if (valueText != null)
-            valueText.text = $"{fish.GetValue()} coins";
+        if (headerText != null) headerText.text = fish.preset.fishName;
+        if (bodyText != null) bodyText.text = $"{fish.lengthCm:F1} cm\n<size=80%><color=#CCCCCC>{fish.preset.description}</color></size>";
+        if (valueText != null) valueText.text = $"{fish.GetValue()} coins";
     }
 
     public void HideTooltip()

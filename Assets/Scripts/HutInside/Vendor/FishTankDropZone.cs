@@ -20,23 +20,45 @@ public class FishTankDropZone : MonoBehaviour
         GameObject prefab = fishData.preset.fishPrefab;
         if (prefab == null) return;
 
-        // 1. Spawn the fish at the tank's center (or slightly offset)
+        // 1. Spawn the fish at the tank's center
         GameObject newFish = Instantiate(prefab, transform.position, Quaternion.identity);
 
-        // 2. Clean up physics/scripts meant for "Caught" state if necessary
-        // (e.g., if your prefab has a Rigidbody for the bucket, we might want to disable gravity)
+        // --- Ensure fish is on Default layer so Raycast hits it ---
+        newFish.layer = 0;
+
+        // 2. Clean up physics/scripts meant for "Caught" state
         Rigidbody rb = newFish.GetComponent<Rigidbody>();
         if (rb != null) Destroy(rb);
 
-        // 3. Remove any old AI scripts if they exist (like RandomWanderAI) to avoid conflict
         var oldAI = newFish.GetComponent<RandomWanderAI>();
         if (oldAI != null) Destroy(oldAI);
 
+        // 3. Attach Data Component for the Tooltip
+        WorldFishData worldData = newFish.AddComponent<WorldFishData>();
+        worldData.fishInfo = fishData;
+
+        // --- FIX: Create a Generous Hitbox ---
+        if (newFish.GetComponent<Collider>() == null)
+        {
+            BoxCollider col = newFish.AddComponent<BoxCollider>();
+
+            // Try to calculate size based on the model
+            Renderer rend = newFish.GetComponentInChildren<Renderer>();
+            if (rend != null)
+            {
+                // Set the box size to 150% of the visual mesh size
+                col.size = rend.bounds.size * 1.5f;
+                // Optional: Adjust center if the pivot isn't in the middle
+                // col.center = rend.bounds.center - newFish.transform.position;
+            }
+            else
+            {
+                // Fallback: Just a nice big box
+                col.size = new Vector3(1.5f, 1.5f, 1.5f);
+            }
+        }
+
         // 4. Register with the Tank Manager
         manager.AddFish(newFish);
-
-        // Optional: Scale fish based on size
-        // float sizeScale = fishData.lengthCm / 50f; // Example scaling
-        // newFish.transform.localScale = Vector3.one * sizeScale;
     }
 }
