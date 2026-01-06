@@ -96,6 +96,16 @@ public class FishingRodController : MonoBehaviour
 
     private void StartCharging()
     {
+        // FIX: Prevent starting a new charge if we aren't truly Idle,
+        // or if there are leftover bobbers in the scene.
+        if (currentState != FishingState.Idle) return;
+
+        if (bobberInWater != null || activeBobber != null)
+        {
+            Debug.LogWarning("Cannot cast: Bobber already exists.");
+            return;
+        }
+
         currentState = FishingState.Charging;
         FishingEvents.OnStartCharging?.Invoke();
     }
@@ -168,7 +178,7 @@ public class FishingRodController : MonoBehaviour
 
         FishingEvents.OnHookFishSuccess?.Invoke();
         currentState = FishingState.FightingFish;
-        currentFightProgress = 30f; // Start with some progress buffer
+        currentFightProgress = 30f;
 
         Debug.Log("Hooked! State: Fighting Fish (Directional Mode)!");
 
@@ -280,10 +290,7 @@ public class FishingRodController : MonoBehaviour
             {
                 if (activeBobber != null)
                 {
-                    // Update direction
                     minigameUI.SetFishDirectionFromVector(activeBobber.StruggleDirection);
-
-                    // --- NEW: Toggle bobber struggling based on rest state ---
                     activeBobber.SetStruggleActive(!minigameUI.IsResting);
                 }
 
@@ -291,7 +298,6 @@ public class FishingRodController : MonoBehaviour
             }
             else
             {
-                // Fallback auto-win if no UI
                 currentFightProgress += Time.deltaTime * 10f;
             }
 

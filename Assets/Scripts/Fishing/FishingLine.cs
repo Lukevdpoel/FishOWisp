@@ -48,15 +48,30 @@ public class FishingLine : MonoBehaviour
 
     private void SpawnAndAttachBobber(Vector3 direction, float force)
     {
+        // FIX: If a bobber already exists (from spamming), destroy it first.
+        if (activeBobber != null)
+        {
+            DestroyBobber();
+        }
+
         GameObject bobberInstance = Instantiate(bobberPrefab, rodTip.position, Quaternion.identity);
         activeBobber = bobberInstance.GetComponent<BobberController>();
+
         if (activeBobber == null)
         {
             Debug.LogError("The bobberPrefab is missing the BobberController script!");
             Destroy(bobberInstance);
             return;
         }
-        activeBobber.GetComponent<Rigidbody>().AddForce(direction * force, ForceMode.VelocityChange);
+
+        // FIX: Ensure physics are active so it doesn't float in mid-air
+        Rigidbody bobberRb = activeBobber.GetComponent<Rigidbody>();
+        if (bobberRb != null)
+        {
+            bobberRb.isKinematic = false;
+            bobberRb.AddForce(direction * force, ForceMode.VelocityChange);
+        }
+
         verletRope.SetupRope(rodTip, activeBobber.transform);
     }
 
@@ -94,16 +109,13 @@ public class FishingLine : MonoBehaviour
         }
     }
 
-    // MODIFIED: Added a safety check at the beginning of the routine
     private IEnumerator ReelInBobberRoutine()
     {
-        // NEW: Safety check to ensure the bobber wasn't destroyed during the start delay.
         if (activeBobber == null)
         {
             yield break;
         }
 
-        // Now it's safe to stop the effects.
         activeBobber.StopBiteEffects();
 
         if (activeBobber.TryGetComponent<Rigidbody>(out var bobberRb))
@@ -126,7 +138,6 @@ public class FishingLine : MonoBehaviour
 
         while (elapsedTime < duration)
         {
-            // This second check handles the case where the bobber is destroyed mid-animation
             if (activeBobber == null) yield break;
 
             float t = elapsedTime / duration;

@@ -15,11 +15,10 @@ public class ModelRotator : MonoBehaviour
         if (Input.GetMouseButton(0))
         {
             Vector3 delta = Input.mousePosition - lastMousePosition;
-            float rotX = delta.y * rotationSpeed * Time.unscaledDeltaTime;
+
             float rotY = -delta.x * rotationSpeed * Time.unscaledDeltaTime;
 
             transform.Rotate(Vector3.up, rotY, Space.World);
-            transform.Rotate(Vector3.right, rotX, Space.World);
 
             lastMousePosition = Input.mousePosition;
         }
