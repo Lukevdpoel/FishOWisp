@@ -56,6 +56,9 @@ public class BobberController : MonoBehaviour
     [Header("In-Air Physics")]
     public float airTumbleTorque = 5f;
 
+    [Tooltip("Extra downward force applied when in the air to prevent 'floatiness'. Increase this to make it fall faster.")]
+    public float extraGravity = 30f; // --- NEW: Fix for "Moon Gravity" ---
+
     [Header("Water Detection")]
     public string waterTag = "Water";
 
@@ -90,7 +93,7 @@ public class BobberController : MonoBehaviour
     private bool hasSplashed = false;
     private bool hasPlayedSplashSound = false;
     private bool hasPlayedImpactSound = false;
-    private float initialLinearDamping;
+    private float initialLinearDamping; // Unity 6 Name
     private float waterSurfaceY;
 
     private CaughtFish hookedFish;
@@ -114,7 +117,12 @@ public class BobberController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         audioSource = GetComponent<AudioSource>();
-        initialLinearDamping = rb.linearDamping;
+
+        // UNITY 6 FIX: Use 'linearDamping' instead of 'drag'
+        if (rb != null)
+        {
+            initialLinearDamping = rb.linearDamping;
+        }
     }
 
     void Start()
@@ -132,9 +140,6 @@ public class BobberController : MonoBehaviour
         {
             Vector3 wakePos = new Vector3(transform.position.x, waterSurfaceY, transform.position.z);
             activeWakeInstance.transform.position = wakePos;
-
-            // Optional: If you want the wake to rotate with the bobber's Y rotation (facing direction)
-            // activeWakeInstance.transform.rotation = Quaternion.Euler(0, transform.eulerAngles.y, 0);
         }
     }
 
@@ -146,6 +151,15 @@ public class BobberController : MonoBehaviour
             if (isStruggling)
             {
                 UpdateStruggleMovement();
+            }
+        }
+        else
+        {
+            // --- NEW: APPLY EXTRA GRAVITY ---
+            // This pushes the bobber down faster when it is flying through the air.
+            if (rb != null && !rb.isKinematic)
+            {
+                rb.AddForce(Vector3.down * extraGravity, ForceMode.Acceleration);
             }
         }
     }
@@ -176,7 +190,12 @@ public class BobberController : MonoBehaviour
         {
             isInWater = false;
             SetStruggleActive(false);
-            rb.linearDamping = initialLinearDamping;
+
+            // UNITY 6 FIX: Reset Damping
+            if (rb != null)
+            {
+                rb.linearDamping = initialLinearDamping;
+            }
 
             // Destroy Wake when leaving water
             if (activeWakeInstance != null)
@@ -205,8 +224,13 @@ public class BobberController : MonoBehaviour
     private void EnterWater()
     {
         isInWater = true;
-        rb.linearDamping = waterDrag;
-        rb.angularDamping = 2f;
+
+        // UNITY 6 FIX: Apply Water Drag
+        if (rb != null)
+        {
+            rb.linearDamping = waterDrag;
+            rb.angularDamping = 2f; // Was angularDrag
+        }
 
         // 1. TRIGGER IMPACT SPLASH
         if (!hasSplashed)
@@ -219,7 +243,6 @@ public class BobberController : MonoBehaviour
         if (wakePrefab != null && activeWakeInstance == null)
         {
             Vector3 wakePos = new Vector3(transform.position.x, waterSurfaceY, transform.position.z);
-            // Instantiate with the prefab's rotation
             activeWakeInstance = Instantiate(wakePrefab, wakePos, wakePrefab.transform.rotation);
         }
 
@@ -242,6 +265,7 @@ public class BobberController : MonoBehaviour
 
         if (depth > 0)
         {
+            // UNITY 6 FIX: Use 'linearVelocity' instead of 'velocity'
             Vector3 force = Vector3.up * (depth * buoyancyForce - rb.linearVelocity.y * bounceDamp);
             rb.AddForce(force, ForceMode.Acceleration);
         }
@@ -284,7 +308,6 @@ public class BobberController : MonoBehaviour
         Debug.Log($"{hookedFish.GetDisplayName()} is on the line!");
         FishingEvents.OnFishBite?.Invoke(this);
 
-        // 3. TRIGGER BITE SPLASH
         SpawnEffect(bitePrefab, biteLifetime);
 
         if (bitePhysicsCoroutine != null) StopCoroutine(bitePhysicsCoroutine);
@@ -293,14 +316,12 @@ public class BobberController : MonoBehaviour
 
     public void SetStruggleActive(bool active)
     {
-        // Prevent re-triggering if state hasn't changed
         if (isStruggling == active) return;
 
         isStruggling = active;
         if (active)
         {
             struggleTimer = 0;
-            // 4. TRIGGER STRUGGLE SPLASH
             SpawnEffect(strugglePrefab, struggleLifetime, true);
         }
     }
@@ -350,10 +371,7 @@ public class BobberController : MonoBehaviour
         for (int i = 0; i < nibbleCount; i++)
         {
             if (rb != null) rb.AddForce(Vector3.down * nibbleForce, ForceMode.Impulse);
-
-            // 2. TRIGGER NIBBLE SPLASH
             SpawnEffect(nibblePrefab, nibbleLifetime);
-
             FishingEvents.OnFishNibble?.Invoke(this);
             yield return new WaitForSeconds(nibbleInterval);
         }
@@ -374,9 +392,6 @@ public class BobberController : MonoBehaviour
         }
     }
 
-    // ------------------------------------------------------------------------
-    // CLEANUP
-    // ------------------------------------------------------------------------
     public void StopBiteEffects()
     {
         if (bitePhysicsCoroutine != null) StopCoroutine(bitePhysicsCoroutine);
@@ -385,7 +400,6 @@ public class BobberController : MonoBehaviour
     void OnDestroy()
     {
         StopAllCoroutines();
-        // Ensure wake is cleaned up
         if (activeWakeInstance != null) Destroy(activeWakeInstance);
     }
 }

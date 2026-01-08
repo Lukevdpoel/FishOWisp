@@ -126,9 +126,6 @@ PrefabInstance:
     - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 6e37fa6b622d93248a229bac3c75dbd3, type: 3}
       insertIndex: -1
       addedObject: {fileID: 4103373324239595329}
-    - targetCorrespondingSourceObject: {fileID: 919132149155446097, guid: 6e37fa6b622d93248a229bac3c75dbd3, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 4008224021153640481}
     - targetCorrespondingSourceObject: {fileID: 2866621852552652557, guid: 6e37fa6b622d93248a229bac3c75dbd3, type: 3}
       insertIndex: -1
       addedObject: {fileID: 5987205831516631951}
@@ -146,7 +143,7 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1120855375467252487}
   serializedVersion: 5
-  m_Mass: 150
+  m_Mass: 1
   m_LinearDamping: 0
   m_AngularDamping: 0.8
   m_CenterOfMass: {x: 0, y: 0, z: 0}
@@ -186,33 +183,6 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 0.9902682
   m_Center: {x: 0, y: 0, z: -0.008975873}
---- !u!114 &4008224021153640481
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1120855375467252487}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: d6f4d9817344ce242a614c0398399e73, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  bobberVisuals: {fileID: 0}
-  waterSplashEffect: {fileID: 8568261835014280744, guid: 083ef2191dedfb747adc6daffe6e7c63, type: 3}
-  splashCount: 3
-  splashInterval: 0.25
-  followEffect: {fileID: 2799942127255786676, guid: c76c160a200da7541beafb148fa6be9c, type: 3}
-  followDuration: 0.2
-  waterLayer:
-    serializedVersion: 2
-    m_Bits: 16
-  waterTag: Water
-  floatHeight: -0.3
-  bounceDamp: 1
-  waterDrag: 3
-  buoyancyForce: 28.4
-  thrower: {fileID: 0}
 --- !u!1 &2632130456758833499 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 2866621852552652557, guid: 6e37fa6b622d93248a229bac3c75dbd3, type: 3}

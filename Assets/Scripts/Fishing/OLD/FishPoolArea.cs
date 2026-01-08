@@ -1,4 +1,3 @@
-// FishPoolArea.cs (Updated)
 using UnityEngine;
 using System.Collections;
 
@@ -13,18 +12,18 @@ public class FishPoolArea : MonoBehaviour
     public float maxCatchTime = 5f; // maximum seconds before a catch
 
     private Coroutine catchRoutine;
-    private Bobber currentBobber; // Store a reference to the bobber's script
+
+    private BobberController currentBobber;
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Bobber"))
+        if (other.CompareTag("Bobber") || other.GetComponent<BobberController>() != null)
         {
-            // Try to get the Bobber script from the object that entered.
-            currentBobber = other.GetComponent<Bobber>();
+            currentBobber = other.GetComponent<BobberController>();
 
             if (currentBobber == null)
             {
-                Debug.LogError("The object with 'Bobber' tag is missing the Bobber script!", other.gameObject);
+                Debug.LogError("Object tagged 'Bobber' is missing the 'BobberController' script!", other.gameObject);
                 return;
             }
 
@@ -39,13 +38,13 @@ public class FishPoolArea : MonoBehaviour
 
     private void OnTriggerExit(Collider other)
     {
-        // Check if the exiting object is the same one we're tracking.
-        if (other.CompareTag("Bobber") && other.GetComponent<Bobber>() == currentBobber)
+        var exitingBobber = other.GetComponent<BobberController>();
+
+        if (exitingBobber != null && exitingBobber == currentBobber)
         {
             Debug.Log($"Bobber exited pool: {fishPool.poolName}");
-            currentBobber = null; // Clear the reference.
+            currentBobber = null; // Clear the reference
 
-            // Stop the catch timer if the bobber leaves.
             if (catchRoutine != null)
             {
                 StopCoroutine(catchRoutine);
@@ -57,17 +56,15 @@ public class FishPoolArea : MonoBehaviour
     private IEnumerator CatchFishAfterDelay()
     {
         float waitTime = Random.Range(minCatchTime, maxCatchTime);
-        Debug.Log($"Waiting {waitTime:F1} seconds to try and catch a fish...");
 
         yield return new WaitForSeconds(waitTime);
 
-        // Check if the bobber is still inside the area before attempting the catch.
         if (currentBobber != null && fishCatchable)
         {
             TryCatchFish();
         }
 
-        catchRoutine = null; // Reset so it can start again next time.
+        catchRoutine = null; 
     }
 
     public void TryCatchFish()
@@ -78,35 +75,18 @@ public class FishPoolArea : MonoBehaviour
             return;
         }
 
-        if (currentBobber.hookedFish != null)
+        if (currentBobber.HookedFish != null)
         {
             Debug.Log("Bobber already has a fish. Won't catch another.");
             return;
         }
 
-        // 1. Select a fish preset from the pool.
         var preset = fishPool.availableFish[Random.Range(0, fishPool.availableFish.Count)];
 
-        if (preset.fishPrefab == null)
-        {
-            Debug.LogError($"The fish preset '{preset.fishName}' is missing its prefab!");
-            return;
-        }
+        if (preset == null) return;
 
-        // 2. Instantiate the fish model at the bobber's current position.
-        GameObject fishInstance = Instantiate(preset.fishPrefab, currentBobber.transform.position, Quaternion.identity);
-        fishInstance.name = preset.fishName; // Give it a clean name in the hierarchy.
+        Debug.Log($"Fish detected! Starting nibble sequence for: {preset.fishName}");
 
-        // 3. Call the HookFish method on the bobber's script, passing in the new fish.
-        currentBobber.HookFish(fishInstance);
-
-        // This part can stay the same for your encyclopedia.
-        float length = Random.Range(preset.minLengthCm, preset.maxLengthCm);
-        // FishEncyclopediaManager.Instance.RegisterCaughtFish(preset, length);
-
-        Debug.Log($"Hooked {preset.fishName} ({length:F1} cm) from {fishPool.poolName}. Handing off to Bobber.");
-
-        // Optional: You could make the pool un-fishable for a while.
-        // fishCatchable = false;
+        currentBobber.StartNibbleSequence(preset);
     }
 }

@@ -4,7 +4,7 @@ using UnityEngine.EventSystems;
 
 public class FishingRodController : MonoBehaviour
 {
-    public enum FishingState { Idle, Charging, WaitingForBite, FishOnTheLine, FightingFish, Reeling, Cooldown }
+    public enum FishingState { Idle, Charging, WaitingForBite, FishOnTheLine, FightingFish, Reeling, InspectingCatch, Cooldown }
 
     [Header("State")]
     [SerializeField] private FishingState currentState = FishingState.Idle;
@@ -14,27 +14,48 @@ public class FishingRodController : MonoBehaviour
     public Transform playerModel;
     public DirectionalFishingMinigame minigameUI;
 
-    [Header("Animation & Cooldowns")]
+    [Header("Catch Presentation")]
+    public Transform fishHoldPoint;
+    public float turnToCameraSpeed = 10f;
+    [Tooltip("How fast the visual fish model spins while inspecting it (degrees per second).")]
+    public float fishRotationSpeed = 45f; // <--- NEW SETTING
+
+    [Header("Animation Settings")]
+    [Tooltip("The BOOLEAN parameter in your Animator. True = Hold Fish, False = Put Away.")]
+    public string showCatchAnimBool = "ShowCatch";
+
     public Animator playerAnimator;
     public string failAnimationTrigger = "FailHook";
+    public string reelingDuringFightBool = "isreelingduringfight";
+
+    [Header("Cooldowns & Timing")]
     public float failCooldown = 2.0f;
     public float reelInDuration = 1.5f;
     public float reelInArcHeight = 5.0f;
-
-    [Header("Timing")]
     public float reactionTime = 1.5f;
+    [Tooltip("Input buffer: You must wait this many seconds after catching before you can click to dismiss.")]
+    public float minInspectionTime = 0.5f;
 
     [Header("Fish Fight Settings")]
     public float maxFightProgress = 100f;
 
     private Coroutine fishFightCoroutine;
     private Coroutine fishEscapeCoroutine;
-
     private BobberController bobberInWater;
     private BobberController activeBobber;
 
     private float currentFightProgress;
     private CaughtFish caughtFishInstance = null;
+    private GameObject heldFishVisual;
+    private PlayerController playerController;
+    private float inspectionStartTime;
+
+    private void Awake()
+    {
+        playerController = GetComponent<PlayerController>();
+        if (playerController == null) playerController = GetComponentInParent<PlayerController>();
+        if (playerController == null) Debug.LogError("FishingRodController: PlayerController missing!");
+    }
 
     private void OnEnable()
     {
@@ -54,21 +75,49 @@ public class FishingRodController : MonoBehaviour
 
     private void HandleBobberLanded(BobberController bobber)
     {
-        if (bobberInWater != null && bobberInWater != bobber)
-        {
-            Destroy(bobberInWater.gameObject);
-        }
+        if (bobberInWater != null && bobberInWater != bobber) Destroy(bobberInWater.gameObject);
         bobberInWater = bobber;
     }
 
     void Update()
     {
         HandleInput();
+
+        // ---------------------------------------------------------
+        // INSPECTION PHASE LOGIC
+        // ---------------------------------------------------------
+        if (currentState == FishingState.InspectingCatch)
+        {
+            // 1. ROTATION LOGIC: Player turns to face camera
+            if (playerModel != null)
+            {
+                Vector3 camForward = Camera.main.transform.forward;
+                camForward.y = 0;
+                if (camForward != Vector3.zero)
+                {
+                    Quaternion targetRotation = Quaternion.LookRotation(-camForward);
+                    playerModel.rotation = Quaternion.Slerp(playerModel.rotation, targetRotation, Time.deltaTime * turnToCameraSpeed);
+                }
+            }
+
+            // 2. FISH SPIN LOGIC: The actual fish visual spins slowly (NEW)
+            if (heldFishVisual != null)
+            {
+                // Rotate around World Y axis so it looks good even if player is turning
+                heldFishVisual.transform.Rotate(Vector3.up, fishRotationSpeed * Time.deltaTime, Space.World);
+            }
+        }
     }
 
     private void HandleInput()
     {
         if (Time.timeScale == 0f) return;
+
+        // Respect locks unless we are in the catch phase
+        if (currentState != FishingState.InspectingCatch)
+        {
+            if (playerController != null && playerController.areControlsLocked) return;
+        }
 
         if (Input.GetKeyDown(KeyCode.Mouse0))
         {
@@ -85,6 +134,16 @@ public class FishingRodController : MonoBehaviour
                 case FishingState.FishOnTheLine:
                     HookFishAndStartFight();
                     break;
+
+                // ---------------------------------------------------------
+                // CLICK TO FINISH
+                // ---------------------------------------------------------
+                case FishingState.InspectingCatch:
+                    if (Time.time > inspectionStartTime + minInspectionTime)
+                    {
+                        FinishInspection();
+                    }
+                    break;
             }
         }
 
@@ -96,142 +155,88 @@ public class FishingRodController : MonoBehaviour
 
     private void StartCharging()
     {
-        // FIX: Prevent starting a new charge if we aren't truly Idle,
-        // or if there are leftover bobbers in the scene.
-        if (currentState != FishingState.Idle) return;
-
-        if (bobberInWater != null || activeBobber != null)
-        {
-            Debug.LogWarning("Cannot cast: Bobber already exists.");
-            return;
-        }
-
-        currentState = FishingState.Charging;
-        FishingEvents.OnStartCharging?.Invoke();
+        if (playerController != null && playerController.areControlsLocked) return;
+        if (bobberInWater != null || activeBobber != null) return;
+        currentState = FishingState.Charging; FishingEvents.OnStartCharging?.Invoke();
     }
-
-    private void HandleThrow(Vector3 direction, float force)
-    {
-        danglingBobber?.SetActive(false);
-        currentState = FishingState.WaitingForBite;
-    }
-
+    private void HandleThrow(Vector3 direction, float force) { danglingBobber?.SetActive(false); currentState = FishingState.WaitingForBite; }
     private void HandleFishBite(BobberController bobber)
     {
         if (currentState != FishingState.WaitingForBite || bobber != bobberInWater) return;
-
-        currentState = FishingState.FishOnTheLine;
-        activeBobber = bobber;
-        Debug.Log("A fish is biting! Hook it now!");
+        currentState = FishingState.FishOnTheLine; activeBobber = bobber;
         fishEscapeCoroutine = StartCoroutine(FishEscapeTimer());
     }
-
-    private IEnumerator FishEscapeTimer()
-    {
-        yield return new WaitForSeconds(reactionTime);
-        FailToHookFish();
-    }
-
-    private void FailToHookFish()
-    {
-        Debug.Log("Too slow! The fish got away!");
-        if (fishEscapeCoroutine != null)
-        {
-            StopCoroutine(fishEscapeCoroutine);
-            fishEscapeCoroutine = null;
-        }
-        StartCoroutine(FailRoutine());
-    }
+    private IEnumerator FishEscapeTimer() { yield return new WaitForSeconds(reactionTime); FailToHookFish(); }
+    private void FailToHookFish() { if (fishEscapeCoroutine != null) StopCoroutine(fishEscapeCoroutine); StartCoroutine(FailRoutine()); }
 
     private IEnumerator FailRoutine()
     {
         if (minigameUI != null) minigameUI.Deactivate();
-
-        if (bobberInWater != null)
-        {
-            Destroy(bobberInWater.gameObject);
-            bobberInWater = null;
-        }
+        if (playerAnimator != null && !string.IsNullOrEmpty(reelingDuringFightBool)) playerAnimator.SetBool(reelingDuringFightBool, false);
+        if (bobberInWater != null) { Destroy(bobberInWater.gameObject); bobberInWater = null; }
         activeBobber = null;
-
         FishingEvents.OnCancelFishing?.Invoke();
         currentState = FishingState.Cooldown;
-        Debug.Log("State: Cooldown (Failed)");
-
-        if (playerAnimator != null && !string.IsNullOrEmpty(failAnimationTrigger))
-            playerAnimator.SetTrigger(failAnimationTrigger);
-
+        if (playerAnimator != null && !string.IsNullOrEmpty(failAnimationTrigger)) playerAnimator.SetTrigger(failAnimationTrigger);
         yield return new WaitForSeconds(failCooldown);
-
-        currentState = FishingState.Idle;
-        danglingBobber?.SetActive(true);
-        Debug.Log("State: Idle (Reset from Cooldown)");
+        currentState = FishingState.Idle; danglingBobber?.SetActive(true);
     }
-
     private void HookFishAndStartFight()
     {
-        if (fishEscapeCoroutine != null)
-        {
-            StopCoroutine(fishEscapeCoroutine);
-            fishEscapeCoroutine = null;
-        }
-
-        FishingEvents.OnHookFishSuccess?.Invoke();
-        currentState = FishingState.FightingFish;
-        currentFightProgress = 30f;
-
-        Debug.Log("Hooked! State: Fighting Fish (Directional Mode)!");
-
-        if (activeBobber != null)
-        {
-            Rigidbody rb = activeBobber.GetComponent<Rigidbody>();
-            if (rb != null)
-            {
-                rb.isKinematic = false;
-                activeBobber.SetStruggleActive(true);
-            }
-        }
-
-        if (minigameUI != null)
-        {
-            minigameUI.Activate();
-            if (activeBobber != null)
-            {
-                minigameUI.SetTrackingTarget(activeBobber.transform);
-            }
-        }
-
-        FishingEvents.OnFishFightBegin?.Invoke(activeBobber.HookedFish.preset);
-        fishFightCoroutine = StartCoroutine(FishFightRoutine());
+        if (fishEscapeCoroutine != null) StopCoroutine(fishEscapeCoroutine);
+        FishingEvents.OnHookFishSuccess?.Invoke(); currentState = FishingState.FightingFish; currentFightProgress = 30f;
+        if (activeBobber != null) { Rigidbody rb = activeBobber.GetComponent<Rigidbody>(); if (rb != null) { rb.isKinematic = false; activeBobber.SetStruggleActive(true); } }
+        if (minigameUI != null) { minigameUI.Activate(); if (activeBobber != null) minigameUI.SetTrackingTarget(activeBobber.transform); }
+        FishingEvents.OnFishFightBegin?.Invoke(activeBobber.HookedFish.preset); fishFightCoroutine = StartCoroutine(FishFightRoutine());
     }
-
     private void WinFishFight()
     {
         currentState = FishingState.Reeling;
-
-        if (fishFightCoroutine != null)
-        {
-            StopCoroutine(fishFightCoroutine);
-            fishFightCoroutine = null;
-        }
-
-        if (activeBobber != null)
-        {
-            activeBobber.SetStruggleActive(false);
-        }
-
+        if (fishFightCoroutine != null) StopCoroutine(fishFightCoroutine);
+        if (activeBobber != null) activeBobber.SetStruggleActive(false);
         if (minigameUI != null) minigameUI.Deactivate();
-
         caughtFishInstance = activeBobber.HookedFish;
-
         FishingEvents.OnFishFightEnd?.Invoke(true);
-
-        if (activeBobber != null)
-        {
-            activeBobber.SwapBobberForFishModel();
-        }
+        if (activeBobber != null) activeBobber.SwapBobberForFishModel();
 
         StartCoroutine(ReelInBobberRoutine(caughtFishInstance));
+    }
+    private IEnumerator FishFightRoutine()
+    {
+        float lastProgress = currentFightProgress;
+        while (currentFightProgress < maxFightProgress && currentFightProgress > 0)
+        {
+            if (minigameUI != null)
+            {
+                if (activeBobber != null)
+                {
+                    minigameUI.SetFishDirectionFromVector(activeBobber.StruggleDirection);
+                    activeBobber.SetStruggleActive(!minigameUI.IsResting);
+                }
+                currentFightProgress = minigameUI.UpdateMinigame(currentFightProgress, maxFightProgress);
+            }
+            else { currentFightProgress += Time.deltaTime * 10f; }
+
+            if (playerAnimator != null && !string.IsNullOrEmpty(reelingDuringFightBool))
+            {
+                bool isGainingProgress = currentFightProgress > lastProgress;
+                playerAnimator.SetBool(reelingDuringFightBool, isGainingProgress);
+            }
+            lastProgress = currentFightProgress;
+            FishingEvents.OnFishFightProgressUpdate?.Invoke(currentFightProgress, maxFightProgress);
+            yield return null;
+        }
+        if (playerAnimator != null && !string.IsNullOrEmpty(reelingDuringFightBool)) playerAnimator.SetBool(reelingDuringFightBool, false);
+        if (currentFightProgress >= maxFightProgress) WinFishFight();
+        else { if (minigameUI != null) minigameUI.Deactivate(); StartCoroutine(FailRoutine()); }
+    }
+    private void CancelFishingAction()
+    {
+        if (currentState != FishingState.Cooldown)
+        {
+            if (bobberInWater != null) Destroy(bobberInWater.gameObject);
+            ResetFishingState(null);
+        }
     }
 
     private IEnumerator ReelInBobberRoutine(CaughtFish fishToInventory)
@@ -242,15 +247,14 @@ public class FishingRodController : MonoBehaviour
         if (activeBobber != null) bobberToReelController = activeBobber;
         else if (bobberInWater != null) bobberToReelController = bobberInWater;
 
+        Transform target = (fishToInventory != null && fishHoldPoint != null) ? fishHoldPoint : playerModel;
+        if (target == null) target = transform;
+
         if (bobberToReelController != null)
         {
             bobberToReelController.enabled = false;
             Rigidbody bobberRb = bobberToReelController.GetComponent<Rigidbody>();
             if (bobberRb != null) bobberRb.isKinematic = true;
-
-            Transform target;
-            if (playerModel != null) target = playerModel;
-            else target = danglingBobber.transform;
 
             Transform bobberToReelTransform = bobberToReelController.transform;
             Vector3 startPos = bobberToReelTransform.position;
@@ -269,87 +273,94 @@ public class FishingRodController : MonoBehaviour
                     Vector3 position = (oneMinusEasedT * oneMinusEasedT * startPos) +
                                        (2f * oneMinusEasedT * easedT * controlPoint) +
                                        (easedT * easedT * target.position);
-
                     bobberToReelTransform.position = position;
                 }
                 elapsed += Time.deltaTime;
                 yield return null;
             }
-
             if (bobberToReelTransform != null) Destroy(bobberToReelTransform.gameObject);
         }
 
         HandleReelingCompleted(fishToInventory);
     }
 
-    private IEnumerator FishFightRoutine()
+    private void HandleReelingCompleted(CaughtFish fishToInventory)
     {
-        while (currentFightProgress < maxFightProgress && currentFightProgress > 0)
+        if (fishToInventory != null)
         {
-            if (minigameUI != null)
-            {
-                if (activeBobber != null)
-                {
-                    minigameUI.SetFishDirectionFromVector(activeBobber.StruggleDirection);
-                    activeBobber.SetStruggleActive(!minigameUI.IsResting);
-                }
+            currentState = FishingState.InspectingCatch;
+            danglingBobber?.SetActive(true);
 
-                currentFightProgress = minigameUI.UpdateMinigame(currentFightProgress, maxFightProgress);
-            }
-            else
+            inspectionStartTime = Time.time;
+
+            if (playerController != null)
             {
-                currentFightProgress += Time.deltaTime * 10f;
+                playerController.areControlsLocked = true;
+                playerController.SetCatchCamera(true);
             }
 
-            FishingEvents.OnFishFightProgressUpdate?.Invoke(currentFightProgress, maxFightProgress);
-            yield return null;
-        }
+            if (playerAnimator != null && !string.IsNullOrEmpty(showCatchAnimBool))
+            {
+                playerAnimator.SetBool(showCatchAnimBool, true);
+            }
 
-        if (currentFightProgress >= maxFightProgress)
-        {
-            WinFishFight();
+            if (fishHoldPoint != null && fishToInventory.preset.fishPrefab != null)
+            {
+                heldFishVisual = Instantiate(fishToInventory.preset.fishPrefab, fishHoldPoint);
+                heldFishVisual.transform.localPosition = Vector3.zero;
+                heldFishVisual.transform.localRotation = Quaternion.identity;
+                SetLayerRecursively(heldFishVisual, playerModel.gameObject.layer);
+            }
         }
         else
         {
-            Debug.Log("Fish escaped during fight (Progress reached 0)!");
-            if (minigameUI != null) minigameUI.Deactivate();
-            StartCoroutine(FailRoutine());
-        }
-    }
-
-    private void CancelFishingAction()
-    {
-        if (currentState != FishingState.Cooldown)
-        {
-            if (bobberInWater != null) Destroy(bobberInWater.gameObject);
             ResetFishingState(null);
         }
     }
 
-    private void HandleReelingCompleted(CaughtFish fishToInventory)
+    private void FinishInspection()
     {
-        ResetFishingState(fishToInventory);
+        if (caughtFishInstance != null) PlayerInventory.Instance.AddFish(caughtFishInstance);
+        if (heldFishVisual != null) Destroy(heldFishVisual);
+
+        if (playerAnimator != null && !string.IsNullOrEmpty(showCatchAnimBool))
+        {
+            playerAnimator.SetBool(showCatchAnimBool, false);
+        }
+
+        ResetFishingState(null);
     }
 
     private void ResetFishingState(CaughtFish fishToInventory)
     {
         if (currentState == FishingState.Idle && fishToInventory == null) return;
 
+        // --- FIXED: FORCE CAMERA RESET ---
+        if (playerController != null)
+        {
+            playerController.SetCatchCamera(false);
+            playerController.areControlsLocked = false;
+        }
+        // ---------------------------------
+
         currentState = FishingState.Idle;
         danglingBobber?.SetActive(true);
-        Debug.Log("State: Idle (Reset)");
-
         fishFightCoroutine = null;
         fishEscapeCoroutine = null;
         activeBobber = null;
         bobberInWater = null;
         caughtFishInstance = null;
-
         if (minigameUI != null) minigameUI.Deactivate();
+    }
 
-        if (fishToInventory != null)
+    void SetLayerRecursively(GameObject obj, int newLayer)
+    {
+        if (obj == null) return;
+        obj.layer = newLayer;
+        foreach (Transform child in obj.transform)
         {
-            PlayerInventory.Instance.AddFish(fishToInventory);
+            if (child == null) continue;
+            SetLayerRecursively(child.gameObject, newLayer);
         }
     }
 }

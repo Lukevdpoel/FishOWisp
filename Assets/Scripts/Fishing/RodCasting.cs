@@ -3,7 +3,12 @@ using UnityEngine;
 public class RodCasting : MonoBehaviour
 {
     [Header("References")]
+    [Tooltip("The TIP of the rod. Used for the actual bobber spawn position.")]
     public Transform throwOrigin;
+
+    [Tooltip("NEW: A stationary point (child of Player Root) where the line starts. Prevents wobbling during animation.")]
+    public Transform predictionOrigin; // <--- NEW FIELD
+
     [Tooltip("The visual model of the player to rotate.")]
     public Transform playerModel;
 
@@ -16,22 +21,26 @@ public class RodCasting : MonoBehaviour
     public float maxThrowForce = 25f;
     public float chargeRate = 10f;
 
+    [Header("Physics Prediction")]
+    [Tooltip("MUST MATCH the 'Extra Gravity' value in your BobberController script.")]
+    public float bobberExtraGravity = 30f;
+
     [Header("Aiming")]
     [Tooltip("The angle (in degrees) from the center to the edge of the allowed aiming cone.")]
     public float aimConeAngle = 45f;
     [Tooltip("How sensitive the aiming is to horizontal mouse movement.")]
     public float aimSensitivity = 2f;
-    [Tooltip("How smoothly the aim follows the mouse. Higher values are faster and less smooth.")]
+    [Tooltip("How smoothly the aim follows the mouse.")]
     public float aimSmoothing = 10f;
 
     private float currentThrowForce;
     private Vector3 throwDirection;
-    private Vector3 targetAimDirection; // The direction the mouse is aiming for
+    private Vector3 targetAimDirection;
     private bool isCharging = false;
     private Camera mainCamera;
 
     private CastingTargetController activeCastingTarget;
-    private int chargeDirection = 1; // 1 for filling, -1 for emptying
+    private int chargeDirection = 1;
 
     void Awake()
     {
@@ -61,8 +70,11 @@ public class RodCasting : MonoBehaviour
 
             if (activeCastingTarget != null)
             {
-                // The trajectory line now uses the smoothed throwDirection
-                activeCastingTarget.UpdateTrajectory(throwOrigin.position, throwDirection, currentThrowForce);
+                // --- FIX: Use predictionOrigin for the visual line ---
+                // If predictionOrigin is missing, it safely falls back to throwOrigin
+                Vector3 startPos = predictionOrigin != null ? predictionOrigin.position : throwOrigin.position;
+
+                activeCastingTarget.UpdateTrajectory(startPos, throwDirection, currentThrowForce, bobberExtraGravity);
             }
         }
     }
@@ -73,11 +85,10 @@ public class RodCasting : MonoBehaviour
         currentThrowForce = minThrowForce;
         chargeDirection = 1;
 
-        // Initialize both aim directions to be straight ahead from the camera
         targetAimDirection = mainCamera.transform.forward;
         targetAimDirection.y = 0;
         targetAimDirection.Normalize();
-        throwDirection = targetAimDirection; // Start the smoothed direction at the target
+        throwDirection = targetAimDirection;
 
         FishingEvents.OnToggleChargeUI?.Invoke(true);
 
@@ -143,17 +154,14 @@ public class RodCasting : MonoBehaviour
 
     private void UpdateAimAndRotation()
     {
-        // 1. Get mouse movement and apply it to the "target" direction
         float mouseX = Input.GetAxis("Mouse X") * aimSensitivity;
         Quaternion rotation = Quaternion.AngleAxis(mouseX, Vector3.up);
         targetAimDirection = rotation * targetAimDirection;
 
-        // 2. Define the center of the aiming cone
         Vector3 coneCenter = mainCamera.transform.forward;
         coneCenter.y = 0;
         coneCenter.Normalize();
 
-        // 3. Clamp the "target" direction to the cone's limits
         float angleToCenter = Vector3.Angle(coneCenter, targetAimDirection);
         if (angleToCenter > aimConeAngle)
         {
@@ -162,12 +170,10 @@ public class RodCasting : MonoBehaviour
             targetAimDirection = clampRotation * coneCenter;
         }
 
-        // 4. Smoothly interpolate the actual throwDirection towards the targetAimDirection
         Quaternion currentRot = Quaternion.LookRotation(throwDirection);
         Quaternion targetRot = Quaternion.LookRotation(targetAimDirection);
         throwDirection = Quaternion.Slerp(currentRot, targetRot, Time.deltaTime * aimSmoothing) * Vector3.forward;
 
-        // 5. Rotate the player model to face the smoothed aim direction
         if (playerModel != null && throwDirection.sqrMagnitude > 0.01f)
         {
             Quaternion playerTargetRot = Quaternion.LookRotation(throwDirection);

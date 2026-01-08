@@ -19,7 +19,6 @@ public class CastingTargetController : MonoBehaviour
     void Awake()
     {
         lineRenderer = GetComponent<LineRenderer>();
-        // Start hidden until it's needed.
         Hide();
     }
 
@@ -35,15 +34,25 @@ public class CastingTargetController : MonoBehaviour
         if (targetIndicator != null) targetIndicator.SetActive(false);
     }
 
-    public void UpdateTrajectory(Vector3 startPoint, Vector3 direction, float force)
+    // --- UPDATED SIGNATURE: Now accepts extraDownForce ---
+    public void UpdateTrajectory(Vector3 startPoint, Vector3 direction, float force, float extraDownForce)
     {
         Vector3 velocity = direction * force;
-        float gravity = Physics.gravity.y;
+
+        // CALCULATE EFFECTIVE GRAVITY
+        // Physics.gravity.y is usually -9.81. 
+        // We subtract the extra positive force (e.g. 30) to get a stronger downward pull (e.g. -39.81).
+        float effectiveGravityY = Physics.gravity.y - extraDownForce;
+
         List<Vector3> points = new List<Vector3>();
         Vector3 currentPoint = startPoint;
 
-        float timeOfFlight = (2 * velocity.y) / -gravity;
-        if (timeOfFlight <= 0) timeOfFlight = 5f;
+        // Recalculate time of flight using the heavier gravity
+        // Formula: t = (2 * Vy) / -g
+        float timeOfFlight = (2 * velocity.y) / -effectiveGravityY;
+
+        // Safety check to prevent infinite loops or errors if aiming down
+        if (timeOfFlight <= 0 || float.IsNaN(timeOfFlight)) timeOfFlight = 2f;
 
         if (targetIndicator != null) targetIndicator.SetActive(false);
 
@@ -52,7 +61,9 @@ public class CastingTargetController : MonoBehaviour
             points.Add(currentPoint);
             float t = (i + 1) * (timeOfFlight / resolution);
 
-            Vector3 nextPoint = startPoint + velocity * t + 0.5f * Vector3.up * gravity * t * t;
+            // Standard trajectory formula: P = P0 + vt + 0.5at^2
+            Vector3 gravityStep = 0.5f * Vector3.up * effectiveGravityY * t * t;
+            Vector3 nextPoint = startPoint + velocity * t + gravityStep;
 
             if (Physics.Linecast(currentPoint, nextPoint, out RaycastHit hit, waterLayer))
             {
@@ -60,7 +71,6 @@ public class CastingTargetController : MonoBehaviour
                 if (targetIndicator != null)
                 {
                     targetIndicator.transform.position = hit.point + hit.normal * 0.02f;
-                    // CORRECTED: Rotate to face the OPPOSITE of the surface normal, making it visible to a camera looking down.
                     targetIndicator.transform.rotation = Quaternion.FromToRotation(Vector3.forward, -hit.normal);
                     targetIndicator.SetActive(true);
                 }

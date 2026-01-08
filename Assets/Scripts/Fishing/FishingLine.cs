@@ -48,7 +48,8 @@ public class FishingLine : MonoBehaviour
 
     private void SpawnAndAttachBobber(Vector3 direction, float force)
     {
-        // FIX: If a bobber already exists (from spamming), destroy it first.
+        // --- GOAL 1 FIX (Backup Layer) ---
+        // If there is already an active bobber, destroy it first!
         if (activeBobber != null)
         {
             DestroyBobber();
@@ -56,7 +57,6 @@ public class FishingLine : MonoBehaviour
 
         GameObject bobberInstance = Instantiate(bobberPrefab, rodTip.position, Quaternion.identity);
         activeBobber = bobberInstance.GetComponent<BobberController>();
-
         if (activeBobber == null)
         {
             Debug.LogError("The bobberPrefab is missing the BobberController script!");
@@ -64,12 +64,12 @@ public class FishingLine : MonoBehaviour
             return;
         }
 
-        // FIX: Ensure physics are active so it doesn't float in mid-air
-        Rigidbody bobberRb = activeBobber.GetComponent<Rigidbody>();
-        if (bobberRb != null)
+        // --- GOAL 2 FIX: FORCE PHYSICS ---
+        Rigidbody rb = activeBobber.GetComponent<Rigidbody>();
+        if (rb != null)
         {
-            bobberRb.isKinematic = false;
-            bobberRb.AddForce(direction * force, ForceMode.VelocityChange);
+            rb.isKinematic = false; // Ensure gravity works
+            rb.AddForce(direction * force, ForceMode.VelocityChange);
         }
 
         verletRope.SetupRope(rodTip, activeBobber.transform);
@@ -116,8 +116,10 @@ public class FishingLine : MonoBehaviour
             yield break;
         }
 
+        // Safe to stop effects
         activeBobber.StopBiteEffects();
 
+        // Turn OFF physics for the reel-in animation
         if (activeBobber.TryGetComponent<Rigidbody>(out var bobberRb))
         {
             bobberRb.isKinematic = true;

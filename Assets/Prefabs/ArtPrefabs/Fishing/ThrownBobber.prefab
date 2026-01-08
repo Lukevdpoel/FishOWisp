@@ -45,7 +45,7 @@ Rigidbody:
   m_GameObject: {fileID: 2096275447604763850}
   serializedVersion: 5
   m_Mass: 150
-  m_LinearDamping: 0
+  m_LinearDamping: 0.05
   m_AngularDamping: 0.8
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
@@ -109,11 +109,12 @@ MonoBehaviour:
   waterEntryVolumeScale: 2.24
   impactSound: {fileID: 8300000, guid: a6c45050064a0e648b6e521a85da2f54, type: 3}
   airTumbleTorque: 324.01
+  extraGravity: 15
   waterTag: Water
   floatHeight: -0.3
   bounceDamp: 0.08
   buoyancyForce: 28.4
-  waterDrag: 2
+  waterDrag: 5
   waterRotationSpeed: 5
   minNibbles: 1
   maxNibbles: 2
