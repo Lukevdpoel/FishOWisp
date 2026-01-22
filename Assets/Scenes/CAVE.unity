@@ -16677,6 +16677,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   sceneName: HUTBUILT
+  targetSpawnID: 
 --- !u!65 &1002321157
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -17421,6 +17422,51 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 2380702934164366268, guid: 49d14cc4f8fab2144b5a9d1a183d2ae1, type: 3}
   m_PrefabInstance: {fileID: 1076259770}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1093485116
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1093485118}
+  - component: {fileID: 1093485117}
+  m_Layer: 0
+  m_Name: Caveinside_Spawn
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1093485117
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1093485116}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 23e62c3026fd4bb40a7db66467288fff, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SpawnPoint
+  spawnID: Caveinside_Spawn
+--- !u!4 &1093485118
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1093485116}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: 0.6164573, z: -0, w: 0.7873884}
+  m_LocalPosition: {x: 135.32, y: 3.89, z: 10.55}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 76.116, z: 0}
 --- !u!4 &1093926505 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 3086559114875721987, guid: 566d03e29fcba24499770969ce585f09, type: 3}
@@ -34524,6 +34570,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   sceneName: HUTBUILT
+  targetSpawnID: 
 --- !u!65 &2098599138
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -35604,3 +35651,4 @@ SceneRoots:
   - {fileID: 345390567}
   - {fileID: 818684864}
   - {fileID: 977160868}
+  - {fileID: 1093485118}

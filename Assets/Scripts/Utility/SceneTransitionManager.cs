@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq; // Required for finding the spawn point easily
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -15,6 +16,9 @@ public class SceneTransitionManager : GenericSingleton<SceneTransitionManager>
 
     private bool isTransitioning = false;
 
+    // Internal variable to remember where we are going
+    private string currentSpawnID;
+
     protected override void Awake()
     {
         base.Awake();
@@ -26,7 +30,6 @@ public class SceneTransitionManager : GenericSingleton<SceneTransitionManager>
 
     private void Start()
     {
-        // Ensure everything is hidden when the game first boots up
         if (loadingIcon != null) loadingIcon.SetActive(false);
         if (progressBar != null) progressBar.fillAmount = 0f;
     }
@@ -41,7 +44,6 @@ public class SceneTransitionManager : GenericSingleton<SceneTransitionManager>
         SceneManager.sceneLoaded -= OnSceneLoaded;
     }
 
-    // This function fires automatically when the new scene is ready
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
         StartCoroutine(OnSceneLoadedRoutine());
@@ -49,58 +51,73 @@ public class SceneTransitionManager : GenericSingleton<SceneTransitionManager>
 
     private IEnumerator OnSceneLoadedRoutine()
     {
-        // 1. Trigger the fade OUT of black (back to clear)
+        // 1. CRITICAL WAIT: Wait 1 frame so the new scene can initialize first.
+        // This prevents the Player Prefab's own Start() script from overwriting our teleport.
+        yield return null;
+
+        // --- POSITIONING LOGIC ---
+        if (!string.IsNullOrEmpty(currentSpawnID))
+        {
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            SpawnPoint point = FindSpawnPoint(currentSpawnID);
+
+            if (player != null && point != null)
+            {
+                // Disable CharacterController to prevent it from fighting the teleport
+                CharacterController cc = player.GetComponent<CharacterController>();
+                if (cc != null) cc.enabled = false;
+
+                // Teleport the player
+                player.transform.position = point.transform.position;
+                player.transform.rotation = point.transform.rotation;
+
+                // Force Unity to acknowledge the move immediately
+                Physics.SyncTransforms();
+
+                if (cc != null) cc.enabled = true;
+
+                Debug.Log($"Teleport successful: Player moved to {currentSpawnID}");
+            }
+            else
+            {
+                Debug.LogWarning($"Teleport Failed: Player found? {player != null}, SpawnPoint found? {point != null}");
+            }
+        }
+        // -------------------------
+
+        // 2. Start fading back in (Clear screen)
         if (transition != null)
         {
             transition.SetTrigger("End");
             transition.ResetTrigger("Start");
         }
 
-        // 2. WAIT here while the screen fades back to clear.
-        // The icon is still visible during this time.
+        // 3. Keep loading icon visible while fading
         yield return new WaitForSeconds(transitionTime);
 
-        // 3. NOW hide the loading elements
-        if (loadingIcon != null)
-        {
-            loadingIcon.SetActive(false);
-        }
+        // 4. Hide loading visuals
+        if (loadingIcon != null) loadingIcon.SetActive(false);
+        if (progressBar != null) progressBar.fillAmount = 0f;
 
-        if (progressBar != null)
-        {
-            progressBar.fillAmount = 0f;
-        }
-
-        // 4. Finally, unlock the system for the next transition
         isTransitioning = false;
     }
 
-    public void LoadScene(string sceneName)
+    public void LoadScene(string sceneName, string spawnID = "")
     {
         if (isTransitioning) return;
 
+        currentSpawnID = spawnID;
         isTransitioning = true;
         StartCoroutine(LoadSceneRoutine(sceneName));
     }
 
     private IEnumerator LoadSceneRoutine(string sceneName)
     {
-        // Turn on the icon immediately when transition starts
-        if (loadingIcon != null)
-        {
-            loadingIcon.SetActive(true);
-        }
+        if (loadingIcon != null) loadingIcon.SetActive(true);
+        if (transition != null) transition.SetTrigger("Start");
 
-        // Start fading to black
-        if (transition != null)
-        {
-            transition.SetTrigger("Start");
-        }
-
-        // Wait for the screen to go fully black
         yield return new WaitForSeconds(transitionTime);
 
-        // Load the new scene in the background
         AsyncOperation operation = SceneManager.LoadSceneAsync(sceneName);
         operation.allowSceneActivation = false;
 
@@ -108,22 +125,21 @@ public class SceneTransitionManager : GenericSingleton<SceneTransitionManager>
         {
             float progress = Mathf.Clamp01(operation.progress / 0.9f);
 
-            if (progressBar != null)
-            {
-                progressBar.fillAmount = progress;
-            }
+            if (progressBar != null) progressBar.fillAmount = progress;
 
-            // When the scene is ready (90%)
             if (operation.progress >= 0.9f)
             {
-                // Optional: Short pause to let the user see the "100%" state
                 yield return new WaitForSeconds(0.2f);
-
-                // Finish the load (this might cause a brief frame freeze)
                 operation.allowSceneActivation = true;
             }
 
             yield return null;
         }
+    }
+
+    private SpawnPoint FindSpawnPoint(string id)
+    {
+        SpawnPoint[] points = FindObjectsOfType<SpawnPoint>();
+        return points.FirstOrDefault(p => p.spawnID == id);
     }
 }
