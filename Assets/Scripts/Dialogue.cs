@@ -3,7 +3,7 @@
 [System.Serializable]
 public class DialogueLine
 {
-    public string characterName; // 🟢 THIS MUST EXIST
+    public string characterName;
     [TextArea(2, 5)]
     public string text;
 }
@@ -12,4 +12,8 @@ public class DialogueLine
 public class Dialogue : ScriptableObject
 {
     public DialogueLine[] lines;
+
+    [Header("End Settings")]
+    [Tooltip("If true, the Yes/No box appears after the last line.")]
+    public bool isQuestion = false;
 }

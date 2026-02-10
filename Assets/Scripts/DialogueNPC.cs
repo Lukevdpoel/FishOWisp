@@ -3,23 +3,25 @@ using UnityEngine;
 public class DialogueNPC : MonoBehaviour
 {
     public Dialogue dialogue;
-    public DialogueManager dialogueManager;
-    public GameObject promptUI;
+    public GameObject promptUI; // The visual "E" or "!" icon above the NPC
 
     private bool playerInZone;
 
     void Start()
     {
-        if (promptUI != null)
-            promptUI.SetActive(false);
+        if (promptUI != null) promptUI.SetActive(false);
     }
 
     void Update()
     {
+        // Check if player is in zone AND hits E
         if (playerInZone && Input.GetKeyDown(KeyCode.E))
         {
-            if (!dialogueManager.IsDialogueActive())
-                dialogueManager.StartDialogue(dialogue);
+            // Only start if dialogue isn't already running
+            if (DialogueManager.Instance != null && !DialogueManager.Instance.IsDialogueActive())
+            {
+                DialogueManager.Instance.StartDialogue(dialogue);
+            }
         }
     }
 
@@ -28,8 +30,7 @@ public class DialogueNPC : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             playerInZone = true;
-            if (promptUI != null)
-                promptUI.SetActive(true);
+            if (promptUI != null) promptUI.SetActive(true);
         }
     }
 
@@ -39,18 +40,13 @@ public class DialogueNPC : MonoBehaviour
         {
             playerInZone = false;
 
-            if (promptUI != null)
-                promptUI.SetActive(false);
+            if (promptUI != null) promptUI.SetActive(false);
 
-            // END DIALOGUE when leaving
-            if (dialogueManager != null && dialogueManager.IsDialogueActive())
+            // Force close dialogue if the player walks away while talking
+            if (DialogueManager.Instance != null)
             {
-                // Force it to end
-                typeof(DialogueManager)
-                    .GetMethod("EndDialogue", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                    ?.Invoke(dialogueManager, null);
+                DialogueManager.Instance.ForceCloseAllUI();
             }
         }
     }
-
 }

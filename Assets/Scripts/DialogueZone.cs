@@ -6,8 +6,11 @@ public class DialogueZone : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            Debug.Log("Player exited zone"); // ✅ Debug check
-            DialogueManager.Instance?.OnPlayerExitZone();
+            // Safe null check
+            if (DialogueManager.Instance != null)
+            {
+                DialogueManager.Instance.ForceCloseAllUI();
+            }
         }
     }
 }
