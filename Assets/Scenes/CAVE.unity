@@ -2048,8 +2048,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 0.17
+  m_Color: {r: 0, g: 0.53624356, b: 0.6226415, a: 1}
+  m_Intensity: 0.27
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -7108,7 +7108,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0777d029ed3dffa4692f417d4aba19ca, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Material: {fileID: 2100000, guid: e8033dd08d41e4e44b67da5f0b055a05, type: 2}
+  m_Material: {fileID: 2100000, guid: cf955641aed87ee4bb163bdcb0025d9e, type: 2}
   m_DrawDistance: 1000
   m_FadeScale: 0.9
   m_StartAngleFade: 180
@@ -12832,7 +12832,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0777d029ed3dffa4692f417d4aba19ca, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Material: {fileID: 2100000, guid: afdda33714915c140a148a598f154cbf, type: 2}
+  m_Material: {fileID: 2100000, guid: cf955641aed87ee4bb163bdcb0025d9e, type: 2}
   m_DrawDistance: 1000
   m_FadeScale: 0.9
   m_StartAngleFade: 180
@@ -23268,6 +23268,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: Lightbeam
       objectReference: {fileID: 0}
+    - target: {fileID: 3877676348211594308, guid: f5132952d3980ca42b7b7757af2ab6c8, type: 3}
+      propertyPath: 'm_Materials.Array.data[0]'
+      value: 
+      objectReference: {fileID: 2100000, guid: 256592e0c2c58b946b1d18f548b583b8, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
@@ -24768,7 +24772,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0777d029ed3dffa4692f417d4aba19ca, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Material: {fileID: 2100000, guid: afdda33714915c140a148a598f154cbf, type: 2}
+  m_Material: {fileID: 2100000, guid: cf955641aed87ee4bb163bdcb0025d9e, type: 2}
   m_DrawDistance: 1000
   m_FadeScale: 0.9
   m_StartAngleFade: 180
@@ -30141,7 +30145,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0777d029ed3dffa4692f417d4aba19ca, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Material: {fileID: 2100000, guid: afdda33714915c140a148a598f154cbf, type: 2}
+  m_Material: {fileID: 2100000, guid: cf955641aed87ee4bb163bdcb0025d9e, type: 2}
   m_DrawDistance: 1000
   m_FadeScale: 0.9
   m_StartAngleFade: 180
@@ -31709,7 +31713,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0777d029ed3dffa4692f417d4aba19ca, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Material: {fileID: 2100000, guid: afdda33714915c140a148a598f154cbf, type: 2}
+  m_Material: {fileID: 2100000, guid: cf955641aed87ee4bb163bdcb0025d9e, type: 2}
   m_DrawDistance: 1000
   m_FadeScale: 0.9
   m_StartAngleFade: 180
