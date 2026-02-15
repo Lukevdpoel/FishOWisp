@@ -1,26 +1,30 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class DialogueNPC : MonoBehaviour
 {
+    [Header("Dialogue Setup")]
     public Dialogue dialogue;
-    public GameObject promptUI; // The visual "E" or "!" icon above the NPC
+    [Tooltip("Drag the 'World Space Canvas' object that holds your 'E' icon here.")]
+    public GameObject promptUI;
 
     private bool playerInZone;
 
     void Start()
     {
+        // Ensure prompt is hidden at start
         if (promptUI != null) promptUI.SetActive(false);
     }
 
     void Update()
     {
-        // Check if player is in zone AND hits E
+        // 1. Check if Player is close AND presses E
         if (playerInZone && Input.GetKeyDown(KeyCode.E))
         {
-            // Only start if dialogue isn't already running
+            // 2. Check if we are already talking
             if (DialogueManager.Instance != null && !DialogueManager.Instance.IsDialogueActive())
             {
-                DialogueManager.Instance.StartDialogue(dialogue);
+                // 3. Start Dialogue and pass 'transform' so the bubble knows where to go
+                DialogueManager.Instance.StartDialogue(dialogue, this.transform);
             }
         }
     }
@@ -39,10 +43,9 @@ public class DialogueNPC : MonoBehaviour
         if (other.CompareTag("Player"))
         {
             playerInZone = false;
-
             if (promptUI != null) promptUI.SetActive(false);
 
-            // Force close dialogue if the player walks away while talking
+            // Safety: If player runs away, close the window
             if (DialogueManager.Instance != null)
             {
                 DialogueManager.Instance.ForceCloseAllUI();
