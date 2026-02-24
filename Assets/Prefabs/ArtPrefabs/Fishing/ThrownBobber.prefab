@@ -82,7 +82,7 @@ SphereCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Radius: 0.9902682
+  m_Radius: 0.24
   m_Center: {x: 0, y: 0, z: -0.008975873}
 --- !u!114 &693156924994179394
 MonoBehaviour:
@@ -108,7 +108,7 @@ MonoBehaviour:
   waterEntrySound: {fileID: 8300000, guid: dc4ba211051ab5f4cbbf9e2c4a95b238, type: 3}
   waterEntryVolumeScale: 2.24
   impactSound: {fileID: 8300000, guid: a6c45050064a0e648b6e521a85da2f54, type: 3}
-  airTumbleTorque: 324.01
+  airTumbleTorque: 70
   extraGravity: 15
   waterTag: Water
   floatHeight: -0.3

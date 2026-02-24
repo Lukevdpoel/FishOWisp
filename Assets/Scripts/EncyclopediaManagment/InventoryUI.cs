@@ -39,6 +39,9 @@ public class InventoryUI : MonoBehaviour
     [Tooltip("Layer for tanks/aquariums (Display fish).")]
     public LayerMask tankLayerMask;
 
+    [Tooltip("Layer for bounty boards (Deliver fish).")]
+    public LayerMask bountyLayerMask;
+
     [Tooltip("Layers that the raycast should ignore completely (e.g. Player, UI, TriggerZones).")]
     public LayerMask raycastIgnoreLayers;
 
@@ -201,6 +204,28 @@ public class InventoryUI : MonoBehaviour
                         // Remove from player inventory
                         PlayerInventory.Instance.RemoveFish(currentDraggedFishData);
                         actionTaken = true;
+                    }
+                }
+                // --- CASE D: HIT BOUNTY BOARD (DELIVER) ---
+                else if (((1 << hitLayer) & bountyLayerMask) != 0)
+                {
+                    Debug.Log($"Hit Bounty Board: {hit.collider.name}. Checking delivery.");
+
+                    BountyBoard board = hit.collider.GetComponent<BountyBoard>();
+                    if (board == null) board = hit.collider.GetComponentInParent<BountyBoard>();
+
+                    if (board != null && PlayerInventory.Instance != null)
+                    {
+                        // The board checks if it needs this specific fish
+                        if (board.TryDeliverFish(currentDraggedFishData))
+                        {
+                            PlayerInventory.Instance.RemoveFish(currentDraggedFishData);
+                            actionTaken = true;
+                        }
+                        else
+                        {
+                            Debug.Log("The Bounty Board doesn't need this fish right now.");
+                        }
                     }
                 }
                 else

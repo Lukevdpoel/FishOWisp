@@ -56,6 +56,8 @@ public class PlayerController : MonoBehaviour
     private bool isFightingFish = false;
     private bool isCasting = false;
     private bool isCatchCameraActive = false;
+    private bool isBountyBoardActive = false;
+    private Transform activeBountyBoard;
 
     private CharacterController characterController;
     private Vector3 targetVelocity;
@@ -87,6 +89,8 @@ public class PlayerController : MonoBehaviour
         FishingEvents.OnStartReelingDuringFight += StartReelingDuringFightAnim;
         FishingEvents.OnStopReelingDuringFight += StopReelingDuringFightAnim;
         FishingEvents.OnBobberLandedInWater += OnBobberLanded;
+
+        BountyBoard.OnBountyBoardStateChange += HandleBountyBoard;
     }
 
     private void OnDisable()
@@ -105,6 +109,8 @@ public class PlayerController : MonoBehaviour
         FishingEvents.OnStartReelingDuringFight -= StartReelingDuringFightAnim;
         FishingEvents.OnStopReelingDuringFight -= StopReelingDuringFightAnim;
         FishingEvents.OnBobberLandedInWater -= OnBobberLanded;
+
+        BountyBoard.OnBountyBoardStateChange -= HandleBountyBoard;
     }
 
     public void SetCatchCamera(bool active) => isCatchCameraActive = active;
@@ -135,20 +141,30 @@ public class PlayerController : MonoBehaviour
         }
         if (framingTarget == null) framingTarget = playerModel;
 
-        // 🟢 LISTEN FOR DIALOGUE EVENTS
         DialogueManager.OnDialogueStateChange += OnDialogueStateChanged;
     }
 
     private void OnDestroy()
     {
-        // 🟢 UNSUBSCRIBE TO PREVENT ERRORS
         DialogueManager.OnDialogueStateChange -= OnDialogueStateChanged;
     }
 
-    // 🟢 EVENT HANDLER: Locks/Unlocks Controls
     private void OnDialogueStateChanged(bool isOpen)
     {
         areControlsLocked = isOpen;
+        if (isOpen)
+        {
+            targetVelocity = Vector3.zero;
+            if (animator) animator.SetBool("Walk", false);
+        }
+    }
+
+    private void HandleBountyBoard(bool isOpen, Transform boardTransform)
+    {
+        areControlsLocked = isOpen;
+        isBountyBoardActive = isOpen;
+        activeBountyBoard = boardTransform;
+
         if (isOpen)
         {
             targetVelocity = Vector3.zero;
@@ -174,7 +190,6 @@ public class PlayerController : MonoBehaviour
         HandleCamera();
     }
 
-    // [Helper Methods Unchanged]
     private void PlayStartChargingAnim() { if (animator && !string.IsNullOrEmpty(startChargingAnim)) animator.SetTrigger(startChargingAnim); }
     private void PlayThrowAnim(Vector3 direction, float force) { if (animator && !string.IsNullOrEmpty(throwAnim)) animator.SetTrigger(throwAnim); }
 
@@ -272,7 +287,6 @@ public class PlayerController : MonoBehaviour
     private void HandleCamera()
     {
         if (!cameraTransform || !playerModel) return;
-        if (areControlsLocked && !isCatchCameraActive) return;
         if (InventoryUI.IsInventoryOpen) return;
 
         if (useStaticCamera)
@@ -283,7 +297,27 @@ public class PlayerController : MonoBehaviour
 
         if (float.IsNaN(xVel) || float.IsNaN(yVel) || float.IsNaN(distanceVelocity)) { xVel = 0f; yVel = 0f; distanceVelocity = 0f; }
 
-        if (!isFightingFish && !isCatchCameraActive)
+        // Determine if we are actively in a conversation or looking at the board
+        bool isDialogueCamera = areControlsLocked && DialogueManager.Instance != null && DialogueManager.Instance.IsDialogueActive();
+        bool isBoardCamera = areControlsLocked && isBountyBoardActive && activeBountyBoard != null;
+
+        // 1. DIALOGUE & BOARD FRAMING
+        if (isDialogueCamera || isBoardCamera)
+        {
+            Transform target = isDialogueCamera ? DialogueManager.Instance.currentSpeaker : activeBountyBoard;
+            if (target != null)
+            {
+                // Calculate direction to look at the Target (NPC or Board)
+                Vector3 directionToTarget = (target.position - playerModel.position).normalized;
+                Quaternion targetRot = Quaternion.LookRotation(directionToTarget);
+
+                // Smoothly orbit camera to face the target
+                cameraXAngle = Mathf.LerpAngle(cameraXAngle, targetRot.eulerAngles.y, Time.deltaTime * 3f);
+                cameraYAngle = Mathf.LerpAngle(cameraYAngle, 20f, Time.deltaTime * 3f);
+            }
+        }
+        // 2. NORMAL CAMERA CONTROL
+        else if (!isFightingFish && !isCatchCameraActive && !areControlsLocked)
         {
             float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
             float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
@@ -291,10 +325,12 @@ public class PlayerController : MonoBehaviour
             cameraYAngle -= mouseY;
             cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
         }
+        // 3. CATCH CAMERA
         else if (isCatchCameraActive)
         {
             cameraYAngle = Mathf.Lerp(cameraYAngle, catchLookDownAngle, Time.deltaTime * 5f);
         }
+        // 4. FISH FIGHTING CAMERA
         else if (activeBobberTransform != null && isFightingFish)
         {
             Vector3 directionToBobber = (activeBobberTransform.position - playerModel.position).normalized;

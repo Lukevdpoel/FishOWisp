@@ -5,6 +5,7 @@ using UnityEngine.UI;
 
 public class DialogueManager : MonoBehaviour
 {
+    // EVENT SYSTEM
     public static event System.Action<bool> OnDialogueStateChange;
 
     [Header("Hierarchy Setup")]
@@ -12,18 +13,18 @@ public class DialogueManager : MonoBehaviour
     public RectTransform backgroundRect;
     public TMP_Text nameText;
     public TMP_Text dialogueText;
-
-    [Tooltip("Drag your Main Canvas here. Required for correct positioning.")]
     public Canvas mainCanvas;
 
-    [Header("Positioning Settings")]
-    [Tooltip("Distance from the NPC center in Canvas Units.")]
-    public float horizontalPadding = 250f;
-    [Tooltip("Height adjustment above the NPC.")]
-    public float verticalPadding = 0f;
-    public float repositionSpeed = 10f;
+    [Header("Continue Arrow")]
+    [Tooltip("Drag the Arrow UI Image here")]
+    public GameObject continueArrow;
+    [Tooltip("How fast the arrow fades in and out")]
+    public float arrowBlinkSpeed = 4f;
 
-    [Tooltip("Prevents the box from touching screen edges.")]
+    [Header("Positioning Settings")]
+    public float horizontalPadding = 0f;
+    public float verticalPadding = 100f;
+    public float repositionSpeed = 10f;
     public float screenEdgeBuffer = 50f;
 
     [Header("Scroll Settings")]
@@ -36,9 +37,12 @@ public class DialogueManager : MonoBehaviour
     public float pulseDuration = 0.15f;
     public float pulseScale = 0.92f;
 
-    [Header("Typewriter")]
+    [Header("Typewriter & Audio")]
     public float typingSpeed = 0.03f;
-    public AudioSource typingAudio;
+    [Tooltip("The Audio Source component attached to this Manager")]
+    public AudioSource audioSource;
+    [Tooltip("List of sounds to pick from at the start of a sentence")]
+    public AudioClip[] sentenceStartSounds;
 
     [Header("Choice UI")]
     public GameObject choicePanel;
@@ -49,7 +53,7 @@ public class DialogueManager : MonoBehaviour
 
     // Internal State
     private Dialogue currentDialogue;
-    private Transform currentSpeaker;
+    public Transform currentSpeaker;
     private int currentLineIndex = 0;
     private bool isDialogueActive = false;
     private bool isTyping = false;
@@ -59,10 +63,14 @@ public class DialogueManager : MonoBehaviour
 
     private RectTransform textRect;
     private RectTransform boxRect;
-    private RectTransform canvasRect; // Cache the canvas rect
+    private RectTransform canvasRect;
     private float currentScrollY = 0;
     private int linesScrolled = 0;
     private Vector2 targetAnchoredPos;
+
+    // Arrow Internal State
+    private CanvasGroup arrowCanvasGroup;
+    private Vector3 arrowBaseScale = Vector3.one;
 
     public static DialogueManager Instance { get; private set; }
 
@@ -74,16 +82,22 @@ public class DialogueManager : MonoBehaviour
         if (dialogueText) textRect = dialogueText.GetComponent<RectTransform>();
         if (dialogueBoxPanel) boxRect = dialogueBoxPanel.GetComponent<RectTransform>();
 
-        // Auto-find canvas if not assigned
         if (mainCanvas == null) mainCanvas = GetComponentInParent<Canvas>();
         if (mainCanvas != null) canvasRect = mainCanvas.GetComponent<RectTransform>();
+
+        // Setup Arrow Component
+        if (continueArrow != null)
+        {
+            arrowBaseScale = continueArrow.transform.localScale;
+            arrowCanvasGroup = continueArrow.GetComponent<CanvasGroup>();
+            if (arrowCanvasGroup == null) arrowCanvasGroup = continueArrow.AddComponent<CanvasGroup>();
+        }
 
         ForceCloseAllUI();
     }
 
     void LateUpdate()
     {
-        // Smoothly follow the target position
         if (isDialogueActive && currentSpeaker != null && Camera.main != null)
         {
             CalculateTargetPosition();
@@ -93,6 +107,22 @@ public class DialogueManager : MonoBehaviour
 
     void Update()
     {
+        // ARROW BLINK LOGIC
+        if (continueArrow != null)
+        {
+            bool shouldShowArrow = isDialogueActive && !isTyping && !isChoosing;
+            continueArrow.SetActive(shouldShowArrow);
+
+            if (shouldShowArrow && arrowCanvasGroup != null)
+            {
+                // Sharp fading math (invisible half the time, pops up quickly)
+                float wave = Mathf.Sin(Time.unscaledTime * arrowBlinkSpeed);
+                float sharpness = 2.0f;
+                arrowCanvasGroup.alpha = Mathf.Clamp01(wave * sharpness);
+            }
+        }
+
+        // Input
         if (isDialogueActive)
         {
             if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetMouseButtonDown(0))
@@ -114,12 +144,13 @@ public class DialogueManager : MonoBehaviour
         isChoosing = false;
 
         dialogueText.text = "";
+        dialogueText.maxVisibleCharacters = 0; // Prevent flash of text
         currentScrollY = 0;
         linesScrolled = 0;
+
         if (textRect) textRect.anchoredPosition = Vector2.zero;
         if (nameText) nameText.text = "";
 
-        // Snap immediately to start position so it doesn't fly in from corner
         if (currentSpeaker != null && Camera.main != null)
         {
             CalculateTargetPosition();
@@ -137,31 +168,16 @@ public class DialogueManager : MonoBehaviour
         }));
     }
 
-    // 🟢 NEW: ROBUST COORDINATE CONVERSION
     private void CalculateTargetPosition()
     {
-        // 1. Where is the NPC's Head in World Space?
         Vector3 npcHeadPos = currentSpeaker.position + Vector3.up * 2.0f;
-
-        // 2. Convert World Space -> Screen Space (Pixel Coordinates)
         Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(Camera.main, npcHeadPos);
 
-        // 3. Convert Screen Space -> Canvas Local Space (The coordinate system UI uses)
         Vector2 localPoint;
         RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPoint, mainCanvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : Camera.main, out localPoint);
 
-        // 4. Determine Side (Left or Right relative to Canvas Center)
-        // If the NPC is on the right side of the screen, we push the box Left.
-        // We compare the localPoint x against 0 (Canvas Center)
-        bool isRightSide = localPoint.x > 0;
+        targetAnchoredPos = new Vector2(localPoint.x + horizontalPadding, localPoint.y + verticalPadding);
 
-        float xOffset = isRightSide ? -horizontalPadding : horizontalPadding;
-
-        // 5. Apply Offsets
-        targetAnchoredPos = new Vector2(localPoint.x + xOffset, localPoint.y + verticalPadding);
-
-        // 6. Clamp to Canvas Edges (Keep it on screen)
-        // We use the canvasRect size to determine boundaries
         float minX = (canvasRect.rect.width / -2f) + (boxRect.rect.width / 2f) + screenEdgeBuffer;
         float maxX = (canvasRect.rect.width / 2f) - (boxRect.rect.width / 2f) - screenEdgeBuffer;
 
@@ -177,36 +193,51 @@ public class DialogueManager : MonoBehaviour
         DialogueLine line = currentDialogue.lines[currentLineIndex];
         if (nameText) nameText.text = line.characterName;
         string textToType = (currentLineIndex == 0) ? line.text : "\n" + line.text;
+
         StopCoroutine("TypeText");
         StartCoroutine(TypeText(textToType));
     }
 
-    IEnumerator TypeText(string text)
+    // TYPEWRITER: Pre-loads text and reveals it, playing one sound at the start
+    IEnumerator TypeText(string newTextChunk)
     {
         isTyping = true;
         skipTyping = false;
 
-        for (int i = 0; i < text.Length; i++)
+        // 🟢 NEW: Play a random sentence start sound
+        if (audioSource != null && sentenceStartSounds != null && sentenceStartSounds.Length > 0)
         {
-            char c = text[i];
-            dialogueText.text += c;
-            dialogueText.ForceMeshUpdate();
+            // Pick a random clip from the array
+            AudioClip randomClip = sentenceStartSounds[Random.Range(0, sentenceStartSounds.Length)];
 
-            if (dialogueText.textInfo.lineCount > maxVisibleLines + linesScrolled)
+            // Play it once, allowing it to overlap with previously playing sounds if needed
+            audioSource.PlayOneShot(randomClip);
+        }
+
+        int startCharIndex = dialogueText.maxVisibleCharacters;
+
+        dialogueText.text += newTextChunk;
+        dialogueText.ForceMeshUpdate();
+
+        int totalVisibleChars = dialogueText.textInfo.characterCount;
+
+        for (int i = startCharIndex; i < totalVisibleChars; i++)
+        {
+            dialogueText.maxVisibleCharacters = i + 1;
+
+            int currentLineOfChar = dialogueText.textInfo.characterInfo[i].lineNumber;
+
+            if (currentLineOfChar >= maxVisibleLines + linesScrolled)
             {
                 linesScrolled++;
                 yield return StartCoroutine(ScrollTextUp(dialogueText.textInfo.lineInfo[0].lineHeight));
             }
 
-            if (typingAudio && !char.IsWhiteSpace(c)) typingAudio.Play();
+            // Notice: The per-letter audio logic was completely removed from here!
 
             if (skipTyping)
             {
-                if (i + 1 < text.Length)
-                {
-                    dialogueText.text += text.Substring(i + 1);
-                    dialogueText.ForceMeshUpdate();
-                }
+                dialogueText.maxVisibleCharacters = totalVisibleChars;
 
                 int totalLines = dialogueText.textInfo.lineCount;
                 if (totalLines > maxVisibleLines)
@@ -220,8 +251,10 @@ public class DialogueManager : MonoBehaviour
                 }
                 break;
             }
+
             yield return new WaitForSeconds(typingSpeed);
         }
+
         isTyping = false;
     }
 
@@ -251,14 +284,32 @@ public class DialogueManager : MonoBehaviour
     IEnumerator PulseAndContinue()
     {
         float halfTime = pulseDuration / 2f;
-        Vector3 start = Vector3.one;
-        Vector3 target = start * pulseScale;
+        Vector3 boxStart = Vector3.one;
+        Vector3 boxTarget = boxStart * pulseScale;
+        Vector3 arrowTarget = arrowBaseScale * 0.5f;
+
         float t = 0;
-        while (t < 1f) { t += Time.deltaTime / halfTime; dialogueBoxPanel.transform.localScale = Vector3.Lerp(start, target, t); yield return null; }
+        while (t < 1f)
+        {
+            t += Time.deltaTime / halfTime;
+            dialogueBoxPanel.transform.localScale = Vector3.Lerp(boxStart, boxTarget, t);
+            if (continueArrow) continueArrow.transform.localScale = Vector3.Lerp(arrowBaseScale, arrowTarget, t);
+            yield return null;
+        }
+
         AdvanceLine();
+
         t = 0;
-        while (t < 1f) { t += Time.deltaTime / halfTime; dialogueBoxPanel.transform.localScale = Vector3.Lerp(target, start, t); yield return null; }
-        dialogueBoxPanel.transform.localScale = start;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / halfTime;
+            dialogueBoxPanel.transform.localScale = Vector3.Lerp(boxTarget, boxStart, t);
+            if (continueArrow) continueArrow.transform.localScale = Vector3.Lerp(arrowTarget, arrowBaseScale, t);
+            yield return null;
+        }
+
+        dialogueBoxPanel.transform.localScale = boxStart;
+        if (continueArrow) continueArrow.transform.localScale = arrowBaseScale;
     }
 
     IEnumerator AnimateBox(Vector3 targetScale, float duration, AnimationCurve curve, System.Action onComplete = null)
