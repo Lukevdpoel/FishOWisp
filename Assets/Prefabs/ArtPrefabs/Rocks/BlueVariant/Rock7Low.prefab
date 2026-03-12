@@ -22,15 +22,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 32c5772b565f4f847b605f4a83d0bbb1, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -62.4
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 32c5772b565f4f847b605f4a83d0bbb1, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.2
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 32c5772b565f4f847b605f4a83d0bbb1, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -67.73
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 32c5772b565f4f847b605f4a83d0bbb1, type: 3}
       propertyPath: m_LocalRotation.w
@@ -69,13 +69,21 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6649893682535974328, guid: 32c5772b565f4f847b605f4a83d0bbb1, type: 3}
+      propertyPath: m_ReceiveGI
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: 6649893682535974328, guid: 32c5772b565f4f847b605f4a83d0bbb1, type: 3}
       propertyPath: m_StaticShadowCaster
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 6649893682535974328, guid: 32c5772b565f4f847b605f4a83d0bbb1, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: 2dbf7c8530ab0b44080a2fd0e4857c2f, type: 2}
+      objectReference: {fileID: 2100000, guid: b22bad19da931ee43b5e3c2e219308da, type: 2}
+    - target: {fileID: 7336940582584218102, guid: 32c5772b565f4f847b605f4a83d0bbb1, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 4300000, guid: e47f42ab95059ec4a96f525d23b726d3, type: 2}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

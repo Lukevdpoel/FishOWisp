@@ -22,15 +22,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 74b075f9d469d9441869d1dd709db5c2, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 23.64411
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 74b075f9d469d9441869d1dd709db5c2, type: 3}
       propertyPath: m_LocalPosition.y
-      value: -0.76
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 74b075f9d469d9441869d1dd709db5c2, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 19.212992
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 74b075f9d469d9441869d1dd709db5c2, type: 3}
       propertyPath: m_LocalRotation.w
@@ -65,13 +65,21 @@ PrefabInstance:
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -1961162532223503644, guid: 74b075f9d469d9441869d1dd709db5c2, type: 3}
+      propertyPath: m_ReceiveGI
+      value: 2
+      objectReference: {fileID: 0}
+    - target: {fileID: -1961162532223503644, guid: 74b075f9d469d9441869d1dd709db5c2, type: 3}
       propertyPath: m_StaticShadowCaster
       value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -1961162532223503644, guid: 74b075f9d469d9441869d1dd709db5c2, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: d1f26773fd392724b82409658c6995a9, type: 2}
+      objectReference: {fileID: 2100000, guid: b22bad19da931ee43b5e3c2e219308da, type: 2}
+    - target: {fileID: -376132041965617439, guid: 74b075f9d469d9441869d1dd709db5c2, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 4300000, guid: a6d277b52568c7b4fb512ce724e968dd, type: 2}
     - target: {fileID: 919132149155446097, guid: 74b075f9d469d9441869d1dd709db5c2, type: 3}
       propertyPath: m_Name
       value: Rock2Low

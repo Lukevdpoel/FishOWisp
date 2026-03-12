@@ -22,15 +22,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: faf0f9e52a49cdf4185d5d6f5ce71af1, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -48.218998
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: faf0f9e52a49cdf4185d5d6f5ce71af1, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 2.8195996
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: faf0f9e52a49cdf4185d5d6f5ce71af1, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -42.642
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: faf0f9e52a49cdf4185d5d6f5ce71af1, type: 3}
       propertyPath: m_LocalRotation.w
@@ -60,9 +60,17 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: -810282913614634573, guid: faf0f9e52a49cdf4185d5d6f5ce71af1, type: 3}
+      propertyPath: m_Mesh
+      value: 
+      objectReference: {fileID: 4300000, guid: 19fd54b4b2174b14485270d22b3c1145, type: 2}
     - target: {fileID: 919132149155446097, guid: faf0f9e52a49cdf4185d5d6f5ce71af1, type: 3}
       propertyPath: m_Name
       value: Rock4Low
+      objectReference: {fileID: 0}
+    - target: {fileID: 1341163906064362119, guid: faf0f9e52a49cdf4185d5d6f5ce71af1, type: 3}
+      propertyPath: m_ReceiveGI
+      value: 2
       objectReference: {fileID: 0}
     - target: {fileID: 1341163906064362119, guid: faf0f9e52a49cdf4185d5d6f5ce71af1, type: 3}
       propertyPath: m_StaticShadowCaster
@@ -71,7 +79,7 @@ PrefabInstance:
     - target: {fileID: 1341163906064362119, guid: faf0f9e52a49cdf4185d5d6f5ce71af1, type: 3}
       propertyPath: 'm_Materials.Array.data[0]'
       value: 
-      objectReference: {fileID: 2100000, guid: a36bb8bb5a3d23c4e9294a670932a9ab, type: 2}
+      objectReference: {fileID: 2100000, guid: b22bad19da931ee43b5e3c2e219308da, type: 2}
     - target: {fileID: 3731111343513612120, guid: faf0f9e52a49cdf4185d5d6f5ce71af1, type: 3}
       propertyPath: m_StaticEditorFlags
       value: 1
