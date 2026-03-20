@@ -9,9 +9,14 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Transform framingTarget;
 
     [Header("Movement Settings")]
-    [SerializeField] private float moveSpeed = 10f;
+    [SerializeField] private float walkSpeed = 6f;       // NEW: Walk speed
+    [SerializeField] private float sprintSpeed = 12f;    // NEW: Sprint speed
     [SerializeField] private float rotationSpeed = 15f;
     [SerializeField] private float gravity = -20f;
+
+    [Header("Movement Animations")]
+    [SerializeField] private string walkAnimBool = "Walk";     // NEW: Made walk anim customizable
+    [SerializeField] private string sprintAnimBool = "Sprint"; // NEW: Sprint anim boolean
 
     [Header("Jump Animation")]
     [SerializeField] private string jumpAnimTrigger = "Jump";
@@ -64,6 +69,9 @@ public class PlayerController : MonoBehaviour
     private float idleTimer;
     private bool allowSitdown = true;
 
+    // NEW: Track if the player is currently sprinting
+    private bool isSprinting = false;
+
     private float startDistance, cameraXAngle, cameraYAngle, smoothXAngle, smoothYAngle, xVel, yVel;
     private Camera cam;
     private float currentCameraDistance, distanceVelocity;
@@ -72,6 +80,8 @@ public class PlayerController : MonoBehaviour
     private Vector3 pivotVelocity;
 
     private Transform activeBobberTransform;
+
+    private Quaternion targetModelRotation;
 
     private void OnEnable()
     {
@@ -138,6 +148,8 @@ public class PlayerController : MonoBehaviour
             smoothYAngle = cameraYAngle;
             cam = cameraTransform.GetComponent<Camera>();
             currentPivotPosition = playerModel.position + Vector3.up * pivotHeight;
+
+            targetModelRotation = playerModel.rotation;
         }
         if (framingTarget == null) framingTarget = playerModel;
 
@@ -155,7 +167,8 @@ public class PlayerController : MonoBehaviour
         if (isOpen)
         {
             targetVelocity = Vector3.zero;
-            if (animator) animator.SetBool("Walk", false);
+            if (animator) animator.SetBool(walkAnimBool, false);
+            if (animator && !string.IsNullOrEmpty(sprintAnimBool)) animator.SetBool(sprintAnimBool, false);
         }
     }
 
@@ -168,7 +181,8 @@ public class PlayerController : MonoBehaviour
         if (isOpen)
         {
             targetVelocity = Vector3.zero;
-            if (animator) animator.SetBool("Walk", false);
+            if (animator) animator.SetBool(walkAnimBool, false);
+            if (animator && !string.IsNullOrEmpty(sprintAnimBool)) animator.SetBool(sprintAnimBool, false);
         }
     }
 
@@ -215,6 +229,13 @@ public class PlayerController : MonoBehaviour
         float h = inputDisabled ? 0f : Input.GetAxisRaw("Horizontal");
         float v = inputDisabled ? 0f : Input.GetAxisRaw("Vertical");
 
+        // NEW: Check for sprint input (Left Shift)
+        bool hasMovementInput = new Vector2(h, v).magnitude > 0.1f;
+        isSprinting = hasMovementInput && Input.GetKey(KeyCode.LeftShift) && !inputDisabled;
+
+        // NEW: Assign current speed based on sprint state
+        float currentSpeed = isSprinting ? sprintSpeed : walkSpeed;
+
         Vector3 camForward = cameraTransform.forward;
         Vector3 camRight = cameraTransform.right;
 
@@ -224,19 +245,21 @@ public class PlayerController : MonoBehaviour
         camRight.Normalize();
 
         Vector3 moveDirection = (camForward * v + camRight * h).normalized;
-        targetVelocity = moveDirection * moveSpeed;
+        targetVelocity = moveDirection * currentSpeed; // Use dynamic speed
         targetVelocity.y = yVelocity;
     }
 
     private void HandleRotation()
     {
         if (areControlsLocked) return;
+
         if (new Vector3(targetVelocity.x, 0, targetVelocity.z).magnitude > 0.1f)
         {
             Vector3 lookDirection = new Vector3(targetVelocity.x, 0, targetVelocity.z);
-            Quaternion targetRotation = Quaternion.LookRotation(lookDirection);
-            playerModel.rotation = Quaternion.Slerp(playerModel.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            targetModelRotation = Quaternion.LookRotation(lookDirection);
         }
+
+        playerModel.rotation = Quaternion.Slerp(playerModel.rotation, targetModelRotation, rotationSpeed * Time.deltaTime);
     }
 
     private void HandleGravity()
@@ -247,9 +270,20 @@ public class PlayerController : MonoBehaviour
 
     private void HandleAnimation()
     {
-        bool isWalking = !areControlsLocked && !InventoryUI.IsInventoryOpen &&
+        bool isMoving = !areControlsLocked && !InventoryUI.IsInventoryOpen &&
                          (new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f);
-        animator.SetBool("Walk", isWalking);
+
+        if (animator)
+        {
+            // NEW: Set walk to true ONLY if moving and NOT sprinting
+            animator.SetBool(walkAnimBool, isMoving && !isSprinting);
+
+            // NEW: Set sprint to true ONLY if sprinting
+            if (!string.IsNullOrEmpty(sprintAnimBool))
+            {
+                animator.SetBool(sprintAnimBool, isSprinting);
+            }
+        }
     }
 
     private void HandleIdleAnimation()
@@ -297,26 +331,21 @@ public class PlayerController : MonoBehaviour
 
         if (float.IsNaN(xVel) || float.IsNaN(yVel) || float.IsNaN(distanceVelocity)) { xVel = 0f; yVel = 0f; distanceVelocity = 0f; }
 
-        // Determine if we are actively in a conversation or looking at the board
         bool isDialogueCamera = areControlsLocked && DialogueManager.Instance != null && DialogueManager.Instance.IsDialogueActive();
         bool isBoardCamera = areControlsLocked && isBountyBoardActive && activeBountyBoard != null;
 
-        // 1. DIALOGUE & BOARD FRAMING
         if (isDialogueCamera || isBoardCamera)
         {
             Transform target = isDialogueCamera ? DialogueManager.Instance.currentSpeaker : activeBountyBoard;
             if (target != null)
             {
-                // Calculate direction to look at the Target (NPC or Board)
                 Vector3 directionToTarget = (target.position - playerModel.position).normalized;
                 Quaternion targetRot = Quaternion.LookRotation(directionToTarget);
 
-                // Smoothly orbit camera to face the target
                 cameraXAngle = Mathf.LerpAngle(cameraXAngle, targetRot.eulerAngles.y, Time.deltaTime * 3f);
                 cameraYAngle = Mathf.LerpAngle(cameraYAngle, 20f, Time.deltaTime * 3f);
             }
         }
-        // 2. NORMAL CAMERA CONTROL
         else if (!isFightingFish && !isCatchCameraActive && !areControlsLocked)
         {
             float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
@@ -325,12 +354,10 @@ public class PlayerController : MonoBehaviour
             cameraYAngle -= mouseY;
             cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
         }
-        // 3. CATCH CAMERA
         else if (isCatchCameraActive)
         {
             cameraYAngle = Mathf.Lerp(cameraYAngle, catchLookDownAngle, Time.deltaTime * 5f);
         }
-        // 4. FISH FIGHTING CAMERA
         else if (activeBobberTransform != null && isFightingFish)
         {
             Vector3 directionToBobber = (activeBobberTransform.position - playerModel.position).normalized;
