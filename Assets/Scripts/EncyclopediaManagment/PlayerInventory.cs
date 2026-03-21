@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 [Serializable]
@@ -12,8 +13,9 @@ public class PlayerInventory : MonoBehaviour
     public int currentCurrency = 100;
     public List<CaughtFish> caughtFishes = new List<CaughtFish>();
 
-    // Event to notify UI (Inventory Grid AND Currency HUD) when data changes
     public event Action OnInventoryChanged;
+
+    private string SavePath => Path.Combine(Application.persistentDataPath, "inventory.json");
 
     private void Awake()
     {
@@ -23,7 +25,7 @@ public class PlayerInventory : MonoBehaviour
 
     private void Start()
     {
-        // Trigger initial update so UI matches data on load
+        LoadInventory();
         OnInventoryChanged?.Invoke();
     }
 
@@ -43,6 +45,7 @@ public class PlayerInventory : MonoBehaviour
         if (fishToAdd == null) return;
 
         caughtFishes.Add(fishToAdd);
+        SaveInventory();
         OnInventoryChanged?.Invoke();
     }
 
@@ -51,16 +54,55 @@ public class PlayerInventory : MonoBehaviour
         if (caughtFishes.Contains(fishToRemove))
         {
             caughtFishes.Remove(fishToRemove);
+            SaveInventory();
             OnInventoryChanged?.Invoke();
         }
     }
 
-    /// <summary>
-    /// Adds currency directly (used by Vendor script).
-    /// </summary>
     public void TransactionAddCurrency(int amount)
     {
         currentCurrency += amount;
+        SaveInventory();
         OnInventoryChanged?.Invoke();
+    }
+
+    private void SaveInventory()
+    {
+        string json = JsonUtility.ToJson(new InventoryDataWrapper(currentCurrency, caughtFishes), true);
+        File.WriteAllText(SavePath, json);
+    }
+
+    private void LoadInventory()
+    {
+        if (!File.Exists(SavePath)) return;
+
+        try
+        {
+            string json = File.ReadAllText(SavePath);
+            InventoryDataWrapper wrapper = JsonUtility.FromJson<InventoryDataWrapper>(json);
+            if (wrapper != null)
+            {
+                currentCurrency = wrapper.currency;
+                caughtFishes = wrapper.fishes ?? new List<CaughtFish>();
+                caughtFishes.RemoveAll(f => f == null || f.preset == null);
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning($"Failed to load inventory: {e.Message}");
+        }
+    }
+
+    [Serializable]
+    private class InventoryDataWrapper
+    {
+        public int currency;
+        public List<CaughtFish> fishes;
+
+        public InventoryDataWrapper(int currency, List<CaughtFish> fishes)
+        {
+            this.currency = currency;
+            this.fishes = fishes;
+        }
     }
 }

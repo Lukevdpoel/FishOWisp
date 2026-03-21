@@ -80,6 +80,15 @@ public class PlayerController : MonoBehaviour
     private Transform activeBobberTransform;
     private Quaternion targetModelRotation;
 
+    private int hashSpeed;
+    private int hashJump;
+    private int hashStartCharging;
+    private int hashThrow;
+    private int hashReelIn;
+    private int hashIsFighting;
+    private int hashIsReelingDuringFight;
+    private int hashSitdown;
+
     private void OnEnable()
     {
         FishingEvents.OnStartCharging += PlayStartChargingAnim;
@@ -127,12 +136,21 @@ public class PlayerController : MonoBehaviour
     private void OnBobberLanded(BobberController bobber) { activeBobberTransform = bobber.transform; }
     private void OnFishFightEnd(bool success) { isFightingFish = false; StopFightingAnimation(); }
 
-    private void StartReelingDuringFightAnim() { if (animator && !string.IsNullOrEmpty(isReelingDuringFightAnimBool)) animator.SetBool(isReelingDuringFightAnimBool, true); }
-    private void StopReelingDuringFightAnim() { if (animator && !string.IsNullOrEmpty(isReelingDuringFightAnimBool)) animator.SetBool(isReelingDuringFightAnimBool, false); }
-    private void PlayReelInAnim() { if (animator && !string.IsNullOrEmpty(reelInAnim)) animator.SetTrigger(reelInAnim); }
+    private void StartReelingDuringFightAnim() { if (animator) animator.SetBool(hashIsReelingDuringFight, true); }
+    private void StopReelingDuringFightAnim() { if (animator) animator.SetBool(hashIsReelingDuringFight, false); }
+    private void PlayReelInAnim() { if (animator) animator.SetTrigger(hashReelIn); }
 
     void Start()
     {
+        hashSpeed = Animator.StringToHash(speedAnimFloat);
+        hashJump = Animator.StringToHash(jumpAnimTrigger);
+        hashStartCharging = Animator.StringToHash(startChargingAnim);
+        hashThrow = Animator.StringToHash(throwAnim);
+        hashReelIn = Animator.StringToHash(reelInAnim);
+        hashIsFighting = Animator.StringToHash(isFightingAnimBool);
+        hashIsReelingDuringFight = Animator.StringToHash(isReelingDuringFightAnimBool);
+        hashSitdown = Animator.StringToHash("Sitdown");
+
         characterController = GetComponent<CharacterController>();
         if (cameraTransform && playerModel)
         {
@@ -164,7 +182,7 @@ public class PlayerController : MonoBehaviour
         if (isOpen)
         {
             targetVelocity = Vector3.zero;
-            if (animator && !string.IsNullOrEmpty(speedAnimFloat)) animator.SetFloat(speedAnimFloat, 0f);
+            if (animator) animator.SetFloat(hashSpeed, 0f);
         }
     }
 
@@ -177,7 +195,7 @@ public class PlayerController : MonoBehaviour
         if (isOpen)
         {
             targetVelocity = Vector3.zero;
-            if (animator && !string.IsNullOrEmpty(speedAnimFloat)) animator.SetFloat(speedAnimFloat, 0f);
+            if (animator) animator.SetFloat(hashSpeed, 0f);
         }
     }
 
@@ -199,19 +217,19 @@ public class PlayerController : MonoBehaviour
         HandleCamera();
     }
 
-    private void PlayStartChargingAnim() { if (animator && !string.IsNullOrEmpty(startChargingAnim)) animator.SetTrigger(startChargingAnim); }
-    private void PlayThrowAnim(Vector3 direction, float force) { if (animator && !string.IsNullOrEmpty(throwAnim)) animator.SetTrigger(throwAnim); }
+    private void PlayStartChargingAnim() { if (animator) animator.SetTrigger(hashStartCharging); }
+    private void PlayThrowAnim(Vector3 direction, float force) { if (animator) animator.SetTrigger(hashThrow); }
 
     private void StartFightingAnimation(FishPreset fish)
     {
         isFightingFish = true;
-        if (animator && !string.IsNullOrEmpty(isFightingAnimBool)) animator.SetBool(isFightingAnimBool, true);
+        if (animator) animator.SetBool(hashIsFighting, true);
     }
 
     private void StopFightingAnimation()
     {
         isFightingFish = false;
-        if (animator && !string.IsNullOrEmpty(isFightingAnimBool)) animator.SetBool(isFightingAnimBool, false);
+        if (animator) animator.SetBool(hashIsFighting, false);
     }
 
     private void HandleSuccessfulCatchAnimation() { StopFightingAnimation(); PlayReelInAnim(); }
@@ -263,7 +281,7 @@ public class PlayerController : MonoBehaviour
 
     private void HandleAnimation()
     {
-        if (animator && !string.IsNullOrEmpty(speedAnimFloat))
+        if (animator)
         {
             float horizontalSpeed = new Vector3(targetVelocity.x, 0, targetVelocity.z).magnitude;
 
@@ -272,7 +290,7 @@ public class PlayerController : MonoBehaviour
                 horizontalSpeed = 0f;
             }
 
-            animator.SetFloat(speedAnimFloat, horizontalSpeed, 0.1f, Time.deltaTime);
+            animator.SetFloat(hashSpeed, horizontalSpeed, 0.1f, Time.deltaTime);
         }
     }
 
@@ -288,7 +306,7 @@ public class PlayerController : MonoBehaviour
 
         if (idleTimer >= sitDownHoldTime && allowSitdown)
         {
-            animator.SetTrigger("Sitdown");
+            animator.SetTrigger(hashSitdown);
             allowSitdown = false;
         }
     }
@@ -300,9 +318,9 @@ public class PlayerController : MonoBehaviour
         if (InventoryUI.IsInventoryOpen || areControlsLocked) return;
         if (characterController.isGrounded && Input.GetButtonDown("Jump"))
         {
-            if (animator && !string.IsNullOrEmpty(jumpAnimTrigger))
+            if (animator)
             {
-                animator.SetTrigger(jumpAnimTrigger);
+                animator.SetTrigger(hashJump);
                 NotifyOfAction();
             }
         }

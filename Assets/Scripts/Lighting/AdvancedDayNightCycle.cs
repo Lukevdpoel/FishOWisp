@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.Rendering;
-using System;
 
 [ExecuteAlways]
 public class CrossFadeDayNight : MonoBehaviour
@@ -22,15 +21,12 @@ public class CrossFadeDayNight : MonoBehaviour
     public float dayStart = 7f;     // 7:00 AM (Start turning Day / End Orange)
     public float dayDuration = 1f;
 
-    [Header("Debug")]
-    public bool useSimulatedTime = false;
-    [Range(0f, 24f)] public float simulatedTime = 12f;
-
     void Update()
     {
         if (dawnVolume == null || nightVolume == null) return;
+        if (GameTimeManager.Instance == null) return;
 
-        float time = GetCurrentTime();
+        float time = GameTimeManager.Instance.CurrentHour;
 
         float dawnWeight = 0f;
         float nightWeight = 0f;
@@ -92,10 +88,4 @@ public class CrossFadeDayNight : MonoBehaviour
         nightVolume.weight = nightWeight;
     }
 
-    float GetCurrentTime()
-    {
-        if (useSimulatedTime) return simulatedTime;
-        DateTime now = DateTime.Now;
-        return now.Hour + (now.Minute / 60f) + (now.Second / 3600f);
-    }
 }

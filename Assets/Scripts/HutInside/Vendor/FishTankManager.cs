@@ -22,6 +22,8 @@ public class FishTankManager : MonoBehaviour
 
     private List<GameObject> tankFish = new List<GameObject>();
     private Vector3 goalPos;
+    private float goalChangeTimer;
+    [SerializeField] private float goalChangeInterval = 3f;
 
     void Start()
     {
@@ -30,10 +32,11 @@ public class FishTankManager : MonoBehaviour
 
     void Update()
     {
-        // 1. Move the target occasionally
-        if (Random.Range(0, 100) < 1)
+        goalChangeTimer -= Time.deltaTime;
+        if (goalChangeTimer <= 0f)
         {
             goalPos = GetRandomPointInTank();
+            goalChangeTimer = goalChangeInterval;
         }
 
         // 2. Update fish
@@ -87,19 +90,21 @@ public class FishTankManager : MonoBehaviour
             Vector3 avoid = Vector3.zero;
             int groupSize = 0;
 
+            float neighborDistSqr = neighborDistance * neighborDistance;
             foreach (GameObject neighbor in tankFish)
             {
                 if (neighbor != fish)
                 {
-                    float dist = Vector3.Distance(fish.transform.position, neighbor.transform.position);
-                    if (dist <= neighborDistance)
+                    Vector3 diff = fish.transform.position - neighbor.transform.position;
+                    float sqrDist = diff.sqrMagnitude;
+                    if (sqrDist <= neighborDistSqr)
                     {
                         center += neighbor.transform.position;
                         groupSize++;
 
-                        if (dist < 1.0f)
+                        if (sqrDist < 1.0f)
                         {
-                            avoid = avoid + (fish.transform.position - neighbor.transform.position);
+                            avoid += diff;
                         }
                     }
                 }

@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
-using System;
 
 [ExecuteAlways] // Runs in Editor without hitting Play!
 public class TimeControlledLUT : MonoBehaviour
@@ -14,45 +13,17 @@ public class TimeControlledLUT : MonoBehaviour
     public float nightEndHour = 6f;    // 6 AM
     public float transitionTime = 1f;
 
-    [Header("Debug Controls")]
-    [Tooltip("Check this to manually control time with the slider below")]
-    public bool enableTestMode = false;
-
-    [Range(0f, 24f)]
-    [Tooltip("Slide this to simulate the time of day")]
-    public float testTimeOfDay = 12f;
-
     private ColorLookup _colorLookup;
 
     void Update()
     {
         if (globalVolume == null || globalVolume.profile == null) return;
-
-        // Try to get the Color Lookup override
+        if (GameTimeManager.Instance == null) return;
         if (!globalVolume.profile.TryGet(out _colorLookup)) return;
 
-        // 1. Determine which time to use (Real or Test)
-        float currentHour = GetCurrentTime();
-
-        // 2. Calculate Intensity
+        float currentHour = GameTimeManager.Instance.CurrentHour;
         float intensity = CalculateNightIntensity(currentHour);
-
-        // 3. Apply to the Volume Slider
         _colorLookup.contribution.value = intensity;
-    }
-
-    float GetCurrentTime()
-    {
-        if (enableTestMode)
-        {
-            return testTimeOfDay;
-        }
-        else
-        {
-            // Get real system time
-            DateTime now = DateTime.Now;
-            return now.Hour + (now.Minute / 60f) + (now.Second / 3600f);
-        }
     }
 
     float CalculateNightIntensity(float time)

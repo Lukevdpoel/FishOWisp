@@ -84,8 +84,10 @@ public class CustomButton : CustomUIElement, IPointerEnterHandler, IPointerExitH
             {
                 OnPointerEnter(null);
             }
+#if UNITY_EDITOR
             Debug.Log("[CustomButton] Pointer hovering: " + gameObject.name);
             Debug.Log($"[CustomButton] Invoking onHover on {gameObject.name}");
+#endif
             onHover?.Invoke();
         }
     }
@@ -96,9 +98,13 @@ public class CustomButton : CustomUIElement, IPointerEnterHandler, IPointerExitH
         
         if (submitPressed && !wasSubmitPressed && !isPressed)
         {
+#if UNITY_EDITOR
             Debug.Log("[Custom Button] Controller button down: " + gameObject.name);
+#endif
             isPressed = true;
+#if UNITY_EDITOR
             Debug.Log($"[CustomButton] Invoking onPressed on {gameObject.name}");
+#endif
             onPressed?.Invoke();
         }
         
@@ -112,11 +118,15 @@ public class CustomButton : CustomUIElement, IPointerEnterHandler, IPointerExitH
         if (!interactible)
             return;
         hasHighlighted = true;
+#if UNITY_EDITOR
         Debug.Log("[Custom Button] Pointer entered: " + gameObject.name);
-        
+#endif
+
         if (!isPressed)
         {
+#if UNITY_EDITOR
             Debug.Log("[Custom Button] Pointer entered while not pressed: " + gameObject.name);
+#endif
             /*if(onEnterSoundEffects.Count > 0)
                 onEnterSoundEffects.GetRandom(sound => 
                 {
@@ -125,12 +135,16 @@ public class CustomButton : CustomUIElement, IPointerEnterHandler, IPointerExitH
                         TempAudioManager.Instance.PlayOneShot(sound, transform.position, 0.25f, 1, true, transform);
                     }
                 });*/
+#if UNITY_EDITOR
             Debug.Log($"[CustomButton] Invoking onEnter on {gameObject.name}");
+#endif
             onEnter?.Invoke();
         }
         else
         {
+#if UNITY_EDITOR
             Debug.Log("[Custom Button] Pointer entered while pressed: " + gameObject.name);
+#endif
         }
     }
     
@@ -141,16 +155,22 @@ public class CustomButton : CustomUIElement, IPointerEnterHandler, IPointerExitH
         if (!interactible)
             return;
         
+#if UNITY_EDITOR
         Debug.Log("[Custom Button] Pointer exited: " + gameObject.name);
+#endif
         if (!isPressed)
         {
+#if UNITY_EDITOR
             Debug.Log("[Custom Button] Pointer exited while not pressed: " + gameObject.name);
             Debug.Log($"[CustomButton] Invoking onExit on {gameObject.name}");
+#endif
             onExit?.Invoke();
         }
         else
         {
+#if UNITY_EDITOR
             Debug.Log("[Custom Button] Pointer exited while pressed: " + gameObject.name);
+#endif
         }
     }
     
@@ -158,9 +178,13 @@ public class CustomButton : CustomUIElement, IPointerEnterHandler, IPointerExitH
     {
         if (!interactible)
             return;
+#if UNITY_EDITOR
         Debug.Log("[Custom Button] Pointer down: " + gameObject.name);
+#endif
         isPressed = true;
+#if UNITY_EDITOR
         Debug.Log($"[CustomButton] Invoking onPressed on {gameObject.name}");
+#endif
         onPressed?.Invoke();
     }
     
@@ -170,26 +194,38 @@ public class CustomButton : CustomUIElement, IPointerEnterHandler, IPointerExitH
             return;
         if (isPressed)
         {
+#if UNITY_EDITOR
             Debug.Log("[Custom Button] Pointer up: " + gameObject.name);
+#endif
             isPressed = false;
-            
+
             if (isHovering)
             {
+#if UNITY_EDITOR
                 Debug.Log("[Custom Button] Pointer submitted - pointer up while hovered: " + gameObject.name);
                 Debug.Log($"[CustomButton] Invoking onReleasedOverButton on {gameObject.name}");
+#endif
                 onReleasedOverButton?.Invoke();
+#if UNITY_EDITOR
                 Debug.Log($"[CustomButton] Invoking unDelayedSubmit on {gameObject.name}");
+#endif
                 unDelayedSubmit?.Invoke();
                 await Task.Delay((int)(submitDelay * 1000));
+#if UNITY_EDITOR
                 Debug.Log($"[CustomButton] Invoking onSubmit on {gameObject.name}");
+#endif
                 onSubmit?.Invoke();
             }
             else
             {
+#if UNITY_EDITOR
                 Debug.Log("[Custom Button] Pointer up while not hovered: " + gameObject.name);
                 Debug.Log($"[CustomButton] Invoking onReleasedOutsideButton on {gameObject.name}");
+#endif
                 onReleasedOutsideButton?.Invoke();
+#if UNITY_EDITOR
                 Debug.Log($"[CustomButton] Invoking onIdle on {gameObject.name}");
+#endif
                 onIdle?.Invoke();
             }
         }
@@ -237,7 +273,9 @@ public class CustomButton : CustomUIElement, IPointerEnterHandler, IPointerExitH
     
     public void TriggerNotSelected()
     {
+#if UNITY_EDITOR
         Debug.Log($"[CustomButton] Invoking onNotSelected on {gameObject.name}");
+#endif
         onNotSelected?.Invoke();
     }
     

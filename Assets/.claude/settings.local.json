@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc -l C:RepositoriesFishOWisp2AssetsScripts/**/*.cs)",
+      "Bash(find . -name \"*.cs\" -exec wc -l {})"
+    ]
+  }
+}

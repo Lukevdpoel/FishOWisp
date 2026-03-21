@@ -33,8 +33,8 @@ public class FlockManager : MonoBehaviour
     // public static FlockManager FM; // This line is now gone.
     // -----------------------------
 
-    // This array is now public so the fish can access it through their reference
     public GameObject[] allFish;
+    public FishBoid[] allFishBoids;
 
     // Awake() is no longer needed
     // void Awake() { ... }
@@ -42,6 +42,7 @@ public class FlockManager : MonoBehaviour
     void Start()
     {
         allFish = new GameObject[numFish];
+        allFishBoids = new FishBoid[numFish];
         for (int i = 0; i < numFish; i++)
         {
             Vector3 randomPos = this.transform.position + new Vector3(
@@ -55,11 +56,11 @@ public class FlockManager : MonoBehaviour
                 randomPos.y = this.transform.position.y;
             }
 
-            // --- NEW: Instantiate and assign the manager reference ---
             GameObject newFish = Instantiate(fishPrefab, randomPos, Quaternion.identity);
-            newFish.GetComponent<FishBoid>().myManager = this; // Give the fish a reference to this manager instance
+            FishBoid boid = newFish.GetComponent<FishBoid>();
+            boid.myManager = this;
             allFish[i] = newFish;
-            // --------------------------------------------------------
+            allFishBoids[i] = boid;
         }
 
         startPosition = this.transform.position;

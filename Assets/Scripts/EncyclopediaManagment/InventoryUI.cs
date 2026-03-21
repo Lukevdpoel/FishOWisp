@@ -58,13 +58,14 @@ public class InventoryUI : MonoBehaviour
 
     private List<InventorySlotUI> spawnedSlots = new List<InventorySlotUI>();
     private EdgeCollider2D containerBoundary;
+    private Camera cachedCamera;
 
-    // State for dragging
     private GameObject currentDraggedModel;
     private CaughtFish currentDraggedFishData;
 
     private void Start()
     {
+        cachedCamera = Camera.main;
         IsInventoryOpen = false;
         ToggleInputScripts(true);
 
@@ -114,7 +115,7 @@ public class InventoryUI : MonoBehaviour
             }
 
             // 2. Position Logic
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            Ray ray = cachedCamera.ScreenPointToRay(Input.mousePosition);
             currentDraggedModel.transform.position = ray.GetPoint(modelDistance);
 
             // 3. Rotation
@@ -137,7 +138,7 @@ public class InventoryUI : MonoBehaviour
         else
         {
             // 2. Check World Block
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            Ray ray = cachedCamera.ScreenPointToRay(Input.mousePosition);
 
             // Calculate mask: All layers EXCEPT the ignore list.
             int finalMask = ~raycastIgnoreLayers.value;
@@ -260,7 +261,7 @@ public class InventoryUI : MonoBehaviour
         {
             currentDraggedModel = Instantiate(fish.preset.fishPrefab);
 
-            Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
+            Ray ray = cachedCamera.ScreenPointToRay(Input.mousePosition);
             currentDraggedModel.transform.position = ray.GetPoint(modelDistance);
 
             currentDraggedModel.transform.rotation = Quaternion.identity;

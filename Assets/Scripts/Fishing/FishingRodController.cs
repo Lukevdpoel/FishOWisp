@@ -50,11 +50,19 @@ public class FishingRodController : MonoBehaviour
     private PlayerController playerController;
     private float inspectionStartTime;
 
+    private int hashShowCatch;
+    private int hashFail;
+    private int hashReelingDuringFight;
+
     private void Awake()
     {
         playerController = GetComponent<PlayerController>();
         if (playerController == null) playerController = GetComponentInParent<PlayerController>();
         if (playerController == null) Debug.LogError("FishingRodController: PlayerController missing!");
+
+        hashShowCatch = Animator.StringToHash(showCatchAnimBool);
+        hashFail = Animator.StringToHash(failAnimationTrigger);
+        hashReelingDuringFight = Animator.StringToHash(reelingDuringFightBool);
     }
 
     private void OnEnable()
@@ -172,12 +180,12 @@ public class FishingRodController : MonoBehaviour
     private IEnumerator FailRoutine()
     {
         if (minigameUI != null) minigameUI.Deactivate();
-        if (playerAnimator != null && !string.IsNullOrEmpty(reelingDuringFightBool)) playerAnimator.SetBool(reelingDuringFightBool, false);
+        if (playerAnimator != null) playerAnimator.SetBool(hashReelingDuringFight, false);
         if (bobberInWater != null) { Destroy(bobberInWater.gameObject); bobberInWater = null; }
         activeBobber = null;
         FishingEvents.OnCancelFishing?.Invoke();
         currentState = FishingState.Cooldown;
-        if (playerAnimator != null && !string.IsNullOrEmpty(failAnimationTrigger)) playerAnimator.SetTrigger(failAnimationTrigger);
+        if (playerAnimator != null) playerAnimator.SetTrigger(hashFail);
         yield return new WaitForSeconds(failCooldown);
         currentState = FishingState.Idle; danglingBobber?.SetActive(true);
     }
@@ -217,16 +225,16 @@ public class FishingRodController : MonoBehaviour
             }
             else { currentFightProgress += Time.deltaTime * 10f; }
 
-            if (playerAnimator != null && !string.IsNullOrEmpty(reelingDuringFightBool))
+            if (playerAnimator != null)
             {
                 bool isGainingProgress = currentFightProgress > lastProgress;
-                playerAnimator.SetBool(reelingDuringFightBool, isGainingProgress);
+                playerAnimator.SetBool(hashReelingDuringFight, isGainingProgress);
             }
             lastProgress = currentFightProgress;
             FishingEvents.OnFishFightProgressUpdate?.Invoke(currentFightProgress, maxFightProgress);
             yield return null;
         }
-        if (playerAnimator != null && !string.IsNullOrEmpty(reelingDuringFightBool)) playerAnimator.SetBool(reelingDuringFightBool, false);
+        if (playerAnimator != null) playerAnimator.SetBool(hashReelingDuringFight, false);
         if (currentFightProgress >= maxFightProgress) WinFishFight();
         else { if (minigameUI != null) minigameUI.Deactivate(); StartCoroutine(FailRoutine()); }
     }
@@ -299,9 +307,9 @@ public class FishingRodController : MonoBehaviour
                 playerController.SetCatchCamera(true);
             }
 
-            if (playerAnimator != null && !string.IsNullOrEmpty(showCatchAnimBool))
+            if (playerAnimator != null)
             {
-                playerAnimator.SetBool(showCatchAnimBool, true);
+                playerAnimator.SetBool(hashShowCatch, true);
             }
 
             if (fishHoldPoint != null && fishToInventory.preset.fishPrefab != null)
@@ -323,9 +331,9 @@ public class FishingRodController : MonoBehaviour
         if (caughtFishInstance != null) PlayerInventory.Instance.AddFish(caughtFishInstance);
         if (heldFishVisual != null) Destroy(heldFishVisual);
 
-        if (playerAnimator != null && !string.IsNullOrEmpty(showCatchAnimBool))
+        if (playerAnimator != null)
         {
-            playerAnimator.SetBool(showCatchAnimBool, false);
+            playerAnimator.SetBool(hashShowCatch, false);
         }
 
         ResetFishingState(null);

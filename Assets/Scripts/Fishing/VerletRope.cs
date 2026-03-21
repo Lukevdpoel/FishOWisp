@@ -16,7 +16,7 @@ public class VerletRope : MonoBehaviour
 
     [Header("Rope Settings")]
     public int segmentCount = 35;
-    public int constraintIterations = 50;
+    public int constraintIterations = 20;
 
     [Header("Physics")]
     public Vector3 gravity = new Vector3(0f, -9.81f, 0f);
@@ -26,6 +26,7 @@ public class VerletRope : MonoBehaviour
     private float segmentLength;
     private bool isInitialized = false;
     private bool isLineTight = false;
+    private Vector3[] positionsCache;
 
     void Awake()
     {
@@ -71,6 +72,7 @@ public class VerletRope : MonoBehaviour
             });
         }
 
+        positionsCache = new Vector3[ropePoints.Count];
         isInitialized = true;
     }
 
@@ -168,12 +170,11 @@ public class VerletRope : MonoBehaviour
     private void DrawSimulatedRope()
     {
         lineRenderer.positionCount = ropePoints.Count;
-        Vector3[] positions = new Vector3[ropePoints.Count];
         for (int i = 0; i < ropePoints.Count; i++)
         {
-            positions[i] = ropePoints[i].currentPosition;
+            positionsCache[i] = ropePoints[i].currentPosition;
         }
-        lineRenderer.SetPositions(positions);
+        lineRenderer.SetPositions(positionsCache);
     }
 
     private void DrawTightLine()

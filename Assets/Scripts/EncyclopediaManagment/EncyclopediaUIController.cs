@@ -5,8 +5,10 @@ using UnityEngine.EventSystems;
 
 public class EncyclopediaUIController : MonoBehaviour
 {
+#if UNITY_EDITOR
     [Header("Debug")]
     public bool debugIgnoreCaughtRequirement = true;
+#endif
 
     [Header("Main Container")]
     public GameObject uiContainer;
@@ -95,7 +97,11 @@ public class EncyclopediaUIController : MonoBehaviour
         foreach (var slot in spawnedSlots) slot.Deselect();
         if (selectedSlot != null) selectedSlot.Select();
 
-        if (debugIgnoreCaughtRequirement || entry.hasCaught > 0)
+        bool showDetails = entry.hasCaught > 0;
+#if UNITY_EDITOR
+        showDetails = debugIgnoreCaughtRequirement || showDetails;
+#endif
+        if (showDetails)
         {
             if (detailsUI != null)
             {

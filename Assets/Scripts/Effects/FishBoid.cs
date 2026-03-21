@@ -18,8 +18,9 @@ public class FishBoid : MonoBehaviour
 
     void Update()
     {
-        // Replace every instance of FlockManager.FM with myManager
-        if (Vector3.Distance(transform.position, myManager.transform.position) >= myManager.spawnBounds.x)
+        float sqrDistToCenter = (transform.position - myManager.transform.position).sqrMagnitude;
+        float boundsSqr = myManager.spawnBounds.x * myManager.spawnBounds.x;
+        if (sqrDistToCenter >= boundsSqr)
         {
             Vector3 directionToCenter = (myManager.transform.position - transform.position).normalized;
             if (myManager.lockYAxis)
@@ -56,22 +57,26 @@ public class FishBoid : MonoBehaviour
         Vector3 alignmentVector = Vector3.zero;
         int neighborsFound = 0;
 
-        // The fish now only checks against the list of fish from its own manager
-        foreach (GameObject fish in myManager.allFish)
+        float perceptionSqr = myManager.perceptionRadius * myManager.perceptionRadius;
+        float avoidanceSqr = myManager.avoidanceRadius * myManager.avoidanceRadius;
+
+        FishBoid[] boids = myManager.allFishBoids;
+        for (int i = 0; i < boids.Length; i++)
         {
-            if (fish != this.gameObject)
+            FishBoid other = boids[i];
+            if (other == this || other == null) continue;
+
+            Vector3 diff = other.transform.position - this.transform.position;
+            float sqrDist = diff.sqrMagnitude;
+            if (sqrDist <= perceptionSqr)
             {
-                float distance = Vector3.Distance(fish.transform.position, this.transform.position);
-                if (distance <= myManager.perceptionRadius)
+                cohesionVector += other.transform.position;
+                if (sqrDist < avoidanceSqr)
                 {
-                    cohesionVector += fish.transform.position;
-                    if (distance < myManager.avoidanceRadius)
-                    {
-                        separationVector -= (fish.transform.position - this.transform.position);
-                    }
-                    alignmentVector += fish.GetComponent<FishBoid>().transform.forward;
-                    neighborsFound++;
+                    separationVector -= diff;
                 }
+                alignmentVector += other.transform.forward;
+                neighborsFound++;
             }
         }
 

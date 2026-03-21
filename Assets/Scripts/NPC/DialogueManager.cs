@@ -67,6 +67,7 @@ public class DialogueManager : MonoBehaviour
     private float currentScrollY = 0;
     private int linesScrolled = 0;
     private Vector2 targetAnchoredPos;
+    private WaitForSeconds typingWait;
 
     // Arrow Internal State
     private CanvasGroup arrowCanvasGroup;
@@ -93,6 +94,7 @@ public class DialogueManager : MonoBehaviour
             if (arrowCanvasGroup == null) arrowCanvasGroup = continueArrow.AddComponent<CanvasGroup>();
         }
 
+        typingWait = new WaitForSeconds(typingSpeed);
         ForceCloseAllUI();
     }
 
@@ -252,7 +254,7 @@ public class DialogueManager : MonoBehaviour
                 break;
             }
 
-            yield return new WaitForSeconds(typingSpeed);
+            yield return typingWait;
         }
 
         isTyping = false;

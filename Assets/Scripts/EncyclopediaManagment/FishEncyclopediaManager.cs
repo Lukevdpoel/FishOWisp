@@ -9,9 +9,11 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
     private string SavePath => Path.Combine(Application.persistentDataPath, "encyclopedia.json");
 
     private int currentIndex = 0;
+#if UNITY_EDITOR
     [Title("Debug Options")]
     [ToggleLeft]
     public bool deleteOnStart = false;
+#endif
 
     public List<FishPreset> allFishPresets;
     public List<FishEncyclopediaEntry> encyclopediaEntries = new List<FishEncyclopediaEntry>();
@@ -20,10 +22,12 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
     {
         if (Instance == null || Instance == this)
         {
+#if UNITY_EDITOR
             if (deleteOnStart)
             {
                 DeleteEncyclopediaSave();
             }
+#endif
 
             LoadEncyclopedia();
             UpdateUI();
