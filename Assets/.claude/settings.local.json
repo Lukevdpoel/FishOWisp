@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(wc -l C:RepositoriesFishOWisp2AssetsScripts/**/*.cs)",
-      "Bash(find . -name \"*.cs\" -exec wc -l {})"
+      "Bash(find . -name \"*.cs\" -exec wc -l {})",
+      "Bash(grep -l DontDestroyOnLoad /c/Repositories/FishOWisp2/Assets/Scripts/**/*.cs)",
+      "Bash(find C:RepositoriesFishOWisp2AssetsREFLECT -type f -name *.cs)",
+      "Bash(find C:RepositoriesFishOWisp2Assets -type f -name *Post* -o -name *post*)",
+      "Bash(find C:RepositoriesFishOWisp2Assets -type f -name *FullScreen*)",
+      "Bash(xargs grep:*)",
+      "Bash(find C:RepositoriesFishOWisp2AssetsScripts -type f -name *Renderer*.cs -o -name *Render*.cs)",
+      "Bash(grep -r \"ScriptableRenderPass\\\\|ScriptableRendererFeature\" C:RepositoriesFishOWisp2AssetsScripts --include=*.cs)"
     ]
   }
 }

@@ -64,6 +64,8 @@ MeshRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -85,6 +87,7 @@ MeshRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -96,10 +99,10 @@ Rigidbody:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 73350193116209274}
-  serializedVersion: 4
+  serializedVersion: 5
   m_Mass: 1
-  m_Drag: 0
-  m_AngularDrag: 0
+  m_LinearDamping: 0
+  m_AngularDamping: 0
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
@@ -279,6 +282,8 @@ MeshRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -300,6 +305,7 @@ MeshRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -383,17 +389,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   currentState: 0
   danglingBobber: {fileID: 73350193116209274}
+  playerModel: {fileID: 0}
+  minigameUI: {fileID: 0}
+  fishHoldPoint: {fileID: 0}
+  turnToCameraSpeed: 10
+  fishRotationSpeed: 45
+  showCatchAnimBool: ShowCatch
   playerAnimator: {fileID: 5048647682359618787}
   failAnimationTrigger: FailHook
+  reelingDuringFightBool: isreelingduringfight
   failCooldown: 1
+  reelInDuration: 1.5
+  reelInArcHeight: 5
   reactionTime: 1
+  minInspectionTime: 0.5
   maxFightProgress: 100
-  reelInRate: 40
-  strugglePenaltyRate: 35
-  minStruggleTime: 1
-  maxStruggleTime: 4
-  minReelWindow: 1
-  maxReelWindow: 4
 --- !u!114 &3597150921749443375
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -407,11 +417,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   throwOrigin: {fileID: 7187859982427345917}
+  predictionOrigin: {fileID: 0}
   playerModel: {fileID: 5864620747877901436}
   castingTargetPrefab: {fileID: 6445658864675443922, guid: 06542c246b957e249a8f48ce9a82b94d, type: 3}
   minThrowForce: 3
   maxThrowForce: 15
   chargeRate: 10
+  bobberExtraGravity: 30
   aimConeAngle: 30
   aimSensitivity: 2
   aimSmoothing: 10
@@ -478,6 +490,8 @@ MeshRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -500,6 +514,7 @@ MeshRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
@@ -511,10 +526,10 @@ Rigidbody:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4838719162583960166}
-  serializedVersion: 4
+  serializedVersion: 5
   m_Mass: 150
-  m_Drag: 0
-  m_AngularDrag: 0
+  m_LinearDamping: 0
+  m_AngularDamping: 0
   m_CenterOfMass: {x: 0, y: 0, z: 0}
   m_InertiaTensor: {x: 1, y: 1, z: 1}
   m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
@@ -672,7 +687,6 @@ MonoBehaviour:
   m_ScreenCoordScaleBias: {x: 0, y: 0, z: 0, w: 0}
   m_RequiresDepthTexture: 0
   m_RequiresColorTexture: 0
-  m_Version: 2
   m_TaaSettings:
     m_Quality: 3
     m_FrameInfluence: 0.1
@@ -680,6 +694,7 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
+  m_Version: 2
 --- !u!1 &6127945813577850835
 GameObject:
   m_ObjectHideFlags: 0
@@ -691,9 +706,11 @@ GameObject:
   - component: {fileID: 8869207768773921664}
   - component: {fileID: 242337906436078197}
   - component: {fileID: 3559968745154457789}
-  - component: {fileID: 7490526973626142239}
   - component: {fileID: 1453452854546728318}
+  - component: {fileID: 7490526973626142239}
   - component: {fileID: 6851105562881306366}
+  - component: {fileID: 9141111527247244841}
+  - component: {fileID: 5922089739667301084}
   m_Layer: 6
   m_Name: Player
   m_TagString: Player
@@ -766,19 +783,6 @@ CharacterController:
   m_SkinWidth: 0.08
   m_MinMoveDistance: 0.001
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &7490526973626142239
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6127945813577850835}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 7ac5fe3b5d822e444ae3e6525fd57882, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  movementThreshold: 0.1
 --- !u!82 &1453452854546728318
 AudioSource:
   m_ObjectHideFlags: 0
@@ -789,7 +793,7 @@ AudioSource:
   m_Enabled: 1
   serializedVersion: 4
   OutputAudioMixerGroup: {fileID: 0}
-  m_audioClip: {fileID: 8300000, guid: 0e47b87fb36ca5343a0bec414be48a66, type: 3}
+  m_audioClip: {fileID: 0}
   m_Resource: {fileID: 8300000, guid: 0e47b87fb36ca5343a0bec414be48a66, type: 3}
   m_PlayOnAwake: 1
   m_Volume: 0.219
@@ -876,6 +880,19 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &7490526973626142239
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6127945813577850835}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7ac5fe3b5d822e444ae3e6525fd57882, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  movementThreshold: 0.1
 --- !u!114 &6851105562881306366
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -890,27 +907,66 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   animator: {fileID: 5048647682359618787}
   playerModel: {fileID: 5864620747877901436}
-  cameraTransform: {fileID: 7708899931553779794}
-  framingTarget: {fileID: 0}
-  moveSpeed: 10
+  cameraController: {fileID: 9141111527247244841}
+  fishingAnimHandler: {fileID: 5922089739667301084}
+  walkSpeed: 6
+  sprintSpeed: 12
   rotationSpeed: 15
   gravity: -20
+  speedAnimFloat: Speed
+  jumpAnimTrigger: Jump
+  sitDownHoldTime: 2
+  areControlsLocked: 0
+--- !u!114 &9141111527247244841
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6127945813577850835}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8c9374eab258efa4b86e2a36165973f0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerCameraController
+  cameraTransform: {fileID: 7708899931553779794}
+  framingTarget: {fileID: 0}
+  cameraSpeed: 120
+  cameraYClamp: {x: 20, y: 55}
+  pivotHeight: 1.3
+  screenYTarget: 0.25
+  catchLookDownAngle: 25
+  catchZoomDistance: 1.2
+  catchVerticalOffset: 1.6
+  catchHorizontalOffset: 0
+  pivotSmoothTime: 0.25
+  cameraSmoothTime: 0.05
+  collisionLayers:
+    serializedVersion: 2
+    m_Bits: 65536
+  collisionRadius: 0.2
+  zoomDampTime: 0.1
+  useStaticCamera: 0
+  staticCameraTarget: {fileID: 0}
+--- !u!114 &5922089739667301084
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6127945813577850835}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f1d3405d912fac942914ed1e64dce8d0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerFishingAnimHandler
+  animator: {fileID: 5048647682359618787}
+  playerController: {fileID: 6851105562881306366}
   startChargingAnim: StartCharging
   throwAnim: Throw
   reelInAnim: ReelIn
   isFightingAnimBool: IsFighting
   isReelingDuringFightAnimBool: IsReelingDuringFight
-  cameraSpeed: 120
-  cameraYClamp: {x: 20, y: 55}
-  pivotHeight: 1.3
-  screenYTarget: 0.25
-  sitDownHoldTime: 2
-  cameraSmoothTime: 0.15
-  collisionLayers:
-    serializedVersion: 2
-    m_Bits: 66816
-  collisionRadius: 1
-  zoomDampTime: 0.1
 --- !u!1 &7540200755364864249
 GameObject:
   m_ObjectHideFlags: 0
@@ -1031,6 +1087,8 @@ LineRenderer:
   m_RayTracingAccelStructBuildFlagsOverride: 0
   m_RayTracingAccelStructBuildFlags: 1
   m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
@@ -1052,6 +1110,7 @@ LineRenderer:
   m_AutoUVMaxDistance: 0.5
   m_AutoUVMaxAngle: 89
   m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0

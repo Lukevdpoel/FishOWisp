@@ -20,8 +20,14 @@ public class DirectionalFishingMinigame : MonoBehaviour
     public float restDuration = 3.0f;
 
     [Header("Scoring")]
-    public float clickFillAmount = 5.0f; // How much progress per click during rest
-    public float progressLossRate = 10f; // How fast it drains when misaligned (Struggle)
+    public float clickFillAmount = 5.0f;
+    public float progressLossRate = 10f;
+    public float progressLossFloor = -1f;
+
+    [Header("Visual Feedback")]
+    public float pulseScaleMultiplier = 1.2f;
+    public float scaleReturnSpeed = 10f;
+    public float angleRotationMultiplier = 50f;
 
     [Header("Colors")]
     public Color alignedColor = Color.green;
@@ -141,12 +147,12 @@ public class DirectionalFishingMinigame : MonoBehaviour
             currentProgress += clickFillAmount;
             // Pulse based on INITIAL scale, not Vector3.one
             if (playerInputImage != null)
-                playerInputImage.transform.localScale = initialScale * 1.2f;
+                playerInputImage.transform.localScale = initialScale * pulseScaleMultiplier;
         }
 
         // Lerp back to INITIAL scale
         if (playerInputImage != null)
-            playerInputImage.transform.localScale = Vector3.Lerp(playerInputImage.transform.localScale, initialScale, Time.deltaTime * 10f);
+            playerInputImage.transform.localScale = Vector3.Lerp(playerInputImage.transform.localScale, initialScale, Time.deltaTime * scaleReturnSpeed);
 
         return Mathf.Clamp(currentProgress, 0f, maxProgress);
     }
@@ -154,7 +160,7 @@ public class DirectionalFishingMinigame : MonoBehaviour
     private float HandleStrugglePhase(float currentProgress, float maxProgress)
     {
         UpdateFishTargetAngle();
-        currentFishAngle = Mathf.MoveTowardsAngle(currentFishAngle, targetFishAngle, rotationSpeed * Time.deltaTime * 50f);
+        currentFishAngle = Mathf.MoveTowardsAngle(currentFishAngle, targetFishAngle, rotationSpeed * Time.deltaTime * angleRotationMultiplier);
         ProcessPlayerInput();
 
         UpdateUI();
@@ -168,7 +174,7 @@ public class DirectionalFishingMinigame : MonoBehaviour
         }
         else
         {
-            return Mathf.Clamp(currentProgress - (progressLossRate * Time.deltaTime), -1f, maxProgress);
+            return Mathf.Clamp(currentProgress - (progressLossRate * Time.deltaTime), progressLossFloor, maxProgress);
         }
     }
 

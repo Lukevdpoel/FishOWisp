@@ -32,7 +32,7 @@ public class GenericSingleton<T> : SerializedMonoBehaviour
         }
         else if (_instance != this)
         {
-            Destroy(transform.root);
+            Destroy(gameObject);
         }
     }
 }

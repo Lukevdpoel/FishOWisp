@@ -4,6 +4,7 @@ using UnityEngine;
 public class FootstepLooper : MonoBehaviour
 {
     public float movementThreshold = 0.1f;
+    public float footstepPitch = 3.4f;
 
     private AudioSource audioSource;
     private CharacterController controller;
@@ -24,7 +25,7 @@ public class FootstepLooper : MonoBehaviour
         if (isMoving && !audioSource.isPlaying)
         {
             audioSource.Play();
-            audioSource.pitch = 3.4f; // Default is 1.0, increase for faster sound
+            audioSource.pitch = footstepPitch;
 
         }
         else if (!isMoving && audioSource.isPlaying)

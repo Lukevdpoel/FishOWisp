@@ -18,9 +18,11 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
     public List<FishPreset> allFishPresets;
     public List<FishEncyclopediaEntry> encyclopediaEntries = new List<FishEncyclopediaEntry>();
 
-    private void Awake()
+    protected override void Awake()
     {
-        if (Instance == null || Instance == this)
+        base.Awake();
+
+        if (Instance == this)
         {
 #if UNITY_EDITOR
             if (deleteOnStart)
@@ -31,10 +33,6 @@ public class FishEncyclopediaManager : GenericSingleton<FishEncyclopediaManager>
 
             LoadEncyclopedia();
             UpdateUI();
-        }
-        else
-        {
-            Destroy(gameObject);
         }
     }
 

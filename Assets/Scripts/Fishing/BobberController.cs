@@ -67,6 +67,7 @@ public class BobberController : MonoBehaviour
     public float bounceDamp = 0.05f;
     public float buoyancyForce = 10f;
     public float waterDrag = 1f;
+    public float waterAngularDamping = 2f;
     public float waterRotationSpeed = 2f;
 
     [Header("Nibble Settings")]
@@ -229,7 +230,7 @@ public class BobberController : MonoBehaviour
         if (rb != null)
         {
             rb.linearDamping = waterDrag;
-            rb.angularDamping = 2f; // Was angularDrag
+            rb.angularDamping = waterAngularDamping;
         }
 
         // 1. TRIGGER IMPACT SPLASH

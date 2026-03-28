@@ -3,7 +3,7 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 
-public class DialogueManager : MonoBehaviour
+public class DialogueManager : GenericSingleton<DialogueManager>
 {
     // EVENT SYSTEM
     public static event System.Action<bool> OnDialogueStateChange;
@@ -20,6 +20,7 @@ public class DialogueManager : MonoBehaviour
     public GameObject continueArrow;
     [Tooltip("How fast the arrow fades in and out")]
     public float arrowBlinkSpeed = 4f;
+    public float arrowBlinkSharpness = 2f;
 
     [Header("Positioning Settings")]
     public float horizontalPadding = 0f;
@@ -73,12 +74,9 @@ public class DialogueManager : MonoBehaviour
     private CanvasGroup arrowCanvasGroup;
     private Vector3 arrowBaseScale = Vector3.one;
 
-    public static DialogueManager Instance { get; private set; }
-
-    private void Awake()
+    protected override void Awake()
     {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
-        Instance = this;
+        base.Awake();
 
         if (dialogueText) textRect = dialogueText.GetComponent<RectTransform>();
         if (dialogueBoxPanel) boxRect = dialogueBoxPanel.GetComponent<RectTransform>();
@@ -119,8 +117,7 @@ public class DialogueManager : MonoBehaviour
             {
                 // Sharp fading math (invisible half the time, pops up quickly)
                 float wave = Mathf.Sin(Time.unscaledTime * arrowBlinkSpeed);
-                float sharpness = 2.0f;
-                arrowCanvasGroup.alpha = Mathf.Clamp01(wave * sharpness);
+                arrowCanvasGroup.alpha = Mathf.Clamp01(wave * arrowBlinkSharpness);
             }
         }
 

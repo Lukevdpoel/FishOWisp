@@ -32,6 +32,8 @@ public class RodCasting : MonoBehaviour
     public float aimSensitivity = 2f;
     [Tooltip("How smoothly the aim follows the mouse.")]
     public float aimSmoothing = 10f;
+    [Tooltip("How fast the player model rotates to face the aim direction.")]
+    public float playerAimRotationSpeed = 10f;
 
     private float currentThrowForce;
     private Vector3 throwDirection;
@@ -177,7 +179,7 @@ public class RodCasting : MonoBehaviour
         if (playerModel != null && throwDirection.sqrMagnitude > 0.01f)
         {
             Quaternion playerTargetRot = Quaternion.LookRotation(throwDirection);
-            playerModel.rotation = Quaternion.Slerp(playerModel.rotation, playerTargetRot, Time.deltaTime * 10f);
+            playerModel.rotation = Quaternion.Slerp(playerModel.rotation, playerTargetRot, Time.deltaTime * playerAimRotationSpeed);
         }
     }
 }

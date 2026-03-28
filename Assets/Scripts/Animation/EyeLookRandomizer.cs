@@ -7,6 +7,7 @@ public class EyeLookRandomizer : MonoBehaviour
     public float moveSpeed = 15f;
     public float minWaitTime = 0.5f;
     public float maxWaitTime = 2.5f;
+    [Range(0f, 1f)] public float centerLookProbability = 0.2f;
 
     [Header("Motion Settings")]
     [Tooltip("If the character moves faster than this, eyes will center.")]
@@ -69,6 +70,6 @@ public class EyeLookRandomizer : MonoBehaviour
     {
         _targetLook = Random.insideUnitCircle * radius;
         _timer = Random.Range(minWaitTime, maxWaitTime);
-        if (Random.value < 0.2f) _targetLook = Vector2.zero;
+        if (Random.value < centerLookProbability) _targetLook = Vector2.zero;
     }
 }

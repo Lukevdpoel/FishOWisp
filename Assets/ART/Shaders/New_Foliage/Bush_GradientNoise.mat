@@ -49,15 +49,20 @@ Material:
     - _Alpha_Clip: 0.5
     - _Ambient_Occlusion: 1
     - _AngleThreshold: 0
+    - _FlattenStrength: 0
     - _HeightLimit: 10
     - _MovementDepth: 0.08
+    - _PlayerBendStrength: 0.35
+    - _PlayerInteractionRadius: 1.5
     - _QueueControl: 0
     - _QueueOffset: 0
     - _SeethroughDistance: 3.8
     - _Smoothness: 0
     - _WorldNoiseScale: 0.15
+    - _Yvector: 0
     m_Colors:
     - _BottomColor: {r: 0.3507031, g: 0.45754737, b: 0.6698113, a: 1}
+    - _PlayerPosition: {r: 0, g: 0, b: 0, a: 0}
     - _TopColor: {r: 0.54442817, g: 0.6792453, b: 0.24670699, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

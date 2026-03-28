@@ -3,11 +3,8 @@ using System.Collections.Generic;
 using System.IO;
 using UnityEngine;
 
-[Serializable]
-public class PlayerInventory : MonoBehaviour
+public class PlayerInventory : GenericSingleton<PlayerInventory>
 {
-    public static PlayerInventory Instance { get; private set; }
-
     [Header("Data")]
     public int inventorySize = 24;
     public int currentCurrency = 100;
@@ -16,12 +13,6 @@ public class PlayerInventory : MonoBehaviour
     public event Action OnInventoryChanged;
 
     private string SavePath => Path.Combine(Application.persistentDataPath, "inventory.json");
-
-    private void Awake()
-    {
-        if (Instance != null && Instance != this) Destroy(gameObject);
-        else Instance = this;
-    }
 
     private void Start()
     {

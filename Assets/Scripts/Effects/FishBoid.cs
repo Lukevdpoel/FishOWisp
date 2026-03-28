@@ -4,7 +4,8 @@ public class FishBoid : MonoBehaviour
 {
     // ----- NEW: A direct reference to this fish's specific manager -----
     public FlockManager myManager;
-    // -----------------------------------------------------------------
+    public float turnSpeed = 2f;
+    [Range(0, 100)] public int speedChangeChance = 10;
 
     private float speed;
     private float lockedYPosition;
@@ -29,11 +30,11 @@ public class FishBoid : MonoBehaviour
             }
             transform.rotation = Quaternion.Slerp(transform.rotation,
                                                  Quaternion.LookRotation(directionToCenter),
-                                                 Time.deltaTime * 2f);
+                                                 Time.deltaTime * turnSpeed);
         }
         else
         {
-            if (Random.Range(0, 100) < 10)
+            if (Random.Range(0, 100) < speedChangeChance)
             {
                 speed = Random.Range(myManager.minSpeed, myManager.maxSpeed);
             }
@@ -96,7 +97,7 @@ public class FishBoid : MonoBehaviour
             if (steering != Vector3.zero)
             {
                 Quaternion targetRotation = Quaternion.LookRotation(steering);
-                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * 2f);
+                transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * turnSpeed);
             }
         }
     }

@@ -27,6 +27,10 @@ public class SimpleSmash : MonoBehaviour
     [SerializeField] private Transform holdPoint;
     [SerializeField] private LayerMask obstacleLayer;
 
+    [Header("Detection")]
+    [SerializeField] private float potCenterHeightOffset = 0.5f;
+    [SerializeField] private float raycastOriginHeight = 1.0f;
+
     [Header("Settings")]
     [SerializeField] private float maxPickupAngle = 60f;
     [SerializeField] private float liftDuration = 0.2f;
@@ -110,8 +114,8 @@ public class SimpleSmash : MonoBehaviour
 
         foreach (GameObject pot in potsInRange)
         {
-            Vector3 targetCenter = pot.transform.position + Vector3.up * 0.5f;
-            Vector3 rayOrigin = origin + Vector3.up * 1.0f;
+            Vector3 targetCenter = pot.transform.position + Vector3.up * potCenterHeightOffset;
+            Vector3 rayOrigin = origin + Vector3.up * raycastOriginHeight;
             Vector3 dirToTarget = (targetCenter - rayOrigin).normalized;
             float dist = Vector3.Distance(rayOrigin, targetCenter);
 

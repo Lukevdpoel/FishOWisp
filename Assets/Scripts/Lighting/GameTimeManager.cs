@@ -2,21 +2,13 @@ using System;
 using UnityEngine;
 
 [ExecuteAlways]
-public class GameTimeManager : MonoBehaviour
+public class GameTimeManager : GenericSingleton<GameTimeManager>
 {
-    public static GameTimeManager Instance { get; private set; }
-
     [Header("Debug")]
     public bool useSimulatedTime = false;
     [Range(0f, 24f)] public float simulatedTime = 12f;
 
     public float CurrentHour { get; private set; }
-
-    private void Awake()
-    {
-        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
-        Instance = this;
-    }
 
     void Update()
     {

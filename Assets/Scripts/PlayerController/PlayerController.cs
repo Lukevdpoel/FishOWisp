@@ -1,12 +1,14 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
     [Header("Object References")]
     [SerializeField] private Animator animator;
     [SerializeField] private Transform playerModel;
-    [SerializeField] private Transform cameraTransform;
-    [SerializeField] private Transform framingTarget;
+
+    [Header("Component References")]
+    [SerializeField] private PlayerCameraController cameraController;
+    [SerializeField] private PlayerFishingAnimHandler fishingAnimHandler;
 
     [Header("Movement Settings")]
     [SerializeField] private float walkSpeed = 6f;
@@ -20,183 +22,37 @@ public class PlayerController : MonoBehaviour
     [Header("Jump Animation")]
     [SerializeField] private string jumpAnimTrigger = "Jump";
 
-    [Header("Fishing Animations")]
-    [SerializeField] private string startChargingAnim = "StartCharging";
-    [SerializeField] private string throwAnim = "Throw";
-    [SerializeField] private string reelInAnim = "ReelIn";
-    [SerializeField] private string isFightingAnimBool = "IsFighting";
-    [SerializeField] private string isReelingDuringFightAnimBool = "IsReelingDuringFight";
-
-    [Header("Camera Orbit")]
-    [SerializeField] private float cameraSpeed = 120f;
-    [SerializeField] private Vector2 cameraYClamp = new Vector2(20f, 55f);
-    [SerializeField] private float pivotHeight = 1.3f;
-    [SerializeField, Range(0f, 1f)] private float screenYTarget = 0.25f;
-
-    [Header("Catch Camera Settings")]
-    [SerializeField] private float catchLookDownAngle = 25f;
-    [SerializeField] private float catchZoomDistance = 1.2f;
-    [SerializeField] private float catchVerticalOffset = 1.6f;
-    [SerializeField] private float catchHorizontalOffset = 0f;
-    [SerializeField] private float pivotSmoothTime = 0.25f;
-
     [Header("Idle Animation")]
+    [SerializeField] private string sitdownAnimTrigger = "Sitdown";
     [SerializeField] private float sitDownHoldTime = 4f;
 
-    [Header("Camera Smoothing")]
-    [SerializeField] private float cameraSmoothTime = 0.05f;
-
-    [Header("Camera Collision")]
-    [SerializeField] private LayerMask collisionLayers;
-    [SerializeField] private float collisionRadius = 0.2f;
-    [SerializeField] private float zoomDampTime = 0.1f;
-
-    [Header("Static Camera Settings")]
-    [SerializeField] private bool useStaticCamera = false;
-    [SerializeField] private Transform staticCameraTarget;
+    [Header("Physics")]
+    [SerializeField] private float groundedDownForce = -2f;
+    [SerializeField] private float speedAnimDampTime = 0.1f;
 
     [HideInInspector] public bool areControlsLocked = false;
-
-    private bool isFightingFish = false;
-    private bool isCasting = false;
-    private bool isCatchCameraActive = false;
-    private bool isBountyBoardActive = false;
-    private Transform activeBountyBoard;
 
     private CharacterController characterController;
     private Vector3 targetVelocity;
     private float idleTimer;
     private bool allowSitdown = true;
-
     private bool isSprinting = false;
-
-    private float startDistance, cameraXAngle, cameraYAngle, smoothXAngle, smoothYAngle, xVel, yVel;
-    private Camera cam;
-    private float currentCameraDistance, distanceVelocity;
-
-    private Vector3 currentPivotPosition;
-    private Vector3 pivotVelocity;
-
-    private Transform activeBobberTransform;
     private Quaternion targetModelRotation;
 
     private int hashSpeed;
     private int hashJump;
-    private int hashStartCharging;
-    private int hashThrow;
-    private int hashReelIn;
-    private int hashIsFighting;
-    private int hashIsReelingDuringFight;
     private int hashSitdown;
-
-    private void OnEnable()
-    {
-        FishingEvents.OnStartCharging += PlayStartChargingAnim;
-        FishingEvents.OnThrowBobber += PlayThrowAnim;
-        FishingEvents.OnHookFishSuccess += PlayReelInAnim;
-        FishingEvents.OnFishFightBegin += StartFightingAnimation;
-        FishingEvents.OnCancelFishing += StopFightingAnimation;
-        FishingEvents.OnFishFightEnd += OnFishFightEnd;
-        FishingEvents.OnStartReeling += HandleSuccessfulCatchAnimation;
-        FishingEvents.OnStartCharging += OnCastStart;
-        FishingEvents.OnCancelCharging += OnCastEnd;
-        FishingEvents.OnCancelFishing += OnCastEnd;
-        FishingEvents.OnThrowBobber += OnThrowBobber;
-        FishingEvents.OnStartReelingDuringFight += StartReelingDuringFightAnim;
-        FishingEvents.OnStopReelingDuringFight += StopReelingDuringFightAnim;
-        FishingEvents.OnBobberLandedInWater += OnBobberLanded;
-
-        BountyBoard.OnBountyBoardStateChange += HandleBountyBoard;
-    }
-
-    private void OnDisable()
-    {
-        FishingEvents.OnStartCharging -= PlayStartChargingAnim;
-        FishingEvents.OnThrowBobber -= PlayThrowAnim;
-        FishingEvents.OnHookFishSuccess -= PlayReelInAnim;
-        FishingEvents.OnFishFightBegin -= StartFightingAnimation;
-        FishingEvents.OnCancelFishing -= StopFightingAnimation;
-        FishingEvents.OnFishFightEnd -= OnFishFightEnd;
-        FishingEvents.OnStartReeling -= HandleSuccessfulCatchAnimation;
-        FishingEvents.OnStartCharging -= OnCastStart;
-        FishingEvents.OnCancelCharging -= OnCastEnd;
-        FishingEvents.OnCancelFishing -= OnCastEnd;
-        FishingEvents.OnThrowBobber -= OnThrowBobber;
-        FishingEvents.OnStartReelingDuringFight -= StartReelingDuringFightAnim;
-        FishingEvents.OnStopReelingDuringFight -= StopReelingDuringFightAnim;
-        FishingEvents.OnBobberLandedInWater -= OnBobberLanded;
-
-        BountyBoard.OnBountyBoardStateChange -= HandleBountyBoard;
-    }
-
-    public void SetCatchCamera(bool active) => isCatchCameraActive = active;
-    private void OnCastStart() => isCasting = true;
-    private void OnCastEnd() { isCasting = false; isFightingFish = false; }
-    private void OnThrowBobber(Vector3 direction, float force) => isCasting = false;
-    private void OnBobberLanded(BobberController bobber) { activeBobberTransform = bobber.transform; }
-    private void OnFishFightEnd(bool success) { isFightingFish = false; StopFightingAnimation(); }
-
-    private void StartReelingDuringFightAnim() { if (animator) animator.SetBool(hashIsReelingDuringFight, true); }
-    private void StopReelingDuringFightAnim() { if (animator) animator.SetBool(hashIsReelingDuringFight, false); }
-    private void PlayReelInAnim() { if (animator) animator.SetTrigger(hashReelIn); }
 
     void Start()
     {
         hashSpeed = Animator.StringToHash(speedAnimFloat);
         hashJump = Animator.StringToHash(jumpAnimTrigger);
-        hashStartCharging = Animator.StringToHash(startChargingAnim);
-        hashThrow = Animator.StringToHash(throwAnim);
-        hashReelIn = Animator.StringToHash(reelInAnim);
-        hashIsFighting = Animator.StringToHash(isFightingAnimBool);
-        hashIsReelingDuringFight = Animator.StringToHash(isReelingDuringFightAnimBool);
-        hashSitdown = Animator.StringToHash("Sitdown");
+        hashSitdown = Animator.StringToHash(sitdownAnimTrigger);
 
         characterController = GetComponent<CharacterController>();
-        if (cameraTransform && playerModel)
-        {
-            startDistance = Vector3.Distance(cameraTransform.position, playerModel.position);
-            currentCameraDistance = startDistance;
-            Vector3 initialCameraAngles = cameraTransform.eulerAngles;
-            cameraXAngle = initialCameraAngles.y;
-            cameraYAngle = initialCameraAngles.x;
-            smoothXAngle = cameraXAngle;
-            smoothYAngle = cameraYAngle;
-            cam = cameraTransform.GetComponent<Camera>();
-            currentPivotPosition = playerModel.position + Vector3.up * pivotHeight;
+        if (playerModel) targetModelRotation = playerModel.rotation;
 
-            targetModelRotation = playerModel.rotation;
-        }
-        if (framingTarget == null) framingTarget = playerModel;
-
-        DialogueManager.OnDialogueStateChange += OnDialogueStateChanged;
-    }
-
-    private void OnDestroy()
-    {
-        DialogueManager.OnDialogueStateChange -= OnDialogueStateChanged;
-    }
-
-    private void OnDialogueStateChanged(bool isOpen)
-    {
-        areControlsLocked = isOpen;
-        if (isOpen)
-        {
-            targetVelocity = Vector3.zero;
-            if (animator) animator.SetFloat(hashSpeed, 0f);
-        }
-    }
-
-    private void HandleBountyBoard(bool isOpen, Transform boardTransform)
-    {
-        areControlsLocked = isOpen;
-        isBountyBoardActive = isOpen;
-        activeBountyBoard = boardTransform;
-
-        if (isOpen)
-        {
-            targetVelocity = Vector3.zero;
-            if (animator) animator.SetFloat(hashSpeed, 0f);
-        }
+        if (cameraController != null) cameraController.Initialize(playerModel);
     }
 
     void Update()
@@ -214,25 +70,40 @@ public class PlayerController : MonoBehaviour
     void LateUpdate()
     {
         if (Time.timeScale == 0f || Time.deltaTime <= 0.0001f) return;
-        HandleCamera();
+
+        if (cameraController != null)
+        {
+            var input = new PlayerCameraController.CameraInput
+            {
+                playerModel = playerModel,
+                areControlsLocked = areControlsLocked,
+                isFightingFish = fishingAnimHandler != null && fishingAnimHandler.IsFightingFish,
+                isBountyBoardActive = fishingAnimHandler != null && fishingAnimHandler.IsBountyBoardActive,
+                activeBountyBoard = fishingAnimHandler != null ? fishingAnimHandler.ActiveBountyBoard : null,
+                activeBobberTransform = fishingAnimHandler != null ? fishingAnimHandler.ActiveBobberTransform : null,
+            };
+            cameraController.UpdateCamera(input);
+        }
     }
 
-    private void PlayStartChargingAnim() { if (animator) animator.SetTrigger(hashStartCharging); }
-    private void PlayThrowAnim(Vector3 direction, float force) { if (animator) animator.SetTrigger(hashThrow); }
-
-    private void StartFightingAnimation(FishPreset fish)
+    public void LockControls(bool locked)
     {
-        isFightingFish = true;
-        if (animator) animator.SetBool(hashIsFighting, true);
+        areControlsLocked = locked;
+        if (locked) ZeroMovement();
     }
 
-    private void StopFightingAnimation()
+    public void ZeroMovement()
     {
-        isFightingFish = false;
-        if (animator) animator.SetBool(hashIsFighting, false);
+        targetVelocity = Vector3.zero;
+        if (animator) animator.SetFloat(hashSpeed, 0f);
     }
 
-    private void HandleSuccessfulCatchAnimation() { StopFightingAnimation(); PlayReelInAnim(); }
+    public void NotifyOfAction() { idleTimer = 0f; allowSitdown = true; }
+
+    public void SetCatchCamera(bool active)
+    {
+        if (cameraController != null) cameraController.SetCatchCamera(active);
+    }
 
     private void HandleMovement()
     {
@@ -247,8 +118,9 @@ public class PlayerController : MonoBehaviour
 
         float currentSpeed = isSprinting ? sprintSpeed : walkSpeed;
 
-        Vector3 camForward = cameraTransform.forward;
-        Vector3 camRight = cameraTransform.right;
+        Transform camTransform = cameraController != null ? cameraController.CameraTransform : transform;
+        Vector3 camForward = camTransform.forward;
+        Vector3 camRight = camTransform.right;
 
         camForward.y = 0f;
         camRight.y = 0f;
@@ -275,7 +147,7 @@ public class PlayerController : MonoBehaviour
 
     private void HandleGravity()
     {
-        if (characterController.isGrounded && targetVelocity.y < 0f) targetVelocity.y = -2f;
+        if (characterController.isGrounded && targetVelocity.y < 0f) targetVelocity.y = groundedDownForce;
         else targetVelocity.y += gravity * Time.deltaTime;
     }
 
@@ -290,7 +162,7 @@ public class PlayerController : MonoBehaviour
                 horizontalSpeed = 0f;
             }
 
-            animator.SetFloat(hashSpeed, horizontalSpeed, 0.1f, Time.deltaTime);
+            animator.SetFloat(hashSpeed, horizontalSpeed, speedAnimDampTime, Time.deltaTime);
         }
     }
 
@@ -311,8 +183,6 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    public void NotifyOfAction() { idleTimer = 0f; allowSitdown = true; }
-
     private void HandleJumpInput()
     {
         if (InventoryUI.IsInventoryOpen || areControlsLocked) return;
@@ -326,95 +196,14 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void HandleCamera()
-    {
-        if (!cameraTransform || !playerModel) return;
-        if (InventoryUI.IsInventoryOpen) return;
-
-        if (useStaticCamera)
-        {
-            if (staticCameraTarget != null) { cameraTransform.position = staticCameraTarget.position; cameraTransform.rotation = staticCameraTarget.rotation; }
-            return;
-        }
-
-        if (float.IsNaN(xVel) || float.IsNaN(yVel) || float.IsNaN(distanceVelocity)) { xVel = 0f; yVel = 0f; distanceVelocity = 0f; }
-
-        bool isDialogueCamera = areControlsLocked && DialogueManager.Instance != null && DialogueManager.Instance.IsDialogueActive();
-        bool isBoardCamera = areControlsLocked && isBountyBoardActive && activeBountyBoard != null;
-
-        if (isDialogueCamera || isBoardCamera)
-        {
-            Transform target = isDialogueCamera ? DialogueManager.Instance.currentSpeaker : activeBountyBoard;
-            if (target != null)
-            {
-                Vector3 directionToTarget = (target.position - playerModel.position).normalized;
-                Quaternion targetRot = Quaternion.LookRotation(directionToTarget);
-
-                cameraXAngle = Mathf.LerpAngle(cameraXAngle, targetRot.eulerAngles.y, Time.deltaTime * 3f);
-                cameraYAngle = Mathf.LerpAngle(cameraYAngle, 20f, Time.deltaTime * 3f);
-            }
-        }
-        else if (!isFightingFish && !isCatchCameraActive && !areControlsLocked)
-        {
-            float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
-            float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
-            cameraXAngle += mouseX;
-            cameraYAngle -= mouseY;
-            cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
-        }
-        else if (isCatchCameraActive)
-        {
-            cameraYAngle = Mathf.Lerp(cameraYAngle, catchLookDownAngle, Time.deltaTime * 5f);
-        }
-        else if (activeBobberTransform != null && isFightingFish)
-        {
-            Vector3 directionToBobber = (activeBobberTransform.position - playerModel.position).normalized;
-            Quaternion targetRot = Quaternion.LookRotation(directionToBobber);
-            cameraXAngle = Mathf.LerpAngle(cameraXAngle, targetRot.eulerAngles.y, Time.deltaTime * 2f);
-        }
-
-        smoothXAngle = Mathf.SmoothDampAngle(smoothXAngle, cameraXAngle, ref xVel, cameraSmoothTime);
-        smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle, ref yVel, cameraSmoothTime);
-
-        Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f);
-        Vector3 cameraDirection = -(rotation * Vector3.forward);
-
-        Vector3 basePos = playerModel.position;
-        Vector3 targetPivot;
-
-        if (isCatchCameraActive)
-        {
-            targetPivot = basePos + Vector3.up * catchVerticalOffset;
-            targetPivot += rotation * Vector3.right * catchHorizontalOffset;
-            currentPivotPosition = Vector3.SmoothDamp(currentPivotPosition, targetPivot, ref pivotVelocity, pivotSmoothTime);
-        }
-        else
-        {
-            targetPivot = basePos + Vector3.up * pivotHeight;
-            currentPivotPosition = targetPivot;
-            pivotVelocity = Vector3.zero;
-        }
-
-        float targetDistance = startDistance;
-        RaycastHit hit;
-
-        if (isCatchCameraActive) targetDistance = catchZoomDistance;
-        else if (Physics.SphereCast(currentPivotPosition, collisionRadius, cameraDirection, out hit, startDistance, collisionLayers)) targetDistance = hit.distance;
-
-        currentCameraDistance = Mathf.SmoothDamp(currentCameraDistance, targetDistance, ref distanceVelocity, zoomDampTime);
-        Vector3 finalPos = currentPivotPosition + cameraDirection * currentCameraDistance;
-
-        if (cam == null) cam = cameraTransform.GetComponent<Camera>();
-        cameraTransform.position = finalPos;
-        cameraTransform.rotation = rotation;
-    }
-
     private void HandleCursorLocking()
     {
         if (areControlsLocked) { Cursor.lockState = CursorLockMode.None; Cursor.visible = true; return; }
-        if (InventoryUI.IsInventoryOpen || isFightingFish)
+
+        bool isFighting = fishingAnimHandler != null && fishingAnimHandler.IsFightingFish;
+        if (InventoryUI.IsInventoryOpen || isFighting)
         {
-            if (isFightingFish && Cursor.lockState != CursorLockMode.None) { Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
+            if (isFighting && Cursor.lockState != CursorLockMode.None) { Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
             return;
         }
         if (Time.timeScale > 0f) { Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; }

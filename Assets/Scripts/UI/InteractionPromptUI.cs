@@ -2,9 +2,8 @@ using UnityEngine;
 using UnityEngine.UI;
 using System.Collections; // Required for Coroutines
 
-public class InteractionPromptUI : MonoBehaviour
+public class InteractionPromptUI : GenericSingleton<InteractionPromptUI>
 {
-    public static InteractionPromptUI Instance { get; private set; }
 
     [Header("UI References")]
     [Tooltip("The GameObject containing the image.")]
@@ -27,10 +26,9 @@ public class InteractionPromptUI : MonoBehaviour
     private Transform currentTarget;
     private Coroutine currentAnimationRoutine;
 
-    private void Awake()
+    protected override void Awake()
     {
-        if (Instance != null && Instance != this) Destroy(gameObject);
-        else Instance = this;
+        base.Awake();
 
         if (promptContainer != null)
         {
