@@ -367,6 +367,37 @@ MonoBehaviour:
   cropToFit:
     m_OverrideState: 1
     m_Value: 1
+--- !u!114 &-2362870391605781982
+MonoBehaviour:
+  m_ObjectHideFlags: 3
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 691896723b54a1141b7b4076a48a9cee, type: 3}
+  m_Name: KuwaharaVolumeComponent
+  m_EditorClassIdentifier: Assembly-CSharp::UnityEngine.Rendering.Universal.KuwaharaVolumeComponent
+  active: 1
+  enabled:
+    m_OverrideState: 1
+    m_Value: 0
+  kernelSize:
+    m_OverrideState: 1
+    m_Value: 4
+  focalDistance:
+    m_OverrideState: 1
+    m_Value: 10
+  nearRange:
+    m_OverrideState: 1
+    m_Value: 3
+  farRange:
+    m_OverrideState: 1
+    m_Value: 10
+  maxBlend:
+    m_OverrideState: 1
+    m_Value: 1
 --- !u!114 &-1410297666881709256
 MonoBehaviour:
   m_ObjectHideFlags: 3
@@ -534,6 +565,7 @@ MonoBehaviour:
   - {fileID: 7518938298396184218}
   - {fileID: -1410297666881709256}
   - {fileID: -4936385611594899392}
+  - {fileID: -2362870391605781982}
 --- !u!114 &853819529557874667
 MonoBehaviour:
   m_ObjectHideFlags: 3

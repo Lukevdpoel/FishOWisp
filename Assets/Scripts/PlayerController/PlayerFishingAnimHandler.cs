@@ -15,6 +15,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
 
     public bool IsFightingFish { get; private set; }
     public bool IsCasting { get; private set; }
+    public bool IsAiming { get; private set; }
     public Transform ActiveBobberTransform { get; private set; }
     public bool IsBountyBoardActive { get; private set; }
     public Transform ActiveBountyBoard { get; private set; }
@@ -52,6 +53,8 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         FishingEvents.OnStartReelingDuringFight += StartReelingDuringFightAnim;
         FishingEvents.OnStopReelingDuringFight += StopReelingDuringFightAnim;
         FishingEvents.OnBobberLandedInWater += OnBobberLanded;
+        FishingEvents.OnStartAiming += OnStartAiming;
+        FishingEvents.OnStopAiming += OnStopAiming;
 
         BountyBoard.OnBountyBoardStateChange += HandleBountyBoard;
         DialogueManager.OnDialogueStateChange += OnDialogueStateChanged;
@@ -73,6 +76,8 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         FishingEvents.OnStartReelingDuringFight -= StartReelingDuringFightAnim;
         FishingEvents.OnStopReelingDuringFight -= StopReelingDuringFightAnim;
         FishingEvents.OnBobberLandedInWater -= OnBobberLanded;
+        FishingEvents.OnStartAiming -= OnStartAiming;
+        FishingEvents.OnStopAiming -= OnStopAiming;
 
         BountyBoard.OnBountyBoardStateChange -= HandleBountyBoard;
         DialogueManager.OnDialogueStateChange -= OnDialogueStateChanged;
@@ -80,6 +85,8 @@ public class PlayerFishingAnimHandler : MonoBehaviour
 
     private void OnCastStart() => IsCasting = true;
     private void OnCastEnd() { IsCasting = false; IsFightingFish = false; }
+    private void OnStartAiming() => IsAiming = true;
+    private void OnStopAiming() => IsAiming = false;
     private void OnThrowBobber(Vector3 direction, float force) => IsCasting = false;
     private void OnBobberLanded(BobberController bobber) { ActiveBobberTransform = bobber.transform; }
     private void OnFishFightEnd(bool success) { IsFightingFish = false; StopFightingAnimation(); }

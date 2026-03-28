@@ -32,4 +32,12 @@ public static class FishingEvents
     // Fired when the player actively reels during a fish fight's calm phase.
     public static Action OnStartReelingDuringFight;
     public static Action OnStopReelingDuringFight;
+
+    // Aim Mode Events
+    public static Action OnStartAiming;
+    public static Action OnStopAiming;
+
+    // Fish Attraction Events
+    public static Action OnAttractFish;
+    public static Action OnFishScared;
 }

@@ -7,8 +7,15 @@ public class FishingLine : MonoBehaviour
     [Header("References")]
     public Transform rodTip;
 
+    [Tooltip("A stable point (not on an animated bone) used as the bobber spawn origin. Falls back to rodTip if unset.")]
+    public Transform stableThrowOrigin;
+
     [Header("Bobber")]
     public GameObject bobberPrefab;
+
+    [Header("Launch Angle")]
+    [Tooltip("Upward launch angle in degrees. Higher values produce a taller arc.")]
+    public float launchAngle = 20f;
 
     [Header("Reeling Animation")]
     public float reelInArcHeight = 2f;
@@ -48,14 +55,14 @@ public class FishingLine : MonoBehaviour
 
     private void SpawnAndAttachBobber(Vector3 direction, float force)
     {
-        // --- GOAL 1 FIX (Backup Layer) ---
-        // If there is already an active bobber, destroy it first!
         if (activeBobber != null)
         {
             DestroyBobber();
         }
 
-        GameObject bobberInstance = Instantiate(bobberPrefab, rodTip.position, Quaternion.identity);
+        // Use a stable spawn point to avoid frame-to-frame animation jitter
+        Transform spawnOrigin = stableThrowOrigin != null ? stableThrowOrigin : rodTip;
+        GameObject bobberInstance = Instantiate(bobberPrefab, spawnOrigin.position, Quaternion.identity);
         activeBobber = bobberInstance.GetComponent<BobberController>();
         if (activeBobber == null)
         {
@@ -64,12 +71,14 @@ public class FishingLine : MonoBehaviour
             return;
         }
 
-        // --- GOAL 2 FIX: FORCE PHYSICS ---
+        // Tilt the horizontal direction upward by launchAngle to create a proper arc
+        Vector3 launchDirection = Quaternion.AngleAxis(-launchAngle, Vector3.Cross(Vector3.up, direction)) * direction;
+
         Rigidbody rb = activeBobber.GetComponent<Rigidbody>();
         if (rb != null)
         {
-            rb.isKinematic = false; // Ensure gravity works
-            rb.AddForce(direction * force, ForceMode.VelocityChange);
+            rb.isKinematic = false;
+            rb.AddForce(launchDirection * force, ForceMode.VelocityChange);
         }
 
         verletRope.SetupRope(rodTip, activeBobber.transform);

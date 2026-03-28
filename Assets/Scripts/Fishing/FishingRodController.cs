@@ -27,6 +27,10 @@ public class FishingRodController : MonoBehaviour
     public float reelInArcHeight = 5.0f;
     public float reactionTime = 1.5f;
 
+    [Header("Auto-Reel Settings")]
+    [Tooltip("If the player walks further than this from where they threw, the line auto-reels back in.")]
+    public float maxDistanceFromCast = 15f;
+
     [Header("Fish Fight Settings")]
     public float maxFightProgress = 100f;
     public float initialFightProgress = 30f;
@@ -41,6 +45,8 @@ public class FishingRodController : MonoBehaviour
     private CaughtFish caughtFishInstance = null;
     private PlayerController playerController;
     private bool wasReelingLastFrame;
+    private bool isAiming;
+    private Vector3 castOriginPosition;
 
     private int hashFail;
 
@@ -78,10 +84,24 @@ public class FishingRodController : MonoBehaviour
     void Update()
     {
         HandleInput();
+        CheckCastDistance();
 
         if (currentState == FishingState.InspectingCatch && inspectionHandler != null)
         {
             inspectionHandler.UpdateInspection(playerModel);
+        }
+    }
+
+    private void CheckCastDistance()
+    {
+        if (currentState != FishingState.WaitingForBite) return;
+
+        float distSqr = (transform.position - castOriginPosition).sqrMagnitude;
+        if (distSqr > maxDistanceFromCast * maxDistanceFromCast)
+        {
+            Debug.Log("Walked too far from cast — auto-reeling.");
+            currentState = FishingState.Reeling;
+            StartCoroutine(ReelInBobberRoutine(null));
         }
     }
 
@@ -94,6 +114,19 @@ public class FishingRodController : MonoBehaviour
             if (playerController != null && playerController.areControlsLocked) return;
         }
 
+        // --- Aim Mode (RMB) - works in any non-fight/non-inspection state ---
+        if (Input.GetKeyDown(KeyCode.Mouse1) && !isAiming)
+        {
+            isAiming = true;
+            FishingEvents.OnStartAiming?.Invoke();
+        }
+
+        if (Input.GetKeyUp(KeyCode.Mouse1) && isAiming)
+        {
+            StopAiming();
+        }
+
+        // --- LMB actions ---
         if (Input.GetKeyDown(KeyCode.Mouse0))
         {
             switch (currentState)
@@ -119,6 +152,19 @@ public class FishingRodController : MonoBehaviour
         {
             FishingEvents.OnCancelCharging?.Invoke();
         }
+
+        // --- Fish Attraction (E key) ---
+        if (Input.GetKeyDown(KeyCode.E) && currentState == FishingState.WaitingForBite)
+        {
+            FishingEvents.OnAttractFish?.Invoke();
+        }
+    }
+
+    private void StopAiming()
+    {
+        if (!isAiming) return;
+        isAiming = false;
+        FishingEvents.OnStopAiming?.Invoke();
     }
 
     private void StartCharging()
@@ -127,7 +173,12 @@ public class FishingRodController : MonoBehaviour
         if (bobberInWater != null || activeBobber != null) return;
         currentState = FishingState.Charging; FishingEvents.OnStartCharging?.Invoke();
     }
-    private void HandleThrow(Vector3 direction, float force) { danglingBobber?.SetActive(false); currentState = FishingState.WaitingForBite; }
+    private void HandleThrow(Vector3 direction, float force)
+    {
+        danglingBobber?.SetActive(false);
+        currentState = FishingState.WaitingForBite;
+        castOriginPosition = transform.position;
+    }
     private void HandleFishBite(BobberController bobber)
     {
         if (currentState != FishingState.WaitingForBite || bobber != bobberInWater) return;
@@ -206,6 +257,7 @@ public class FishingRodController : MonoBehaviour
     {
         if (currentState != FishingState.Cooldown)
         {
+            StopAiming();
             if (bobberInWater != null) Destroy(bobberInWater.gameObject);
             ResetFishingState();
         }
@@ -300,6 +352,7 @@ public class FishingRodController : MonoBehaviour
 
         if (inspectionHandler != null) inspectionHandler.ForceCleanup();
 
+        StopAiming();
         currentState = FishingState.Idle;
         danglingBobber?.SetActive(true);
         fishFightCoroutine = null;

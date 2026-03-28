@@ -79,6 +79,7 @@ public class PlayerController : MonoBehaviour
                 areControlsLocked = areControlsLocked,
                 isFightingFish = fishingAnimHandler != null && fishingAnimHandler.IsFightingFish,
                 isBountyBoardActive = fishingAnimHandler != null && fishingAnimHandler.IsBountyBoardActive,
+                isAiming = fishingAnimHandler != null && fishingAnimHandler.IsAiming,
                 activeBountyBoard = fishingAnimHandler != null ? fishingAnimHandler.ActiveBountyBoard : null,
                 activeBobberTransform = fishingAnimHandler != null ? fishingAnimHandler.ActiveBobberTransform : null,
             };
@@ -135,6 +136,11 @@ public class PlayerController : MonoBehaviour
     private void HandleRotation()
     {
         if (areControlsLocked) return;
+        if (fishingAnimHandler != null && fishingAnimHandler.IsCasting)
+        {
+            targetModelRotation = playerModel.rotation;
+            return;
+        }
 
         if (new Vector3(targetVelocity.x, 0, targetVelocity.z).magnitude > 0.1f)
         {

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 using System.Collections;
 
 public class NoteMenu : MonoBehaviour
@@ -23,7 +24,7 @@ public class NoteMenu : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Tab))
+        if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
         {
             if (isNoteOpen)
             {

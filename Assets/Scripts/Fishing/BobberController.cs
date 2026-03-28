@@ -315,6 +315,15 @@ public class BobberController : MonoBehaviour
         bitePhysicsCoroutine = StartCoroutine(BitePhysicsRoutine());
     }
 
+    public void PlayAttractJiggle()
+    {
+        if (rb != null && isInWater && !rb.isKinematic)
+        {
+            rb.AddForce(Vector3.down * nibbleForce * 0.5f, ForceMode.Impulse);
+        }
+        SpawnEffect(nibblePrefab, nibbleLifetime);
+    }
+
     public void SetStruggleActive(bool active)
     {
         if (isStruggling == active) return;

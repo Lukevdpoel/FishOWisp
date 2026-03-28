@@ -130,13 +130,12 @@ MonoBehaviour:
     probeSamplingDebugTexture: {fileID: 2800000, guid: 24ec0e140fb444a44ab96ee80844e18e, type: 3}
     probeVolumeBlendStatesCS: {fileID: 7200000, guid: b9a23f869c4fd45f19c5ada54dd82176, type: 3}
   m_RendererFeatures:
-  - {fileID: 7833122117494664109}
   - {fileID: -3645586558223233748}
   - {fileID: -2130659816663937646}
-  - {fileID: 5194472116383182668}
   - {fileID: 9106493445037574711}
   - {fileID: -2178547928464856187}
-  m_RendererFeatureMap: ad6b866f10d7b46c2c4d2a27574668cd920d8c7a2f606ee24cefb04cde781648374ae33c8ac3607e856bb095333ec4e1
+  - {fileID: 8580932327565783422}
+  m_RendererFeatureMap: 2c4d2a27574668cd920d8c7a2f606ee2374ae33c8ac3607e856bb095333ec4e17e7139fa7c981577
   m_UseNativeRenderPass: 1
   xrSystemData: {fileID: 0}
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
@@ -165,7 +164,7 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
---- !u!114 &5194472116383182668
+--- !u!114 &8580932327565783422
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -174,46 +173,11 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e3059ae7893fb1b44bfa2bee3a7919e0, type: 3}
-  m_Name: VolumetricLightScattering
-  m_EditorClassIdentifier: Assembly-CSharp::VolumetricLightScattering
+  m_Script: {fileID: 11500000, guid: 9a2493fd634432743a6fa660ed421f8b, type: 3}
+  m_Name: KuwaharaRendererFeature
+  m_EditorClassIdentifier: Assembly-CSharp::KuwaharaRendererFeature
   m_Active: 1
-  settings:
-    renderPassEvent: 1000
-    resolutionScale: 0.5
-    intensity: 1
-    blurWidth: 0.85
-    numSamples: 16
-    lightSource: {fileID: 0}
-    occluderMask:
-      serializedVersion: 2
-      m_Bits: 16777217
---- !u!114 &7833122117494664109
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 0}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f62c9c65cf3354c93be831c8bc075510, type: 3}
-  m_Name: ScreenSpaceAmbientOcclusion
-  m_EditorClassIdentifier: 
-  m_Active: 0
-  m_Settings:
-    AOMethod: 0
-    Downsample: 0
-    AfterOpaque: 0
-    Source: 1
-    NormalSamples: 1
-    Intensity: 0.4
-    DirectLightingStrength: 0.25
-    Radius: 0.3
-    Samples: 1
-    BlurQuality: 0
-    Falloff: 100
-    SampleCount: -1
+  renderPass: 550
 --- !u!114 &9106493445037574711
 MonoBehaviour:
   m_ObjectHideFlags: 0

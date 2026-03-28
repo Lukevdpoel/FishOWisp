@@ -8,6 +8,7 @@ public class PlayerCameraController : MonoBehaviour
         public bool areControlsLocked;
         public bool isFightingFish;
         public bool isBountyBoardActive;
+        public bool isAiming;
         public Transform activeBountyBoard;
         public Transform activeBobberTransform;
     }
@@ -37,6 +38,11 @@ public class PlayerCameraController : MonoBehaviour
 
     [Header("Camera Smoothing")]
     [SerializeField] private float cameraSmoothTime = 0.05f;
+
+    [Header("Aim Camera Settings")]
+    [SerializeField] private float aimZoomDistance = 3.5f;
+    [SerializeField] private float aimYAngleOffset = -3f;
+    [SerializeField] private float aimCameraLerpSpeed = 4f;
 
     [Header("Camera Collision")]
     [SerializeField] private LayerMask collisionLayers;
@@ -109,7 +115,15 @@ public class PlayerCameraController : MonoBehaviour
             float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
             cameraXAngle += mouseX;
             cameraYAngle -= mouseY;
-            cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
+
+            float minY = input.isAiming ? cameraYClamp.x + aimYAngleOffset : cameraYClamp.x;
+            cameraYAngle = Mathf.Clamp(cameraYAngle, minY, cameraYClamp.y);
+
+            if (input.isAiming)
+            {
+                float aimTargetY = Mathf.Clamp(cameraYClamp.x + aimYAngleOffset, minY, cameraYClamp.y);
+                cameraYAngle = Mathf.Lerp(cameraYAngle, aimTargetY, Time.deltaTime * aimCameraLerpSpeed);
+            }
         }
         else if (isCatchCameraActive)
         {
@@ -148,7 +162,10 @@ public class PlayerCameraController : MonoBehaviour
         RaycastHit hit;
 
         if (isCatchCameraActive) targetDistance = catchZoomDistance;
-        else if (Physics.SphereCast(currentPivotPosition, collisionRadius, cameraDirection, out hit, startDistance, collisionLayers)) targetDistance = hit.distance;
+        else if (input.isAiming) targetDistance = aimZoomDistance;
+
+        if (!isCatchCameraActive && Physics.SphereCast(currentPivotPosition, collisionRadius, cameraDirection, out hit, targetDistance, collisionLayers))
+            targetDistance = hit.distance;
 
         currentCameraDistance = Mathf.SmoothDamp(currentCameraDistance, targetDistance, ref distanceVelocity, zoomDampTime);
         Vector3 finalPos = currentPivotPosition + cameraDirection * currentCameraDistance;
