@@ -169,8 +169,16 @@ public class FishingRodController : MonoBehaviour
 
     private void StartCharging()
     {
-        if (playerController != null && playerController.areControlsLocked) return;
-        if (bobberInWater != null || activeBobber != null) return;
+        if (playerController != null && playerController.areControlsLocked)
+        {
+            Debug.Log("[FishFight] StartCharging BLOCKED — controls locked");
+            return;
+        }
+        if (bobberInWater != null || activeBobber != null)
+        {
+            Debug.Log($"[FishFight] StartCharging BLOCKED — bobberInWater: {(bobberInWater != null ? "exists" : "null")}, activeBobber: {(activeBobber != null ? "exists" : "null")}");
+            return;
+        }
         currentState = FishingState.Charging; FishingEvents.OnStartCharging?.Invoke();
     }
     private void HandleThrow(Vector3 direction, float force)
@@ -183,6 +191,7 @@ public class FishingRodController : MonoBehaviour
     {
         if (currentState != FishingState.WaitingForBite || bobber != bobberInWater) return;
         currentState = FishingState.FishOnTheLine; activeBobber = bobber;
+        if (playerController != null) playerController.LockOnFish(bobber.transform);
         fishEscapeCoroutine = StartCoroutine(FishEscapeTimer());
     }
     private IEnumerator FishEscapeTimer() { yield return new WaitForSeconds(reactionTime); FailToHookFish(); }
@@ -192,6 +201,7 @@ public class FishingRodController : MonoBehaviour
     {
         if (minigameUI != null) minigameUI.Deactivate();
         FishingEvents.OnStopReelingDuringFight?.Invoke();
+        if (playerController != null) playerController.UnlockFromFish();
         if (bobberInWater != null) { Destroy(bobberInWater.gameObject); bobberInWater = null; }
         activeBobber = null;
         FishingEvents.OnCancelFishing?.Invoke();
@@ -204,13 +214,16 @@ public class FishingRodController : MonoBehaviour
     {
         if (fishEscapeCoroutine != null) StopCoroutine(fishEscapeCoroutine);
         FishingEvents.OnHookFishSuccess?.Invoke(); currentState = FishingState.FightingFish; currentFightProgress = initialFightProgress;
-        if (activeBobber != null) { Rigidbody rb = activeBobber.GetComponent<Rigidbody>(); if (rb != null) { rb.isKinematic = false; activeBobber.SetStruggleActive(true); } }
+        if (activeBobber != null) { Rigidbody rb = activeBobber.GetComponent<Rigidbody>(); if (rb != null) { rb.isKinematic = false; activeBobber.SetStruggleActive(true); } activeBobber.SetPlayerTransform(transform); }
         if (minigameUI != null) { minigameUI.Activate(); if (activeBobber != null) minigameUI.SetTrackingTarget(activeBobber.transform); }
+        else { Debug.LogWarning("FishingRodController: minigameUI is NULL — fish fight will auto-fill! Reassign the DirectionalFishingMinigame reference in the Inspector."); }
         FishingEvents.OnFishFightBegin?.Invoke(activeBobber.HookedFish.preset); fishFightCoroutine = StartCoroutine(FishFightRoutine());
     }
     private void WinFishFight()
     {
+        Debug.Log($"[FishFight] WinFishFight — activeBobber: {(activeBobber != null ? "valid" : "NULL")}, inspectionHandler: {(inspectionHandler != null ? "valid" : "NULL")}");
         currentState = FishingState.Reeling;
+        if (playerController != null) playerController.UnlockFromFish();
         if (fishFightCoroutine != null) StopCoroutine(fishFightCoroutine);
         if (activeBobber != null) activeBobber.SetStruggleActive(false);
         if (minigameUI != null) minigameUI.Deactivate();
@@ -315,6 +328,7 @@ public class FishingRodController : MonoBehaviour
 
     private void HandleReelingCompleted(CaughtFish fishToInventory)
     {
+        Debug.Log($"[FishFight] HandleReelingCompleted — fish: {(fishToInventory != null ? fishToInventory.GetDisplayName() : "NULL")}, inspectionHandler: {(inspectionHandler != null ? "valid" : "NULL")}");
         if (fishToInventory != null && inspectionHandler != null)
         {
             currentState = FishingState.InspectingCatch;
@@ -342,12 +356,14 @@ public class FishingRodController : MonoBehaviour
 
     private void ResetFishingState()
     {
+        Debug.Log($"[FishFight] ResetFishingState — currentState: {currentState}, bobberInWater: {(bobberInWater != null ? "valid" : "NULL")}, activeBobber: {(activeBobber != null ? "valid" : "NULL")}");
         if (currentState == FishingState.Idle) return;
 
         if (playerController != null)
         {
             playerController.SetCatchCamera(false);
             playerController.areControlsLocked = false;
+            playerController.UnlockFromFish();
         }
 
         if (inspectionHandler != null) inspectionHandler.ForceCleanup();

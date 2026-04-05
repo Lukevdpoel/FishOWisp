@@ -12,6 +12,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     [SerializeField] private string reelInAnim = "ReelIn";
     [SerializeField] private string isFightingAnimBool = "IsFighting";
     [SerializeField] private string isReelingDuringFightAnimBool = "IsReelingDuringFight";
+    [SerializeField] private string rodDirectionAnimFloat = "RodDirection";
 
     public bool IsFightingFish { get; private set; }
     public bool IsCasting { get; private set; }
@@ -25,6 +26,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     private int hashReelIn;
     private int hashIsFighting;
     private int hashIsReelingDuringFight;
+    private int hashRodDirection;
 
     private void Awake()
     {
@@ -33,6 +35,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         hashReelIn = Animator.StringToHash(reelInAnim);
         hashIsFighting = Animator.StringToHash(isFightingAnimBool);
         hashIsReelingDuringFight = Animator.StringToHash(isReelingDuringFightAnimBool);
+        hashRodDirection = Animator.StringToHash(rodDirectionAnimFloat);
 
         if (playerController == null) playerController = GetComponent<PlayerController>();
     }
@@ -55,6 +58,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         FishingEvents.OnBobberLandedInWater += OnBobberLanded;
         FishingEvents.OnStartAiming += OnStartAiming;
         FishingEvents.OnStopAiming += OnStopAiming;
+        FishingEvents.OnRodDirectionUpdate += OnRodDirectionUpdate;
 
         BountyBoard.OnBountyBoardStateChange += HandleBountyBoard;
         DialogueManager.OnDialogueStateChange += OnDialogueStateChanged;
@@ -78,6 +82,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         FishingEvents.OnBobberLandedInWater -= OnBobberLanded;
         FishingEvents.OnStartAiming -= OnStartAiming;
         FishingEvents.OnStopAiming -= OnStopAiming;
+        FishingEvents.OnRodDirectionUpdate -= OnRodDirectionUpdate;
 
         BountyBoard.OnBountyBoardStateChange -= HandleBountyBoard;
         DialogueManager.OnDialogueStateChange -= OnDialogueStateChanged;
@@ -107,6 +112,11 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     {
         IsFightingFish = false;
         if (animator) animator.SetBool(hashIsFighting, false);
+    }
+
+    private void OnRodDirectionUpdate(float direction)
+    {
+        if (animator) animator.SetFloat(hashRodDirection, direction);
     }
 
     private void HandleSuccessfulCatchAnimation() { StopFightingAnimation(); PlayReelInAnim(); }

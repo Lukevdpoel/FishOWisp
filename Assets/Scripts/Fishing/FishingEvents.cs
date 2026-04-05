@@ -29,6 +29,9 @@ public static class FishingEvents
     public static Action<float, float> OnFishFightProgressUpdate;
     public static Action<bool> OnFishFightEnd;
 
+    // Rod direction during fish fight (-1 = left, 0 = center, 1 = right)
+    public static Action<float> OnRodDirectionUpdate;
+
     // Fired when the player actively reels during a fish fight's calm phase.
     public static Action OnStartReelingDuringFight;
     public static Action OnStopReelingDuringFight;
@@ -40,4 +43,5 @@ public static class FishingEvents
     // Fish Attraction Events
     public static Action OnAttractFish;
     public static Action OnFishScared;
+    public static Action<BobberController> OnBiteImminent;
 }

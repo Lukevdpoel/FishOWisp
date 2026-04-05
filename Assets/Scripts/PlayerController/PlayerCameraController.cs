@@ -115,15 +115,7 @@ public class PlayerCameraController : MonoBehaviour
             float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
             cameraXAngle += mouseX;
             cameraYAngle -= mouseY;
-
-            float minY = input.isAiming ? cameraYClamp.x + aimYAngleOffset : cameraYClamp.x;
-            cameraYAngle = Mathf.Clamp(cameraYAngle, minY, cameraYClamp.y);
-
-            if (input.isAiming)
-            {
-                float aimTargetY = Mathf.Clamp(cameraYClamp.x + aimYAngleOffset, minY, cameraYClamp.y);
-                cameraYAngle = Mathf.Lerp(cameraYAngle, aimTargetY, Time.deltaTime * aimCameraLerpSpeed);
-            }
+            cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
         }
         else if (isCatchCameraActive)
         {

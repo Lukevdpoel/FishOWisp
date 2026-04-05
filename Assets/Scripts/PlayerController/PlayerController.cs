@@ -38,6 +38,8 @@ public class PlayerController : MonoBehaviour
     private bool allowSitdown = true;
     private bool isSprinting = false;
     private Quaternion targetModelRotation;
+    private bool isLockedOnFish;
+    private Transform fishLockTarget;
 
     private int hashSpeed;
     private int hashJump;
@@ -101,6 +103,19 @@ public class PlayerController : MonoBehaviour
 
     public void NotifyOfAction() { idleTimer = 0f; allowSitdown = true; }
 
+    public void LockOnFish(Transform target)
+    {
+        isLockedOnFish = true;
+        fishLockTarget = target;
+        ZeroMovement();
+    }
+
+    public void UnlockFromFish()
+    {
+        isLockedOnFish = false;
+        fishLockTarget = null;
+    }
+
     public void SetCatchCamera(bool active)
     {
         if (cameraController != null) cameraController.SetCatchCamera(active);
@@ -109,7 +124,7 @@ public class PlayerController : MonoBehaviour
     private void HandleMovement()
     {
         float yVelocity = targetVelocity.y;
-        bool inputDisabled = InventoryUI.IsInventoryOpen || areControlsLocked;
+        bool inputDisabled = InventoryUI.IsInventoryOpen || areControlsLocked || isLockedOnFish;
 
         float h = inputDisabled ? 0f : Input.GetAxisRaw("Horizontal");
         float v = inputDisabled ? 0f : Input.GetAxisRaw("Vertical");
@@ -136,6 +151,17 @@ public class PlayerController : MonoBehaviour
     private void HandleRotation()
     {
         if (areControlsLocked) return;
+
+        if (isLockedOnFish && fishLockTarget != null)
+        {
+            Vector3 dirToFish = fishLockTarget.position - playerModel.position;
+            dirToFish.y = 0f;
+            if (dirToFish.sqrMagnitude > 0.001f)
+                targetModelRotation = Quaternion.LookRotation(dirToFish.normalized);
+            playerModel.rotation = Quaternion.Slerp(playerModel.rotation, targetModelRotation, rotationSpeed * Time.deltaTime);
+            return;
+        }
+
         if (fishingAnimHandler != null && fishingAnimHandler.IsCasting)
         {
             targetModelRotation = playerModel.rotation;
@@ -163,7 +189,7 @@ public class PlayerController : MonoBehaviour
         {
             float horizontalSpeed = new Vector3(targetVelocity.x, 0, targetVelocity.z).magnitude;
 
-            if (areControlsLocked || InventoryUI.IsInventoryOpen)
+            if (areControlsLocked || InventoryUI.IsInventoryOpen || isLockedOnFish)
             {
                 horizontalSpeed = 0f;
             }
@@ -179,7 +205,7 @@ public class PlayerController : MonoBehaviour
         bool isRotatingCamera = !areControlsLocked && !InventoryUI.IsInventoryOpen && Input.GetMouseButton(1);
         if (InventoryUI.IsInventoryOpen) { isMoving = false; isRotatingCamera = false; }
 
-        if (isMoving || isRotatingCamera) NotifyOfAction();
+        if (isMoving || isRotatingCamera || isLockedOnFish) NotifyOfAction();
         else idleTimer += Time.deltaTime;
 
         if (idleTimer >= sitDownHoldTime && allowSitdown)
@@ -191,7 +217,7 @@ public class PlayerController : MonoBehaviour
 
     private void HandleJumpInput()
     {
-        if (InventoryUI.IsInventoryOpen || areControlsLocked) return;
+        if (InventoryUI.IsInventoryOpen || areControlsLocked || isLockedOnFish) return;
         if (characterController.isGrounded && Input.GetButtonDown("Jump"))
         {
             if (animator)
@@ -207,9 +233,11 @@ public class PlayerController : MonoBehaviour
         if (areControlsLocked) { Cursor.lockState = CursorLockMode.None; Cursor.visible = true; return; }
 
         bool isFighting = fishingAnimHandler != null && fishingAnimHandler.IsFightingFish;
-        if (InventoryUI.IsInventoryOpen || isFighting)
+        if (InventoryUI.IsInventoryOpen) return;
+        if (isFighting)
         {
-            if (isFighting && Cursor.lockState != CursorLockMode.None) { Cursor.lockState = CursorLockMode.None; Cursor.visible = true; }
+            // Keep cursor locked during fight — mouse controls rod direction
+            if (Cursor.lockState != CursorLockMode.Locked) { Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; }
             return;
         }
         if (Time.timeScale > 0f) { Cursor.lockState = CursorLockMode.Locked; Cursor.visible = false; }

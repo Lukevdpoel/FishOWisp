@@ -115,6 +115,7 @@ MonoBehaviour:
   bounceDamp: 0.08
   buoyancyForce: 28.4
   waterDrag: 5
+  waterAngularDamping: 2
   waterRotationSpeed: 5
   minNibbles: 1
   maxNibbles: 2
@@ -122,8 +123,13 @@ MonoBehaviour:
   nibbleForce: 175
   biteForce: 400
   biteDuration: 1
+  biteDelay: 0.15
   struggleForce: 6
   directionChangeInterval: 1
+  obstacleCheckLayers:
+    serializedVersion: 2
+    m_Bits: 256
+  obstacleCheckDistance: 0.5
   bobberVisuals: {fileID: 3855882591336779785}
 --- !u!82 &8704116694854614809
 AudioSource:

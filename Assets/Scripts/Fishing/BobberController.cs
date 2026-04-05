@@ -79,10 +79,18 @@ public class BobberController : MonoBehaviour
     [Header("Bite Settings")]
     public float biteForce = 100f;
     public float biteDuration = 0.5f;
+    [Tooltip("Delay before the bite event fires, to let the final nibble jab play out visually.")]
+    public float biteDelay = 0.15f;
 
     [Header("Struggle Settings")]
     public float struggleForce = 2f;
-    public float directionChangeInterval = 1.0f;
+    public float directionChangeInterval = 2.5f;
+
+    [Header("Struggle Obstacle Detection")]
+    [Tooltip("Layers that count as obstacles the fish cannot swim through.")]
+    public LayerMask obstacleCheckLayers;
+    [Tooltip("How far ahead to check for obstacles in the struggle direction.")]
+    public float obstacleCheckDistance = 2f;
 
     [Header("Visuals")]
     public GameObject bobberVisuals;
@@ -109,10 +117,14 @@ public class BobberController : MonoBehaviour
     private bool isStruggling = false;
     private Vector3 struggleDirection;
     private float struggleTimer;
+    private int currentStruggleSide = 1; // 1 or -1
+    private Transform playerTransform;
 
     public CaughtFish HookedFish => hookedFish;
     public GameObject ActiveFishModel => activeFishModel;
     public Vector3 StruggleDirection => struggleDirection;
+
+    public void SetPlayerTransform(Transform player) { playerTransform = player; }
 
     void Awake()
     {
@@ -278,12 +290,34 @@ public class BobberController : MonoBehaviour
 
     private void UpdateStruggleMovement()
     {
+        // Compute perpendicular axis to the player→bobber line
+        Vector3 toBobber = transform.position - (playerTransform != null ? playerTransform.position : transform.position - Vector3.forward);
+        toBobber.y = 0f;
+        if (toBobber.sqrMagnitude < 0.01f) toBobber = Vector3.forward;
+        toBobber.Normalize();
+
+        Vector3 perpendicular = Vector3.Cross(toBobber, Vector3.up).normalized;
+
         struggleTimer -= Time.fixedDeltaTime;
         if (struggleTimer <= 0f)
         {
-            Vector2 randomCirclePoint = Random.insideUnitCircle.normalized;
-            struggleDirection = new Vector3(randomCirclePoint.x, 0, randomCirclePoint.y);
+            // Flip side
+            currentStruggleSide = -currentStruggleSide;
             struggleTimer = directionChangeInterval;
+        }
+
+        struggleDirection = perpendicular * currentStruggleSide;
+
+        // Check for obstacles ahead — reverse direction if blocked
+        if (obstacleCheckLayers != 0)
+        {
+            Vector3 rayOrigin = transform.position + Vector3.up * 0.5f;
+            if (Physics.Raycast(rayOrigin, struggleDirection, obstacleCheckDistance, obstacleCheckLayers))
+            {
+                currentStruggleSide = -currentStruggleSide;
+                struggleDirection = perpendicular * currentStruggleSide;
+                struggleTimer = directionChangeInterval;
+            }
         }
 
         if (rb != null && !rb.isKinematic)
@@ -299,6 +333,15 @@ public class BobberController : MonoBehaviour
     {
         if (nibbleCoroutine != null) StopCoroutine(nibbleCoroutine);
         nibbleCoroutine = StartCoroutine(NibbleRoutine(preset));
+    }
+
+    public void CancelNibbleSequence()
+    {
+        if (nibbleCoroutine != null)
+        {
+            StopCoroutine(nibbleCoroutine);
+            nibbleCoroutine = null;
+        }
     }
 
     public void HookFish(FishPreset fishPreset)
@@ -385,6 +428,14 @@ public class BobberController : MonoBehaviour
             FishingEvents.OnFishNibble?.Invoke(this);
             yield return new WaitForSeconds(nibbleInterval);
         }
+
+        // Signal that the bite is about to happen, then do the final nibble
+        FishingEvents.OnBiteImminent?.Invoke(this);
+        if (rb != null) rb.AddForce(Vector3.down * nibbleForce, ForceMode.Impulse);
+        SpawnEffect(nibblePrefab, nibbleLifetime);
+        FishingEvents.OnFishNibble?.Invoke(this);
+        yield return new WaitForSeconds(biteDelay);
+
         HookFish(fishPreset);
     }
 
