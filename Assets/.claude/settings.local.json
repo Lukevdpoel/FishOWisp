@@ -10,7 +10,9 @@
       "Bash(xargs grep:*)",
       "Bash(find C:RepositoriesFishOWisp2AssetsScripts -type f -name *Renderer*.cs -o -name *Render*.cs)",
       "Bash(grep -r \"ScriptableRenderPass\\\\|ScriptableRendererFeature\" C:RepositoriesFishOWisp2AssetsScripts --include=*.cs)",
-      "Bash(find /c/Repositories/FishOWisp2/Library/PackageCache/com.unity.render-pipelines.universal* -name \"*.cs\")"
+      "Bash(find /c/Repositories/FishOWisp2/Library/PackageCache/com.unity.render-pipelines.universal* -name \"*.cs\")",
+      "Read(//c/Repositories/FishOWisp2/Packages/**)",
+      "Read(//c/Repositories/FishOWisp2/Library/**)"
     ]
   }
 }
