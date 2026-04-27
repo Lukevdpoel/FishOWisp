@@ -49,6 +49,16 @@ public class PlayerCameraController : MonoBehaviour
     [SerializeField] private float collisionRadius = 0.2f;
     [SerializeField] private float zoomDampTime = 0.1f;
 
+    [Header("Bite Reaction Pitch")]
+    [Tooltip("Degrees to pitch the camera down on each individual nibble. Positive = look down.")]
+    public float nibblePitchOffset = 5f;
+    [Tooltip("How long the nibble pitch is held before releasing back to neutral.")]
+    public float nibblePitchHoldTime = 0.25f;
+    [Tooltip("Degrees to pitch the camera down while a fish is biting (reaction window). Holds until success or failure.")]
+    public float bitePitchOffset = 12f;
+    [Tooltip("Lerp speed for the bite/nibble pitch offset to reach its target.")]
+    public float bitePitchLerpSpeed = 6f;
+
     [Header("Static Camera Settings")]
     [SerializeField] private bool useStaticCamera = false;
     [SerializeField] private Transform staticCameraTarget;
@@ -60,9 +70,44 @@ public class PlayerCameraController : MonoBehaviour
     private Vector3 currentPivotPosition;
     private Vector3 pivotVelocity;
 
+    private float nibbleHoldTimer = 0f;
+    private bool isBitePitchActive = false;
+    private float currentPitchOffset = 0f;
+
     public Transform CameraTransform => cameraTransform;
 
     public void SetCatchCamera(bool active) => isCatchCameraActive = active;
+
+    private void OnEnable()
+    {
+        FishingEvents.OnFishNibble += HandleFishNibble;
+        FishingEvents.OnFishBite += HandleFishBite;
+        FishingEvents.OnHookFishSuccess += HandleBitePitchRelease;
+        FishingEvents.OnCancelFishing += HandleBitePitchRelease;
+    }
+
+    private void OnDisable()
+    {
+        FishingEvents.OnFishNibble -= HandleFishNibble;
+        FishingEvents.OnFishBite -= HandleFishBite;
+        FishingEvents.OnHookFishSuccess -= HandleBitePitchRelease;
+        FishingEvents.OnCancelFishing -= HandleBitePitchRelease;
+    }
+
+    private void HandleFishNibble(BobberController b) { nibbleHoldTimer = nibblePitchHoldTime; }
+    private void HandleFishBite(BobberController b) { isBitePitchActive = true; nibbleHoldTimer = 0f; }
+    private void HandleBitePitchRelease() { isBitePitchActive = false; }
+
+    private void UpdateBitePitchOffset()
+    {
+        if (nibbleHoldTimer > 0f) nibbleHoldTimer -= Time.deltaTime;
+
+        float target = 0f;
+        if (isBitePitchActive) target = bitePitchOffset;
+        else if (nibbleHoldTimer > 0f) target = nibblePitchOffset;
+
+        currentPitchOffset = Mathf.Lerp(currentPitchOffset, target, Time.deltaTime * bitePitchLerpSpeed);
+    }
 
     public void Initialize(Transform playerModel)
     {
@@ -128,8 +173,10 @@ public class PlayerCameraController : MonoBehaviour
             cameraXAngle = Mathf.LerpAngle(cameraXAngle, targetRot.eulerAngles.y, Time.deltaTime * fightCameraLerpSpeed);
         }
 
+        UpdateBitePitchOffset();
+
         smoothXAngle = Mathf.SmoothDampAngle(smoothXAngle, cameraXAngle, ref xVel, cameraSmoothTime);
-        smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle, ref yVel, cameraSmoothTime);
+        smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle + currentPitchOffset, ref yVel, cameraSmoothTime);
 
         Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f);
         Vector3 cameraDirection = -(rotation * Vector3.forward);

@@ -21,11 +21,23 @@ public class VerletRope : MonoBehaviour
     [Header("Physics")]
     public Vector3 gravity = new Vector3(0f, -9.81f, 0f);
 
+    [Header("Slack After Landing")]
+    [Tooltip("Baseline slack reduction once the bobber is sitting in the water (0 = original full slack, 1 = fully straight). The nibble pulse is layered on top.")]
+    [Range(0f, 1f)] public float landedTightenAmount = 0.25f;
+
+    [Header("Nibble Tighten Pulse")]
+    [Tooltip("How much the line tightens on each individual nibble (0 = no change, 1 = fully straight).")]
+    [Range(0f, 1f)] public float nibbleTightenAmount = 0.6f;
+    [Tooltip("Seconds for a nibble's tighten pulse to decay back to baseline.")]
+    public float nibbleTightenDecay = 0.4f;
+
     private LineRenderer lineRenderer;
     private List<RopePoint> ropePoints = new List<RopePoint>();
     private float segmentLength;
     private bool isInitialized = false;
     private bool isLineTight = false;
+    private bool hasLanded = false;
+    private float nibbleTightness = 0f;
     private Vector3[] positionsCache;
 
     void Awake()
@@ -35,14 +47,37 @@ public class VerletRope : MonoBehaviour
 
     private void OnEnable()
     {
+        FishingEvents.OnBobberLandedInWater += HandleBobberLandedInWater;
+        FishingEvents.OnFishNibble += HandleFishNibble;
+        FishingEvents.OnFishBite += HandleFishBite;
         FishingEvents.OnFishFightBegin += HandleFishFightBegin;
         FishingEvents.OnFishFightEnd += HandleFishFightEnd;
     }
 
     private void OnDisable()
     {
+        FishingEvents.OnBobberLandedInWater -= HandleBobberLandedInWater;
+        FishingEvents.OnFishNibble -= HandleFishNibble;
+        FishingEvents.OnFishBite -= HandleFishBite;
         FishingEvents.OnFishFightBegin -= HandleFishFightBegin;
         FishingEvents.OnFishFightEnd -= HandleFishFightEnd;
+    }
+
+    private void HandleFishNibble(BobberController b)
+    {
+        nibbleTightness = nibbleTightenAmount;
+    }
+
+    private void HandleFishBite(BobberController b)
+    {
+        isLineTight = true;
+        nibbleTightness = 0f;
+    }
+
+    private void HandleBobberLandedInWater(BobberController landed)
+    {
+        if (!isInitialized) return;
+        hasLanded = true;
     }
 
     private void HandleFishFightBegin(FishPreset fish)
@@ -74,12 +109,15 @@ public class VerletRope : MonoBehaviour
 
         positionsCache = new Vector3[ropePoints.Count];
         isInitialized = true;
+        hasLanded = false;
     }
 
     public void DeactivateRope()
     {
         isInitialized = false;
         isLineTight = false;
+        hasLanded = false;
+        nibbleTightness = 0f;
         if (lineRenderer != null)
             lineRenderer.positionCount = 0;
     }
@@ -96,6 +134,11 @@ public class VerletRope : MonoBehaviour
             return;
         }
         // ---------------------------------
+
+        if (nibbleTightness > 0f)
+        {
+            nibbleTightness = Mathf.Max(0f, nibbleTightness - Time.deltaTime / Mathf.Max(0.001f, nibbleTightenDecay));
+        }
 
         if (isLineTight)
         {
@@ -169,10 +212,24 @@ public class VerletRope : MonoBehaviour
 
     private void DrawSimulatedRope()
     {
-        lineRenderer.positionCount = ropePoints.Count;
-        for (int i = 0; i < ropePoints.Count; i++)
+        int count = ropePoints.Count;
+        lineRenderer.positionCount = count;
+        int last = count - 1;
+
+        float baseline = hasLanded ? landedTightenAmount : 0f;
+        float effectiveTightness = Mathf.Max(baseline, nibbleTightness);
+        bool blend = effectiveTightness > 0f && last > 0;
+
+        for (int i = 0; i < count; i++)
         {
-            positionsCache[i] = ropePoints[i].currentPosition;
+            Vector3 pos = ropePoints[i].currentPosition;
+            if (blend)
+            {
+                float t = (float)i / last;
+                Vector3 straight = Vector3.Lerp(rodTip.position, bobber.position, t);
+                pos = Vector3.Lerp(pos, straight, effectiveTightness);
+            }
+            positionsCache[i] = pos;
         }
         lineRenderer.SetPositions(positionsCache);
     }

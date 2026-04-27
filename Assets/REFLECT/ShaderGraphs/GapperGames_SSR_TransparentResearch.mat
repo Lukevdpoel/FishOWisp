@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: SSR_Transparent
-  m_Shader: {fileID: -6465566751694194690, guid: 84e06f44b0c952f4498f70d2fd63193d, type: 3}
+  m_Name: GapperGames_SSR_TransparentResearch
+  m_Shader: {fileID: -6465566751694194690, guid: b76e546a8bb6bdd43b87ae84c2eef290, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -20,16 +20,12 @@ Material:
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
-  m_LockedProperties: _FoamSlider
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
     - _CameraGBufferTexture0:
         m_Texture: {fileID: 0}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _Diffuse:
-        m_Texture: {fileID: 2800000, guid: d26d16a517dc10349929ce23e083dc66, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _FoamTex:
@@ -41,22 +37,10 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NormalMap:
-        m_Texture: {fileID: 2800000, guid: b722543030734cb4893dea1471a6b4fb, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _RefractionNoise:
-        m_Texture: {fileID: 2800000, guid: 831c5593c581cba48b8b8d269a2958b0, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _SampleTexture2D_dbed7ba62da145539bcb443af4674c3e_Texture_1_Texture2D:
-        m_Texture: {fileID: 2800000, guid: 831c5593c581cba48b8b8d269a2958b0, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _SmoothnessMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
-    - _Texture2DAsset_d9dbd3bf5c8e4528a1de5c79a4d01e7e_Out_0_Texture2D:
+    - _SmoothnessMap:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
@@ -74,7 +58,6 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Alpha: 0.5
     - _BinarySamples: 6
     - _DepthFade: 4.75
     - _FoamDirection: 1
@@ -82,29 +65,27 @@ Material:
     - _FoamSlider: 1
     - _FoamSlider2: 1
     - _FoamSlider3: 0.34
-    - _FoamSpeed: 0.1
+    - _FoamSpeed: 0.14
     - _Metallic: 0
     - _NormalStrength: 1
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReflectionStrength: 0.08
-    - _RefractionSpeed: 0.01
-    - _RefractionSpeed_1: 1
     - _RefractionStrength: 0
-    - _RefractionTiling: 0.71
+    - _RefractionTiling: 1
     - _Samples: 125
     - _Smoothness: 1
     - _StepSize: 0.1
-    - _Thickness: 0.77
+    - _Thickness: 0.1
     - _Tiling: 5
     m_Colors:
-    - _Albedo: {r: 0.22745055, g: 0.18502212, b: 0.09803883, a: 0.43137255}
-    - _Color: {r: 0.087887116, g: 0.23584902, b: 0.21612075, a: 1}
+    - _Albedo: {r: 0.30188674, g: 0.18501627, b: 0.11534352, a: 0.6313726}
+    - _Color: {r: 0.08627445, g: 0.23529404, b: 0.21568617, a: 1}
     - _FoamColor: {r: 1, g: 1, b: 1, a: 1}
     - _Foam_Color: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &4043035887456062214
+--- !u!114 &8795969089084808779
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
@@ -115,5 +96,5 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Editor::UnityEditor.Rendering.Universal.AssetVersion
   version: 10

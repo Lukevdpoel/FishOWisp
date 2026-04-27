@@ -77,14 +77,29 @@ public class BobberController : MonoBehaviour
     public float nibbleForce = 5f;
 
     [Header("Bite Settings")]
-    public float biteForce = 100f;
-    public float biteDuration = 0.5f;
+    [Tooltip("How far below the water surface the bobber sits while a fish is hooked. Replaces the floatHeight target during bite/fight.")]
+    public float biteSubmergeDepth = 1.5f;
     [Tooltip("Delay before the bite event fires, to let the final nibble jab play out visually.")]
     public float biteDelay = 0.15f;
 
     [Header("Struggle Settings")]
     public float struggleForce = 2f;
-    public float directionChangeInterval = 2.5f;
+    [Tooltip("Min/max time the fish holds a single struggle burst before picking a new one.")]
+    public Vector2 struggleHoldRange = new Vector2(0.4f, 2.5f);
+    [Tooltip("Max random angular offset from the perpendicular axis, in degrees. Breaks the pure left/right metronome while keeping the side cue readable.")]
+    public float maxAngleOffsetDegrees = 35f;
+    [Tooltip("Chance the fish keeps the same side (left/right) on a new burst instead of flipping. 0 = always alternate.")]
+    [Range(0f, 1f)] public float repeatSideChance = 0.25f;
+    [Tooltip("Random multiplier applied to struggleForce per burst. Lets weak tugs and hard jabs mix.")]
+    public Vector2 forceMultiplierRange = new Vector2(0.5f, 1.6f);
+
+    [Header("Struggle Tether")]
+    [Tooltip("Radius of the AOE circle around the hook point that the fish prefers to stay within.")]
+    public float tetherRadius = 3f;
+    [Tooltip("Strength of the pull-back force applied when the bobber drifts beyond the tether radius. Acts only on the overshoot — feels free inside the radius.")]
+    public float tetherReturnForce = 4f;
+    [Tooltip("Fraction of tetherRadius past which new struggle bursts are biased to swim back toward the anchor. 0 = always biased inward, 1 = never biased.")]
+    [Range(0f, 1f)] public float tetherInwardBiasThreshold = 0.7f;
 
     [Header("Struggle Obstacle Detection")]
     [Tooltip("Layers that count as obstacles the fish cannot swim through.")]
@@ -112,12 +127,15 @@ public class BobberController : MonoBehaviour
     private GameObject activeWakeInstance;
 
     private Coroutine nibbleCoroutine;
-    private Coroutine bitePhysicsCoroutine;
+    private bool isSubmerged = false;
 
     private bool isStruggling = false;
     private Vector3 struggleDirection;
     private float struggleTimer;
     private int currentStruggleSide = 1; // 1 or -1
+    private float currentStruggleForceMultiplier = 1f;
+    private Vector3 struggleAnchor;
+    private bool hasStruggleAnchor = false;
     private Transform playerTransform;
 
     public CaughtFish HookedFish => hookedFish;
@@ -202,7 +220,9 @@ public class BobberController : MonoBehaviour
         if (other.CompareTag(waterTag) && isInWater)
         {
             isInWater = false;
+            isSubmerged = false;
             SetStruggleActive(false);
+            hasStruggleAnchor = false;
 
             // UNITY 6 FIX: Reset Damping
             if (rb != null)
@@ -273,7 +293,8 @@ public class BobberController : MonoBehaviour
     // ------------------------------------------------------------------------
     private void ApplyBuoyancy()
     {
-        float targetY = waterSurfaceY - floatHeight;
+        float effectiveFloatHeight = isSubmerged ? biteSubmergeDepth : floatHeight;
+        float targetY = waterSurfaceY - effectiveFloatHeight;
         float depth = targetY - transform.position.y;
 
         if (depth > 0)
@@ -301,29 +322,71 @@ public class BobberController : MonoBehaviour
         struggleTimer -= Time.fixedDeltaTime;
         if (struggleTimer <= 0f)
         {
-            // Flip side
-            currentStruggleSide = -currentStruggleSide;
-            struggleTimer = directionChangeInterval;
+            int inwardSide = ChooseInwardStruggleSide(perpendicular);
+            if (inwardSide != 0)
+            {
+                currentStruggleSide = inwardSide;
+            }
+            else if (Random.value > repeatSideChance)
+            {
+                currentStruggleSide = -currentStruggleSide;
+            }
+            StartNewStruggleBurst(perpendicular);
         }
 
-        struggleDirection = perpendicular * currentStruggleSide;
-
-        // Check for obstacles ahead — reverse direction if blocked
+        // Check for obstacles ahead — flip side and pick a fresh burst if blocked
         if (obstacleCheckLayers != 0)
         {
             Vector3 rayOrigin = transform.position + Vector3.up * 0.5f;
             if (Physics.Raycast(rayOrigin, struggleDirection, obstacleCheckDistance, obstacleCheckLayers))
             {
                 currentStruggleSide = -currentStruggleSide;
-                struggleDirection = perpendicular * currentStruggleSide;
-                struggleTimer = directionChangeInterval;
+                StartNewStruggleBurst(perpendicular);
             }
         }
 
         if (rb != null && !rb.isKinematic)
         {
-            rb.AddForce(struggleDirection * struggleForce, ForceMode.Acceleration);
+            rb.AddForce(struggleDirection * struggleForce * currentStruggleForceMultiplier, ForceMode.Acceleration);
+            ApplyTetherPullBack();
         }
+    }
+
+    private int ChooseInwardStruggleSide(Vector3 perpendicular)
+    {
+        if (!hasStruggleAnchor || tetherRadius <= 0f) return 0;
+
+        Vector3 offset = transform.position - struggleAnchor;
+        offset.y = 0f;
+        float dist = offset.magnitude;
+        if (dist < tetherRadius * tetherInwardBiasThreshold) return 0;
+
+        Vector3 toAnchor = -offset / dist;
+        return Vector3.Dot(perpendicular, toAnchor) >= 0f ? 1 : -1;
+    }
+
+    private void ApplyTetherPullBack()
+    {
+        if (!hasStruggleAnchor || tetherRadius <= 0f || tetherReturnForce <= 0f) return;
+
+        Vector3 offset = transform.position - struggleAnchor;
+        offset.y = 0f;
+        float dist = offset.magnitude;
+        if (dist <= tetherRadius) return;
+
+        Vector3 returnDir = -offset / dist;
+        float overshoot = dist - tetherRadius;
+        rb.AddForce(returnDir * tetherReturnForce * overshoot, ForceMode.Acceleration);
+    }
+
+    private void StartNewStruggleBurst(Vector3 perpendicular)
+    {
+        float angleOffset = Random.Range(-maxAngleOffsetDegrees, maxAngleOffsetDegrees);
+        Vector3 baseDir = perpendicular * currentStruggleSide;
+        struggleDirection = Quaternion.AngleAxis(angleOffset, Vector3.up) * baseDir;
+
+        currentStruggleForceMultiplier = Random.Range(forceMultiplierRange.x, forceMultiplierRange.y);
+        struggleTimer = Random.Range(struggleHoldRange.x, struggleHoldRange.y);
     }
 
     // ------------------------------------------------------------------------
@@ -352,10 +415,12 @@ public class BobberController : MonoBehaviour
         Debug.Log($"{hookedFish.GetDisplayName()} is on the line!");
         FishingEvents.OnFishBite?.Invoke(this);
 
+        struggleAnchor = transform.position;
+        hasStruggleAnchor = true;
+
         SpawnEffect(bitePrefab, biteLifetime);
 
-        if (bitePhysicsCoroutine != null) StopCoroutine(bitePhysicsCoroutine);
-        bitePhysicsCoroutine = StartCoroutine(BitePhysicsRoutine());
+        isSubmerged = true;
     }
 
     public void PlayAttractJiggle()
@@ -439,23 +504,9 @@ public class BobberController : MonoBehaviour
         HookFish(fishPreset);
     }
 
-    private IEnumerator BitePhysicsRoutine()
-    {
-        float timer = 0f;
-        while (timer < biteDuration)
-        {
-            if (rb != null && isInWater)
-            {
-                rb.AddForce(Vector3.down * biteForce, ForceMode.Force);
-            }
-            timer += Time.deltaTime;
-            yield return null;
-        }
-    }
-
     public void StopBiteEffects()
     {
-        if (bitePhysicsCoroutine != null) StopCoroutine(bitePhysicsCoroutine);
+        isSubmerged = false;
     }
 
     void OnDestroy()

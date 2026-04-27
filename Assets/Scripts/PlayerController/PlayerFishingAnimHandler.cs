@@ -13,6 +13,8 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     [SerializeField] private string isFightingAnimBool = "IsFighting";
     [SerializeField] private string isReelingDuringFightAnimBool = "IsReelingDuringFight";
     [SerializeField] private string rodDirectionAnimFloat = "RodDirection";
+    public string attractAnim = "Attract";
+    public string biteReactionAnim = "BiteReaction";
 
     public bool IsFightingFish { get; private set; }
     public bool IsCasting { get; private set; }
@@ -27,6 +29,8 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     private int hashIsFighting;
     private int hashIsReelingDuringFight;
     private int hashRodDirection;
+    private int hashAttract;
+    private int hashBiteReaction;
 
     private void Awake()
     {
@@ -36,6 +40,8 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         hashIsFighting = Animator.StringToHash(isFightingAnimBool);
         hashIsReelingDuringFight = Animator.StringToHash(isReelingDuringFightAnimBool);
         hashRodDirection = Animator.StringToHash(rodDirectionAnimFloat);
+        hashAttract = Animator.StringToHash(attractAnim);
+        hashBiteReaction = Animator.StringToHash(biteReactionAnim);
 
         if (playerController == null) playerController = GetComponent<PlayerController>();
     }
@@ -59,6 +65,8 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         FishingEvents.OnStartAiming += OnStartAiming;
         FishingEvents.OnStopAiming += OnStopAiming;
         FishingEvents.OnRodDirectionUpdate += OnRodDirectionUpdate;
+        FishingEvents.OnAttractFish += PlayAttractAnim;
+        FishingEvents.OnFishBite += PlayBiteReactionAnim;
 
         BountyBoard.OnBountyBoardStateChange += HandleBountyBoard;
         DialogueManager.OnDialogueStateChange += OnDialogueStateChanged;
@@ -83,6 +91,8 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         FishingEvents.OnStartAiming -= OnStartAiming;
         FishingEvents.OnStopAiming -= OnStopAiming;
         FishingEvents.OnRodDirectionUpdate -= OnRodDirectionUpdate;
+        FishingEvents.OnAttractFish -= PlayAttractAnim;
+        FishingEvents.OnFishBite -= PlayBiteReactionAnim;
 
         BountyBoard.OnBountyBoardStateChange -= HandleBountyBoard;
         DialogueManager.OnDialogueStateChange -= OnDialogueStateChanged;
@@ -99,6 +109,8 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     private void PlayStartChargingAnim() { if (animator) animator.SetTrigger(hashStartCharging); }
     private void PlayThrowAnim(Vector3 direction, float force) { if (animator) animator.SetTrigger(hashThrow); }
     private void PlayReelInAnim() { if (animator) animator.SetTrigger(hashReelIn); }
+    private void PlayAttractAnim() { if (animator) animator.SetTrigger(hashAttract); }
+    private void PlayBiteReactionAnim(BobberController b) { if (animator) animator.SetTrigger(hashBiteReaction); }
     private void StartReelingDuringFightAnim() { if (animator) animator.SetBool(hashIsReelingDuringFight, true); }
     private void StopReelingDuringFightAnim() { if (animator) animator.SetBool(hashIsReelingDuringFight, false); }
 

@@ -14,7 +14,7 @@ Material:
   m_ValidKeywords: []
   m_InvalidKeywords: []
   m_LightmapFlags: 4
-  m_EnableInstancingVariants: 0
+  m_EnableInstancingVariants: 1
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
   stringTagMap: {}
@@ -110,15 +110,18 @@ Material:
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
+    - _Flattenstrength: -0.77
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
     - _Metallic: 0
-    - _MovementDepth: 0.5
+    - _MovementDepth: 0.03
     - _NormalInfluence: -0.03
     - _NormalStrength: 0.1
     - _OcclusionStrength: 1
     - _Parallax: 0.005
+    - _PlayerBendStrength: 0.25
+    - _PlayerInteractionRadius: 1.35
     - _PushRadius: 3
     - _PushStrength: 100
     - _QueueControl: 0
@@ -134,8 +137,9 @@ Material:
     - _Surface: 0
     - _WorkflowMode: 1
     - _XRMotionVectorsPass: 1
+    - _Yvector: 0
     - _ZWrite: 1
-    - _isGrounded: 0
+    - _isGrounded: 1
     - _seethroughdistance: 4.5
     m_Colors:
     - _BaseColor: {r: 0.22432362, g: 0.6698113, b: 0.30682135, a: 1}
@@ -143,6 +147,7 @@ Material:
     - _Color: {r: 0.22432357, g: 0.6698113, b: 0.30682132, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _PlayerPosition: {r: 0, g: 0, b: 0, a: 0}
+    - _PlayerPosition_1: {r: 0, g: 0, b: 0, a: 0}
     - _Scatter_Color: {r: 0.2307694, g: 1, b: 0, a: 1}
     - _SpecColor: {r: 0.19999996, g: 0.19999996, b: 0.19999996, a: 1}
     - _TopColor: {r: 0.27727836, g: 0.8773585, b: 0.5008377, a: 1}

@@ -103,7 +103,7 @@ MonoBehaviour:
   nibbleLifetime: 2
   bitePrefab: {fileID: 2230609935683277320, guid: 148f577ce39aebe4c9011b5515a19cdc, type: 3}
   biteLifetime: 1
-  strugglePrefab: {fileID: 0}
+  strugglePrefab: {fileID: 2230609935683277320, guid: ab14262e5f56b0449a45d6f89e4e3b3f, type: 3}
   struggleLifetime: 3
   waterEntrySound: {fileID: 8300000, guid: dc4ba211051ab5f4cbbf9e2c4a95b238, type: 3}
   waterEntryVolumeScale: 2.24
@@ -119,13 +119,18 @@ MonoBehaviour:
   waterRotationSpeed: 5
   minNibbles: 1
   maxNibbles: 2
-  nibbleInterval: 2
+  nibbleInterval: 1
   nibbleForce: 175
-  biteForce: 400
-  biteDuration: 1
+  biteSubmergeDepth: 0.05
   biteDelay: 0.15
   struggleForce: 6
-  directionChangeInterval: 1
+  struggleHoldRange: {x: 0.4, y: 2.5}
+  maxAngleOffsetDegrees: 35
+  repeatSideChance: 0.25
+  forceMultiplierRange: {x: 0.5, y: 1.6}
+  tetherRadius: 3
+  tetherReturnForce: 4
+  tetherInwardBiasThreshold: 0.7
   obstacleCheckLayers:
     serializedVersion: 2
     m_Bits: 256

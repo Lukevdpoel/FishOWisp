@@ -13,6 +13,10 @@ public class PlayerController : MonoBehaviour
     [Header("Movement Settings")]
     [SerializeField] private float walkSpeed = 6f;
     [SerializeField] private float sprintSpeed = 12f;
+    [SerializeField] private float acceleration = 25f;
+    [SerializeField] private float deceleration = 35f;
+    [SerializeField] private float tapKickSpeed = 3f;
+    [SerializeField] private float tapKickThreshold = 1.5f;
     [SerializeField] private float rotationSpeed = 15f;
     [SerializeField] private float gravity = -20f;
 
@@ -37,6 +41,7 @@ public class PlayerController : MonoBehaviour
     private float idleTimer;
     private bool allowSitdown = true;
     private bool isSprinting = false;
+    private bool hadMovementInputLast;
     private Quaternion targetModelRotation;
     private bool isLockedOnFish;
     private Transform fishLockTarget;
@@ -144,8 +149,19 @@ public class PlayerController : MonoBehaviour
         camRight.Normalize();
 
         Vector3 moveDirection = (camForward * v + camRight * h).normalized;
-        targetVelocity = moveDirection * currentSpeed;
-        targetVelocity.y = yVelocity;
+        Vector3 desiredHorizontal = moveDirection * currentSpeed;
+
+        Vector3 currentHorizontal = new Vector3(targetVelocity.x, 0f, targetVelocity.z);
+
+        bool freshPress = hasMovementInput && !hadMovementInputLast;
+        if (freshPress && currentHorizontal.magnitude < tapKickThreshold)
+            currentHorizontal = moveDirection * tapKickSpeed;
+        hadMovementInputLast = hasMovementInput;
+
+        float rate = hasMovementInput ? acceleration : deceleration;
+        Vector3 newHorizontal = Vector3.MoveTowards(currentHorizontal, desiredHorizontal, rate * Time.deltaTime);
+
+        targetVelocity = new Vector3(newHorizontal.x, yVelocity, newHorizontal.z);
     }
 
     private void HandleRotation()
