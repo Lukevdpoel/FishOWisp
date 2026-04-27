@@ -177,6 +177,7 @@ Material:
     - _AlphaToMask: 0
     - _Blend: 0
     - _BlendModePreserveSpecular: 1
+    - _Blur: 2.44
     - _BumpScale: 1
     - _CastShadows: 1
     - _ClearCoatMask: 0
@@ -187,6 +188,7 @@ Material:
     - _DecalMeshBiasType: 0
     - _DecalMeshDepthBias: 0
     - _DecalMeshViewBias: 0
+    - _Density: 1.19
     - _DetailAlbedoMapScale: 1
     - _DetailNormalMapScale: 1
     - _DrawOrder: 0
@@ -194,6 +196,12 @@ Material:
     - _DstBlendAlpha: 0
     - _EmissiveStrength: 0.63
     - _EnvironmentReflections: 1
+    - _FadeEnd: 0.5
+    - _FadeEndEdge: 0.3
+    - _FadeEndMiddle: 0.2
+    - _FadeStart: 0
+    - _FadeStartEdge: 0
+    - _FadeStartMiddle: 0.67
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
@@ -201,7 +209,9 @@ Material:
     - _MovementDepth: 0.17
     - _NormalStrength: 0
     - _OcclusionStrength: 1
+    - _Offset: 1
     - _Parallax: 0.005
+    - _Power: 1.83
     - _QueueControl: 0
     - _QueueOffset: 0
     - _ReceiveShadows: 1
@@ -234,7 +244,7 @@ Material:
     - _timespeed1_1: 0.05
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _Color: {r: 0.69803923, g: 0.9254902, b: 0.3372549, a: 1}
+    - _Color: {r: 0.6516352, g: 1, b: 0.0990566, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _EmissiveColor: {r: 0, g: 0.68422145, b: 0.8301887, a: 0}
     - _Levels: {r: 0, g: 0, b: 0, a: 0}
