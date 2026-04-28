@@ -20,7 +20,7 @@ Material:
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
-  m_LockedProperties: _FoamSlider
+  m_LockedProperties: _FoamSlider _SoftFoamDistanceFromShore
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -86,9 +86,9 @@ Material:
     - _DepthFade: 4.75
     - _FoamDirection: 1
     - _FoamDistanceFromShore: 7.57
-    - _FoamMask1: 1.08
+    - _FoamMask1: 3.29
     - _FoamMask2: 0.15
-    - _FoamMask3: -0.02
+    - _FoamMask3: 83.51
     - _FoamMaskEdge: 1
     - _FoamMaskSize: 0.2
     - _FoamNoiseDirection: 0.7
@@ -120,7 +120,7 @@ Material:
     - _Thickness: 0.77
     - _Tiling: 5
     m_Colors:
-    - _Albedo: {r: 0.22745037, g: 0.18502197, b: 0.098038666, a: 0.6117647}
+    - _Albedo: {r: 0.22745031, g: 0.1850219, b: 0.09803861, a: 0.47058824}
     - _CausticColor: {r: 0.6625544, g: 1, b: 0.26886788, a: 1}
     - _Color: {r: 0.08788701, g: 0.2358489, b: 0.2161206, a: 1}
     - _FoamColor: {r: 1, g: 1, b: 1, a: 1}

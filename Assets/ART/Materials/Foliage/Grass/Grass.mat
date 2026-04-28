@@ -120,14 +120,15 @@ Material:
     - _DstBlend: 0
     - _DstBlendAlpha: 0
     - _EnvironmentReflections: 1
-    - _FadeEndDistance: 0
+    - _FadeEndDistance: 1.22
     - _FadeStartDistance: 0
-    - _FlattenRadius: 0
+    - _FlattenRadius: 2.23
     - _FlattenStrength: 1
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
     - _HeightBlend: 1.8
+    - _MaxTiltDistance: 28.72
     - _Metallic: 0
     - _OcclusionStrength: 1
     - _Parallax: 0.005
@@ -144,6 +145,9 @@ Material:
     - _Surface: 0
     - _TerrainOffset: 0
     - _TerrainSize: 70
+    - _TiltCurve: 2.33
+    - _TiltDownAmount: -0.8
+    - _TiltStrength: 0.94
     - _USE_TERRAINCOLOR: 1
     - _WindHeight: 1.11
     - _WindIntensity: 0.1
