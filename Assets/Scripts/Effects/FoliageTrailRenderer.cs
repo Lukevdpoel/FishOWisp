@@ -28,9 +28,9 @@ public class FoliageTrailRenderer : MonoBehaviour
     public int resolution = 256;
 
     [Header("Trail")]
-    [Tooltip("How fast the trail fades. 1 = never fades, 0.95 = quick fade. Per update tick.")]
-    [Range(0.5f, 1f)]
-    public float fadePerUpdate = 0.985f;
+    [Tooltip("Fraction of trail intensity remaining after 1 second. 1 = never fades, 0.1 = very fast fade. Frame-rate independent.")]
+    [Range(0.05f, 0.999f)]
+    public float fadePerSecond = 0.6f;
 
     [Tooltip("Stamp radius as a fraction of worldSize. 0.05 with worldSize=20 -> ~1m radius.")]
     [Range(0.005f, 0.2f)]
@@ -57,6 +57,7 @@ public class FoliageTrailRenderer : MonoBehaviour
     RenderTexture rtA;
     RenderTexture rtB;
     Vector2 lastCenter;
+    float lastTickTime;
     int frameCounter;
     bool ready;
 
@@ -95,6 +96,7 @@ public class FoliageTrailRenderer : MonoBehaviour
         ClearRT(rtB);
 
         lastCenter = GetXZ();
+        lastTickTime = Time.time;
         ready = true;
     }
 
@@ -136,8 +138,10 @@ public class FoliageTrailRenderer : MonoBehaviour
             Vector2 deltaUV = delta / worldSize;
             lastCenter = newCenter;
 
-            // Fade compounds across skipped frames so updateInterval doesn't change look.
-            float effectiveFade = Mathf.Pow(fadePerUpdate, updateInterval);
+            // Time-based fade so the trail looks identical across frame rates.
+            float dt = Mathf.Max(0f, Time.time - lastTickTime);
+            lastTickTime = Time.time;
+            float effectiveFade = Mathf.Pow(fadePerSecond, dt);
 
             updateMat.SetFloat(FadeAmountID, effectiveFade);
             updateMat.SetVector(DeltaUVID, new Vector4(deltaUV.x, deltaUV.y, 0, 0));

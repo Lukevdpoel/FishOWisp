@@ -64,6 +64,22 @@ public class FishRipple : MonoBehaviour
     [Tooltip("This fish notices the bobber and auto-attracts (as a follower) whenever the bobber sits within this radius. Drifts back to wandering once the bobber leaves the radius.")]
     public float actionRadius = 8f;
 
+    [Header("Aim Glimpse Indicator")]
+    [Tooltip("Maximum distance from the camera at which the fish glimpse can appear while aiming. Set 0 to disable the distance check.")]
+    public float aimRevealRange = 15f;
+    [Tooltip("Minimum seconds between glimpses of this fish while aiming.")]
+    public float glimpseIntervalMin = 1.5f;
+    [Tooltip("Maximum seconds between glimpses of this fish while aiming.")]
+    public float glimpseIntervalMax = 4f;
+    [Tooltip("How long a single glimpse stays fully visible (seconds), not counting fades.")]
+    public float glimpseDurationMin = 0.25f;
+    [Tooltip("How long a single glimpse stays fully visible (seconds), not counting fades.")]
+    public float glimpseDurationMax = 0.6f;
+    [Tooltip("Seconds the glimpse takes to fade in.")]
+    public float glimpseFadeIn = 0.35f;
+    [Tooltip("Seconds the glimpse takes to fade out.")]
+    public float glimpseFadeOut = 0.6f;
+
     [Header("Timing")]
     public float scareCooldown = 5f;
     public float wanderPauseMin = 0.5f;
@@ -106,7 +122,12 @@ public class FishRipple : MonoBehaviour
     // UI indicator
     private GameObject indicatorInstance;
     private Canvas indicatorCanvas;
+    private CanvasGroup indicatorCanvasGroup;
     private bool isAimingActive;
+    private float glimpseTimer;
+    private float glimpseAlpha;
+    private enum GlimpsePhase { Hidden, FadingIn, Holding, FadingOut }
+    private GlimpsePhase glimpsePhase = GlimpsePhase.Hidden;
 
     public void Initialize(Collider bounds, float surfaceY, GameObject aimIndicatorPrefab)
     {
@@ -122,7 +143,7 @@ public class FishRipple : MonoBehaviour
         if (aimIndicatorPrefab != null)
         {
             indicatorInstance = Instantiate(aimIndicatorPrefab, transform);
-            indicatorInstance.transform.localPosition = Vector3.up * 0.5f;
+            indicatorInstance.transform.localPosition = Vector3.zero;
 
             indicatorCanvas = indicatorInstance.GetComponentInChildren<Canvas>();
             if (indicatorCanvas != null)
@@ -131,7 +152,15 @@ public class FishRipple : MonoBehaviour
                 indicatorCanvas.sortingOrder = 1000;
             }
 
-            indicatorInstance.SetActive(isAimingActive);
+            indicatorCanvasGroup = indicatorInstance.GetComponentInChildren<CanvasGroup>();
+            if (indicatorCanvasGroup == null && indicatorCanvas != null)
+                indicatorCanvasGroup = indicatorCanvas.gameObject.AddComponent<CanvasGroup>();
+
+            FishAimIndicator aimIndicator = indicatorInstance.GetComponentInChildren<FishAimIndicator>(true);
+            if (aimIndicator != null) aimIndicator.ApplyPreset(preset);
+
+            if (indicatorCanvasGroup != null) indicatorCanvasGroup.alpha = 0f;
+            indicatorInstance.SetActive(false);
         }
 
         // Spawn wake
@@ -288,13 +317,126 @@ public class FishRipple : MonoBehaviour
     private void ShowIndicator()
     {
         isAimingActive = true;
-        if (indicatorInstance != null) indicatorInstance.SetActive(true);
+        EnterHidden(Random.Range(glimpseIntervalMin, glimpseIntervalMax));
     }
 
     private void HideIndicator()
     {
         isAimingActive = false;
-        if (indicatorInstance != null) indicatorInstance.SetActive(false);
+        EnterHidden(0f);
+    }
+
+    private void EnterHidden(float waitSeconds)
+    {
+        glimpsePhase = GlimpsePhase.Hidden;
+        glimpseTimer = waitSeconds;
+        glimpseAlpha = 0f;
+        ApplyGlimpseAlpha();
+    }
+
+    private void ApplyGlimpseAlpha()
+    {
+        if (indicatorInstance == null) return;
+        if (indicatorCanvasGroup != null) indicatorCanvasGroup.alpha = glimpseAlpha;
+        bool shouldBeActive = glimpseAlpha > 0.001f;
+        if (indicatorInstance.activeSelf != shouldBeActive)
+            indicatorInstance.SetActive(shouldBeActive);
+    }
+
+    private bool IsWithinRevealRange()
+    {
+        if (aimRevealRange <= 0f) return true;
+        Camera cam = Camera.main;
+        if (cam == null) return true;
+        float sqr = (transform.position - cam.transform.position).sqrMagnitude;
+        return sqr <= aimRevealRange * aimRevealRange;
+    }
+
+    private void UpdateGlimpse()
+    {
+        if (indicatorInstance == null) return;
+
+        if (!isAimingActive)
+        {
+            if (glimpseAlpha != 0f) { glimpseAlpha = 0f; ApplyGlimpseAlpha(); }
+            return;
+        }
+
+        bool inRange = IsWithinRevealRange();
+        if (!inRange)
+        {
+            // Out of range — fade out if currently visible, then idle hidden until back in range.
+            if (glimpsePhase == GlimpsePhase.FadingIn || glimpsePhase == GlimpsePhase.Holding)
+            {
+                glimpsePhase = GlimpsePhase.FadingOut;
+            }
+            else if (glimpsePhase == GlimpsePhase.Hidden)
+            {
+                glimpseTimer = Random.Range(glimpseIntervalMin, glimpseIntervalMax);
+            }
+        }
+
+        glimpseTimer -= Time.deltaTime;
+
+        switch (glimpsePhase)
+        {
+            case GlimpsePhase.Hidden:
+                if (inRange && glimpseTimer <= 0f)
+                {
+                    glimpsePhase = GlimpsePhase.FadingIn;
+                    glimpseTimer = Mathf.Max(0.0001f, glimpseFadeIn);
+                }
+                break;
+
+            case GlimpsePhase.FadingIn:
+            {
+                float dur = Mathf.Max(0.0001f, glimpseFadeIn);
+                float t = 1f - Mathf.Clamp01(glimpseTimer / dur);
+                glimpseAlpha = Mathf.SmoothStep(0f, 1f, t);
+                if (glimpseTimer <= 0f)
+                {
+                    glimpseAlpha = 1f;
+                    glimpsePhase = GlimpsePhase.Holding;
+                    glimpseTimer = Random.Range(glimpseDurationMin, glimpseDurationMax);
+                }
+                break;
+            }
+
+            case GlimpsePhase.Holding:
+                glimpseAlpha = 1f;
+                if (glimpseTimer <= 0f)
+                {
+                    glimpsePhase = GlimpsePhase.FadingOut;
+                    glimpseTimer = Mathf.Max(0.0001f, glimpseFadeOut);
+                }
+                break;
+
+            case GlimpsePhase.FadingOut:
+            {
+                float dur = Mathf.Max(0.0001f, glimpseFadeOut);
+                float t = Mathf.Clamp01(glimpseTimer / dur);
+                glimpseAlpha = Mathf.SmoothStep(0f, 1f, t);
+                if (glimpseTimer <= 0f)
+                {
+                    EnterHidden(Random.Range(glimpseIntervalMin, glimpseIntervalMax));
+                    return;
+                }
+                break;
+            }
+        }
+
+        ApplyGlimpseAlpha();
+
+        if (glimpseAlpha > 0.001f)
+        {
+            Camera cam = Camera.main;
+            if (cam != null)
+            {
+                indicatorInstance.transform.rotation = Quaternion.LookRotation(
+                    indicatorInstance.transform.position - cam.transform.position
+                );
+            }
+        }
     }
 
     void Update()
@@ -310,17 +452,7 @@ public class FishRipple : MonoBehaviour
         }
         transform.position = pos;
 
-        // Make indicator face camera
-        if (isAimingActive && indicatorInstance != null)
-        {
-            Camera cam = Camera.main;
-            if (cam != null)
-            {
-                indicatorInstance.transform.rotation = Quaternion.LookRotation(
-                    indicatorInstance.transform.position - cam.transform.position
-                );
-            }
-        }
+        UpdateGlimpse();
 
         switch (currentState)
         {
