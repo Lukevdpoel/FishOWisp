@@ -27,6 +27,11 @@ public class PlayerInventory : GenericSingleton<PlayerInventory>
             FishEncyclopediaManager.Instance.RegisterCaughtFish(fishToAdd);
         }
 
+        if (FishMilestoneTracker.Instance != null)
+        {
+            FishMilestoneTracker.Instance.RegisterCatch(fishToAdd);
+        }
+
         if (caughtFishes.Count >= inventorySize)
         {
             Debug.Log("Inventory is full! Cannot add fish.");

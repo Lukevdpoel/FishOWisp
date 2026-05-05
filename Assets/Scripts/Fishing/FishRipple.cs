@@ -51,10 +51,18 @@ public class FishRipple : MonoBehaviour
     public float obstacleRayHeight = 5f;
 
     [Header("Ranges")]
-    public float nibbleRange = 1.5f;
-    public float scareRange = 2f;
+    [Tooltip("Distance at which the lead fish starts nibbling the bobber. Keep small so the fish has to almost touch the bobber to bite.")]
+    public float nibbleRange = 0.5f;
+    [Tooltip("If the player presses Attract while the fish is closer than this, the fish spooks. Keep ≥ nibbleRange.")]
+    public float scareRange = 1.0f;
     [Tooltip("How far wandering fish stay from the bobber when another fish is being attracted.")]
     public float bobberAvoidRadius = 3f;
+    [Tooltip("Distance at which a non-lead 'follower' fish hovers from the bobber. Should be slightly larger than nibbleRange so followers crowd in but never bite.")]
+    public float followerHoverDistance = 1.4f;
+
+    [Header("Awareness (Passive)")]
+    [Tooltip("This fish notices the bobber and auto-attracts (as a follower) whenever the bobber sits within this radius. Drifts back to wandering once the bobber leaves the radius.")]
+    public float actionRadius = 8f;
 
     [Header("Timing")]
     public float scareCooldown = 5f;
@@ -64,8 +72,10 @@ public class FishRipple : MonoBehaviour
     [HideInInspector] public FishPreset preset;
 
     public FishState CurrentState => currentState;
+    public bool IsFollower => isFollower;
 
     private FishState currentState = FishState.Wandering;
+    private bool isFollower;
     private Collider zoneBounds;
     private float waterSurfaceY;
     private Transform bobberTransform;
@@ -152,6 +162,7 @@ public class FishRipple : MonoBehaviour
     public void ClearBobberTransform()
     {
         bobberTransform = null;
+        isFollower = false;
         if (currentState == FishState.Attracted)
         {
             currentState = FishState.Wandering;
@@ -178,6 +189,45 @@ public class FishRipple : MonoBehaviour
         attractPauseTimer = 0f;
         lastAttractInputTime = Time.time;
         isDriftingBack = false;
+    }
+
+    public void SetFollower(bool follower)
+    {
+        isFollower = follower;
+    }
+
+    public void StopFollowing()
+    {
+        if (!isFollower) return;
+        isFollower = false;
+
+        if (currentState == FishState.Attracted)
+        {
+            currentState = FishState.Wandering;
+            // Drift to a wander target away from the bobber so the school visually scatters.
+            if (bobberTransform != null)
+            {
+                Vector3 awayDir = transform.position - bobberTransform.position;
+                awayDir.y = 0f;
+                if (awayDir.sqrMagnitude < 0.01f)
+                {
+                    Vector2 rand = Random.insideUnitCircle.normalized;
+                    awayDir = new Vector3(rand.x, 0f, rand.y);
+                }
+                else
+                {
+                    awayDir.Normalize();
+                }
+                wanderTarget = transform.position + awayDir * loseInterestDriftDistance;
+                wanderTarget.y = waterSurfaceY;
+                wanderTarget = ClampToBounds(wanderTarget);
+                hasWanderTarget = true;
+            }
+            else
+            {
+                PickNewWanderTarget();
+            }
+        }
     }
 
     public void NotifyAttractInput()
@@ -215,6 +265,7 @@ public class FishRipple : MonoBehaviour
         scareDirection = awayDir;
         scareTimer = scareCooldown;
         scareJinkTimer = 0f;
+        isFollower = false;
         currentState = FishState.Scared;
         FishingEvents.OnFishScared?.Invoke();
     }
@@ -290,6 +341,22 @@ public class FishRipple : MonoBehaviour
 
     private void UpdateWandering()
     {
+        // Passive auto-attract: if the bobber is sitting inside this fish's awareness radius
+        // (and we're not being told to give the lead fish space), wake up and approach as a follower.
+        if (bobberTransform != null && !shouldAvoidBobber && actionRadius > 0f)
+        {
+            float bobberDist = GetHorizontalDistance(transform.position, bobberTransform.position);
+            if (bobberDist <= actionRadius)
+            {
+                AttractToBobber();
+                if (currentState == FishState.Attracted)
+                {
+                    isFollower = true;          // self-attracted fish never nibble until promoted by FishingZone
+                    return;
+                }
+            }
+        }
+
         if (wanderPauseTimer > 0f)
         {
             wanderPauseTimer -= Time.deltaTime;
@@ -363,6 +430,19 @@ public class FishRipple : MonoBehaviour
 
         float dist = GetHorizontalDistance(transform.position, bobberPos);
 
+        // Passive engagement: while the bobber sits inside our awareness radius, suppress lose-interest
+        // (the fish stays curious as long as the lure is nearby). If the bobber leaves the radius and
+        // we self-attracted as a follower, gracefully drift back to wandering.
+        if (actionRadius > 0f && dist <= actionRadius)
+        {
+            lastAttractInputTime = Time.time;
+        }
+        else if (actionRadius > 0f && isFollower && dist > actionRadius)
+        {
+            StopFollowing();
+            return;
+        }
+
         // If drifting back after losing interest
         if (isDriftingBack)
         {
@@ -379,7 +459,7 @@ public class FishRipple : MonoBehaviour
             }
         }
 
-        if (dist < nibbleRange)
+        if (!isFollower && dist < nibbleRange)
         {
             StartNibbling();
             return;
@@ -434,7 +514,20 @@ public class FishRipple : MonoBehaviour
             }
         }
 
-        Vector3 targetPos = bobberPos + weaveOffset;
+        // Followers hover at followerHoverDistance from the bobber rather than crowding the hook.
+        Vector3 approachCenter = bobberPos;
+        if (isFollower)
+        {
+            Vector3 fromBobber = transform.position - bobberPos;
+            fromBobber.y = 0f;
+            float fromBobberDist = fromBobber.magnitude;
+            Vector3 outward = fromBobberDist > 0.01f
+                ? fromBobber / fromBobberDist
+                : new Vector3(Mathf.Cos(GetInstanceID()), 0f, Mathf.Sin(GetInstanceID()));
+            approachCenter = bobberPos + outward * followerHoverDistance;
+        }
+
+        Vector3 targetPos = approachCenter + weaveOffset;
         targetPos.y = waterSurfaceY;
 
         MoveToward(targetPos, attractSpeed);

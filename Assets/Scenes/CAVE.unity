@@ -4014,6 +4014,9 @@ MonoBehaviour:
   segmentCount: 10
   constraintIterations: 50
   gravity: {x: 0, y: -9.81, z: 0}
+  landedTightenAmount: 0.25
+  nibbleTightenAmount: 0.6
+  nibbleTightenDecay: 0.4
 --- !u!120 &212623642
 LineRenderer:
   serializedVersion: 2
@@ -16808,6 +16811,8 @@ MonoBehaviour:
   respawnTimeMin: 10
   respawnTimeMax: 30
   splashScareRadius: 4
+  maxFollowers: 4
+  attractCallRadius: 0
   waterTag: Water
   maxAttractsBeforeScare: 3
   scareWindow: 2
@@ -29020,7 +29025,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1661144008
 Transform:
   m_ObjectHideFlags: 0

@@ -41,7 +41,7 @@ public class ModelViewer : GenericSingleton<ModelViewer>
         {
             camera.gameObject.SetActive(true);
             // Update camera position based on the fish's specific view distance
-            camera.localPosition = new Vector3(0, 0, -prefab.cameraviewdistance);
+            camera.localPosition = new Vector3(0, 0, -SizeClassHelper.GetCameraViewDistance(prefab.sizeClass));
         }
 
         // Instantiate new model as child of container

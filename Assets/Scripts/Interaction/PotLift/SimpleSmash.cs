@@ -193,7 +193,10 @@ public class SimpleSmash : MonoBehaviour
         float remainingWait = smashImpactDelay - liftDuration;
         if (remainingWait > 0) yield return new WaitForSeconds(remainingWait);
 
-        Destroy(pot);
+        Vector3 impactPoint = pot.transform.position;
+        PotShatter shatter = pot.GetComponent<PotShatter>();
+        if (shatter != null) shatter.Shatter(impactPoint);
+        else Destroy(pot);
         if (recoveryDelay > 0) yield return new WaitForSeconds(recoveryDelay);
 
         playerController.areControlsLocked = false;

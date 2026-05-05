@@ -44,6 +44,18 @@ public class PlayerCameraController : MonoBehaviour
     [SerializeField] private float aimYAngleOffset = -3f;
     [SerializeField] private float aimCameraLerpSpeed = 4f;
 
+    [Header("Charge Camera Settings")]
+    [Tooltip("How many units closer to the player the camera moves at FULL charge (subtracted from the normal/aim distance).")]
+    [SerializeField] private float chargeZoomAmount = 3f;
+    [Tooltip("Hard floor for camera distance during charge so it never crosses through the player.")]
+    [SerializeField] private float chargeMinDistance = 0.6f;
+    [Tooltip("Degrees the camera pitches UP at full charge (subtracted from yAngle).")]
+    [SerializeField] private float chargePitchUpAngle = 22f;
+    [Tooltip("SmoothDamp time (seconds) for the charge-driven camera offset. Higher = smoother / more lag. ~0.6–1.0 feels cinematic.")]
+    [SerializeField] private float chargeSmoothTime = 0.7f;
+    [Tooltip("Cap on how fast (per second) the smoothed charge value can change. Keep generous — it's just a safety on SmoothDamp.")]
+    [SerializeField] private float chargeMaxSpeed = 4f;
+
     [Header("Camera Collision")]
     [SerializeField] private LayerMask collisionLayers;
     [SerializeField] private float collisionRadius = 0.2f;
@@ -74,6 +86,10 @@ public class PlayerCameraController : MonoBehaviour
     private bool isBitePitchActive = false;
     private float currentPitchOffset = 0f;
 
+    private float chargeProgressTarget = 0f;
+    private float chargeProgress = 0f;
+    private float chargeProgressVel = 0f;
+
     public Transform CameraTransform => cameraTransform;
 
     public void SetCatchCamera(bool active) => isCatchCameraActive = active;
@@ -84,6 +100,11 @@ public class PlayerCameraController : MonoBehaviour
         FishingEvents.OnFishBite += HandleFishBite;
         FishingEvents.OnHookFishSuccess += HandleBitePitchRelease;
         FishingEvents.OnCancelFishing += HandleBitePitchRelease;
+
+        FishingEvents.OnChargeProgressNormalized += HandleChargeProgress;
+        FishingEvents.OnCancelCharging += HandleChargeEnded;
+        FishingEvents.OnThrowBobber += HandleChargeReleased;
+        FishingEvents.OnCancelFishing += HandleChargeEnded;
     }
 
     private void OnDisable()
@@ -92,7 +113,25 @@ public class PlayerCameraController : MonoBehaviour
         FishingEvents.OnFishBite -= HandleFishBite;
         FishingEvents.OnHookFishSuccess -= HandleBitePitchRelease;
         FishingEvents.OnCancelFishing -= HandleBitePitchRelease;
+
+        FishingEvents.OnChargeProgressNormalized -= HandleChargeProgress;
+        FishingEvents.OnCancelCharging -= HandleChargeEnded;
+        FishingEvents.OnThrowBobber -= HandleChargeReleased;
+        FishingEvents.OnCancelFishing -= HandleChargeEnded;
     }
+
+    private void HandleChargeProgress(float t)
+    {
+        chargeProgressTarget = Mathf.Clamp01(t);
+        if (!hasLoggedChargeEvent)
+        {
+            hasLoggedChargeEvent = true;
+            Debug.Log($"[ChargeCam] First charge event received. zoomAmount={chargeZoomAmount}, pitchUp={chargePitchUpAngle}, startDistance={startDistance}");
+        }
+    }
+    private void HandleChargeEnded() { chargeProgressTarget = 0f; }
+    private void HandleChargeReleased(Vector3 dir, float force) { chargeProgressTarget = 0f; }
+    private bool hasLoggedChargeEvent;
 
     private void HandleFishNibble(BobberController b) { nibbleHoldTimer = nibblePitchHoldTime; }
     private void HandleFishBite(BobberController b) { isBitePitchActive = true; nibbleHoldTimer = 0f; }
@@ -175,8 +214,11 @@ public class PlayerCameraController : MonoBehaviour
 
         UpdateBitePitchOffset();
 
+        chargeProgress = Mathf.SmoothDamp(chargeProgress, chargeProgressTarget, ref chargeProgressVel, chargeSmoothTime, chargeMaxSpeed, Time.deltaTime);
+        float chargePitchOffset = -chargePitchUpAngle * chargeProgress;
+
         smoothXAngle = Mathf.SmoothDampAngle(smoothXAngle, cameraXAngle, ref xVel, cameraSmoothTime);
-        smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle + currentPitchOffset, ref yVel, cameraSmoothTime);
+        smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle + currentPitchOffset + chargePitchOffset, ref yVel, cameraSmoothTime);
 
         Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f);
         Vector3 cameraDirection = -(rotation * Vector3.forward);
@@ -202,6 +244,11 @@ public class PlayerCameraController : MonoBehaviour
 
         if (isCatchCameraActive) targetDistance = catchZoomDistance;
         else if (input.isAiming) targetDistance = aimZoomDistance;
+
+        if (!isCatchCameraActive && chargeProgress > 0.001f)
+        {
+            targetDistance = Mathf.Max(chargeMinDistance, targetDistance - chargeZoomAmount * chargeProgress);
+        }
 
         if (!isCatchCameraActive && Physics.SphereCast(currentPivotPosition, collisionRadius, cameraDirection, out hit, targetDistance, collisionLayers))
             targetDistance = hit.distance;

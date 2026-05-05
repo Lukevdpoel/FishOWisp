@@ -24,6 +24,20 @@ public class FishingZone : MonoBehaviour
     [Tooltip("Fish within this radius of the bobber landing spot get scared.")]
     public float splashScareRadius = 4f;
 
+    [Header("Multi-Fish Attract")]
+    [Tooltip("Maximum number of follower fish that join the lead fish on each attract call. Set 0 to disable followers.")]
+    public int maxFollowers = 4;
+    [Tooltip("Optional radius cap (in world units) for how far away a fish can be and still join as a follower. Set ≤ 0 to ignore distance and just take the maxFollowers closest wandering fish in the zone.")]
+    public float attractCallRadius = 0f;
+
+    [Header("Auto-Nibble Timer (Passive Fishing)")]
+    [Tooltip("Minimum seconds after the bobber lands before a fish auto-investigates and starts nibbling on its own.")]
+    public float autoNibbleMin = 4f;
+    [Tooltip("Maximum seconds after the bobber lands before a fish auto-investigates and starts nibbling on its own.")]
+    public float autoNibbleMax = 12f;
+    [Tooltip("Seconds to wait between retries if the timer fires but no fish has approached the bobber yet.")]
+    public float autoNibbleRetryDelay = 1.5f;
+
     [Header("Water Detection")]
     [Tooltip("Tag used to find the water collider for surface height.")]
     public string waterTag = "Water";
@@ -40,8 +54,15 @@ public class FishingZone : MonoBehaviour
     public float scareWindow = 2f;
 
     private FishRipple currentlyAttractedFish;
+    private List<FishRipple> followerFish = new List<FishRipple>();
     private float respawnTimer;
     private List<float> attractTimestamps = new List<float>();
+
+    // Auto-nibble timer state
+    private float autoNibbleTimer = -1f;
+    // True between OnFishBite and the matching reel-in / cancel — blocks any second fish
+    // from getting promoted to lead while the player is reacting / fighting / catching.
+    private bool isCatchingFish = false;
 
     void Awake()
     {
@@ -102,9 +123,14 @@ public class FishingZone : MonoBehaviour
                 && currentlyAttractedFish.CurrentState != FishRipple.FishState.Nibbling)
             {
                 currentlyAttractedFish = null;
+                ScatterFollowers();
                 SetOtherFishAvoidance(false);
+                ResetAutoNibbleTimer();
             }
         }
+
+        CleanupFollowers();
+        UpdateAutoNibbleTimer();
 
         // Respawn fish over time
         if (activeFish.Count < maxFishCount)
@@ -122,8 +148,8 @@ public class FishingZone : MonoBehaviour
     {
         if (fishPool == null || fishPool.availableFish.Count == 0 || fishRipplePrefab == null) return;
 
-        int initialCount = Random.Range(1, maxFishCount + 1);
-        for (int i = 0; i < initialCount; i++)
+        // Spawn the zone fully populated so the player sees a believable school of multiple fish.
+        for (int i = 0; i < maxFishCount; i++)
         {
             SpawnOneFish();
         }
@@ -168,6 +194,7 @@ public class FishingZone : MonoBehaviour
 
             Debug.Log($"Bobber entered pool: {fishPool.poolName}");
             currentBobber = bobber;
+            ResetAutoNibbleTimer();
 
             Vector3 splashPos = bobber.transform.position;
             for (int i = 0; i < activeFish.Count; i++)
@@ -210,6 +237,9 @@ public class FishingZone : MonoBehaviour
     private void HandleAttract()
     {
         if (currentBobber == null) return;
+        // While a fish is being caught (post-bite), ignore further attract calls so we never
+        // promote a second lead mid-fight.
+        if (isCatchingFish) return;
 
         // Track spam
         float now = Time.time;
@@ -224,6 +254,7 @@ public class FishingZone : MonoBehaviour
             {
                 currentlyAttractedFish.Scare();
                 currentlyAttractedFish = null;
+                ScatterFollowers();
                 attractTimestamps.Clear();
                 SetOtherFishAvoidance(false);
             }
@@ -232,6 +263,7 @@ public class FishingZone : MonoBehaviour
             {
                 currentlyAttractedFish.Scare();
                 currentlyAttractedFish = null;
+                ScatterFollowers();
                 attractTimestamps.Clear();
                 SetOtherFishAvoidance(false);
             }
@@ -243,10 +275,20 @@ public class FishingZone : MonoBehaviour
                 // Re-call attract — this handles the "too close = scare" check inside FishRipple
                 currentlyAttractedFish.AttractToBobber();
 
+                // Refresh interest for follower fish too, so the school keeps approaching
+                for (int i = 0; i < followerFish.Count; i++)
+                {
+                    if (followerFish[i] != null && followerFish[i].CurrentState == FishRipple.FishState.Attracted)
+                    {
+                        followerFish[i].NotifyAttractInput();
+                    }
+                }
+
                 // If it got scared from being too close, clear it
                 if (currentlyAttractedFish.CurrentState == FishRipple.FishState.Scared)
                 {
                     currentlyAttractedFish = null;
+                    ScatterFollowers();
                     attractTimestamps.Clear();
                     SetOtherFishAvoidance(false);
                 }
@@ -254,32 +296,62 @@ public class FishingZone : MonoBehaviour
         }
         else
         {
-            // No fish attracted yet — find nearest wandering fish
-            FishRipple nearest = null;
-            float nearestDist = float.MaxValue;
-
+            // No lead yet. Pool the candidates: any fish that's already curious (Attracted)
+            // OR still wandering within the attract-call radius. Sort by distance and pick the
+            // closest as the new lead, the rest become followers.
+            Vector3 bobberPos = currentBobber.transform.position;
+            List<FishRipple> candidates = new List<FishRipple>();
             for (int i = 0; i < activeFish.Count; i++)
             {
                 FishRipple fish = activeFish[i];
                 if (fish == null) continue;
-                if (fish.CurrentState != FishRipple.FishState.Wandering) continue;
-
-                float dist = HorizontalDistance(fish.transform.position, currentBobber.transform.position);
-                if (dist < nearestDist)
+                if (fish.CurrentState == FishRipple.FishState.Scared) continue;
+                if (fish.CurrentState == FishRipple.FishState.Nibbling) continue;
+                if (fish.CurrentState == FishRipple.FishState.Wandering)
                 {
-                    nearestDist = dist;
-                    nearest = fish;
+                    if (attractCallRadius > 0f
+                        && HorizontalDistance(fish.transform.position, bobberPos) > attractCallRadius) continue;
                 }
+                candidates.Add(fish);
             }
 
-            if (nearest != null)
+            candidates.Sort((a, b) =>
+                HorizontalDistance(a.transform.position, bobberPos)
+                .CompareTo(HorizontalDistance(b.transform.position, bobberPos)));
+
+            FishRipple lead = candidates.Count > 0 ? candidates[0] : null;
+            if (lead != null)
             {
-                nearest.AttractToBobber();
-                if (nearest.CurrentState == FishRipple.FishState.Attracted)
+                lead.SetFollower(false);
+                lead.AttractToBobber();
+                if (lead.CurrentState == FishRipple.FishState.Attracted)
                 {
-                    currentlyAttractedFish = nearest;
+                    currentlyAttractedFish = lead;
+                    autoNibbleTimer = -1f; // pause the passive timer; we now have a lead
                     attractTimestamps.Clear();
                     attractTimestamps.Add(now);
+
+                    followerFish.Clear();
+                    int taken = 0;
+                    for (int i = 1; i < candidates.Count && taken < maxFollowers; i++)
+                    {
+                        FishRipple follower = candidates[i];
+                        follower.SetFollower(true);
+                        follower.AttractToBobber();
+                        if (follower.CurrentState == FishRipple.FishState.Attracted)
+                        {
+                            followerFish.Add(follower);
+                            taken++;
+                        }
+                        else
+                        {
+                            // AttractToBobber may have scared a too-close fish — clear follower flag.
+                            follower.SetFollower(false);
+                        }
+                    }
+
+                    Debug.Log($"[Attract] Lead + {taken} follower(s) from {candidates.Count} candidates (E pressed).");
+
                     SetOtherFishAvoidance(true);
                 }
             }
@@ -309,7 +381,10 @@ public class FishingZone : MonoBehaviour
         }
 
         currentlyAttractedFish = null;
+        ScatterFollowers();
         SetOtherFishAvoidance(false);
+        autoNibbleTimer = -1f;
+        isCatchingFish = false;
     }
 
     private void HandleFishBite(BobberController bobber)
@@ -321,7 +396,12 @@ public class FishingZone : MonoBehaviour
         {
             RemoveFish(currentlyAttractedFish);
             currentlyAttractedFish = null;
-            SetOtherFishAvoidance(false);
+            ScatterFollowers();
+            // Force every remaining fish to give the bobber space for the duration of the catch —
+            // this stops them from auto-attracting via their actionRadius and triggering a second bite.
+            SetOtherFishAvoidance(true);
+            autoNibbleTimer = -1f;
+            isCatchingFish = true;
         }
     }
 
@@ -341,6 +421,9 @@ public class FishingZone : MonoBehaviour
     {
         currentBobber = null;
         currentlyAttractedFish = null;
+        isCatchingFish = false;
+        autoNibbleTimer = -1f;
+        ScatterFollowers();
         attractTimestamps.Clear();
         for (int i = 0; i < activeFish.Count; i++)
         {
@@ -356,9 +439,50 @@ public class FishingZone : MonoBehaviour
     {
         for (int i = 0; i < activeFish.Count; i++)
         {
-            if (activeFish[i] != null && activeFish[i] != currentlyAttractedFish)
+            FishRipple fish = activeFish[i];
+            if (fish == null) continue;
+            if (fish == currentlyAttractedFish) continue;
+            if (followerFish.Contains(fish)) continue; // followers don't avoid the bobber
+            fish.SetAvoidBobber(avoid);
+        }
+    }
+
+    private void ScatterFollowers()
+    {
+        // Tracked followers (player-promoted explicit list).
+        for (int i = 0; i < followerFish.Count; i++)
+        {
+            if (followerFish[i] != null)
             {
-                activeFish[i].SetAvoidBobber(avoid);
+                followerFish[i].StopFollowing();
+            }
+        }
+        followerFish.Clear();
+
+        // Plus any *self-attracted* fish in the zone. They aren't in the followerFish list
+        // because they auto-attracted via their own actionRadius — but they should also scatter
+        // when the lead is lost / reeled / caught.
+        for (int i = 0; i < activeFish.Count; i++)
+        {
+            FishRipple fish = activeFish[i];
+            if (fish == null) continue;
+            if (fish == currentlyAttractedFish) continue;
+            if (fish.CurrentState == FishRipple.FishState.Attracted)
+            {
+                fish.StopFollowing();
+            }
+        }
+    }
+
+    private void CleanupFollowers()
+    {
+        for (int i = followerFish.Count - 1; i >= 0; i--)
+        {
+            FishRipple f = followerFish[i];
+            if (f == null || f.CurrentState != FishRipple.FishState.Attracted)
+            {
+                if (f != null) f.SetFollower(false);
+                followerFish.RemoveAt(i);
             }
         }
     }
@@ -368,5 +492,105 @@ public class FishingZone : MonoBehaviour
         float dx = a.x - b.x;
         float dz = a.z - b.z;
         return Mathf.Sqrt(dx * dx + dz * dz);
+    }
+
+    // ----- Passive auto-nibble timer -----
+
+    private void ResetAutoNibbleTimer()
+    {
+        if (currentBobber == null)
+        {
+            autoNibbleTimer = -1f;
+            return;
+        }
+        autoNibbleTimer = Random.Range(autoNibbleMin, autoNibbleMax);
+    }
+
+    private void UpdateAutoNibbleTimer()
+    {
+        // No bobber, nothing to count toward.
+        if (currentBobber == null)
+        {
+            autoNibbleTimer = -1f;
+            return;
+        }
+        // A fish has already bitten — don't promote another one until the catch resolves.
+        if (isCatchingFish)
+        {
+            autoNibbleTimer = -1f;
+            return;
+        }
+        // Already have a lead — pause the timer until the lead clears.
+        if (currentlyAttractedFish != null)
+        {
+            return;
+        }
+        // First tick after a clear/land: roll a fresh random delay.
+        if (autoNibbleTimer < 0f)
+        {
+            ResetAutoNibbleTimer();
+            return;
+        }
+
+        autoNibbleTimer -= Time.deltaTime;
+        if (autoNibbleTimer > 0f) return;
+
+        // Time's up — try to promote a fish that already noticed the bobber.
+        if (TryAutoPromoteLead())
+        {
+            autoNibbleTimer = -1f; // lead is set; timer pauses until lead clears
+        }
+        else
+        {
+            // Nobody nearby yet — peek again shortly.
+            autoNibbleTimer = autoNibbleRetryDelay;
+        }
+    }
+
+    private bool TryAutoPromoteLead()
+    {
+        if (currentBobber == null) return false;
+
+        Vector3 bobberPos = currentBobber.transform.position;
+        FishRipple chosen = null;
+        float bestDist = float.MaxValue;
+
+        for (int i = 0; i < activeFish.Count; i++)
+        {
+            FishRipple fish = activeFish[i];
+            if (fish == null) continue;
+            if (fish == currentlyAttractedFish) continue;
+            if (fish.CurrentState != FishRipple.FishState.Attracted) continue;
+
+            float d = HorizontalDistance(fish.transform.position, bobberPos);
+            if (d < bestDist)
+            {
+                bestDist = d;
+                chosen = fish;
+            }
+        }
+
+        if (chosen == null) return false;
+
+        // Promote: clear follower flag so UpdateAttracted will let it transition into Nibbling
+        // once it gets within nibbleRange of the bobber.
+        chosen.SetFollower(false);
+        currentlyAttractedFish = chosen;
+        attractTimestamps.Clear();
+
+        // Anything else that was already in the school becomes a follower (capped to maxFollowers).
+        followerFish.Clear();
+        for (int i = 0; i < activeFish.Count && followerFish.Count < maxFollowers; i++)
+        {
+            FishRipple fish = activeFish[i];
+            if (fish == null || fish == chosen) continue;
+            if (fish.CurrentState != FishRipple.FishState.Attracted) continue;
+            fish.SetFollower(true);
+            followerFish.Add(fish);
+        }
+
+        SetOtherFishAvoidance(true);
+        Debug.Log($"[AutoNibble] Promoted fish at dist {bestDist:F2} to lead. Followers: {followerFish.Count}.");
+        return true;
     }
 }

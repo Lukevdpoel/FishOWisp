@@ -25,6 +25,9 @@ public static class FishingEvents
     public static Action<bool> OnToggleChargeUI;
     public static Action<float, float> OnUpdateChargeUI;
 
+    // Charge progress as a normalized 0..1 value, used to drive the camera zoom/pitch.
+    public static Action<float> OnChargeProgressNormalized;
+
     public static Action<FishPreset> OnFishFightBegin;
     public static Action<float, float> OnFishFightProgressUpdate;
     public static Action<bool> OnFishFightEnd;

@@ -30,6 +30,11 @@ public class FishingRodController : MonoBehaviour
     [Header("Auto-Reel Settings")]
     [Tooltip("If the player walks further than this from where they threw, the line auto-reels back in.")]
     public float maxDistanceFromCast = 15f;
+    [Tooltip("Cosine threshold of the player's facing vs. the direction to the bobber. Below this, the line auto-reels. Default -0.05 ≈ slightly past 90° (sideways).")]
+    [Range(-1f, 1f)]
+    public float turnAwayDotThreshold = -0.05f;
+    [Tooltip("Grace time after casting before turn-away auto-reel can trigger, so the cast animation can settle.")]
+    public float turnAwayGracePeriod = 0.5f;
 
     [Header("Fish Fight Settings")]
     public float maxFightProgress = 100f;
@@ -47,6 +52,7 @@ public class FishingRodController : MonoBehaviour
     private bool wasReelingLastFrame;
     private bool isAiming;
     private Vector3 castOriginPosition;
+    private float castStartTime;
 
     private int hashFail;
 
@@ -102,6 +108,26 @@ public class FishingRodController : MonoBehaviour
             Debug.Log("Walked too far from cast — auto-reeling.");
             currentState = FishingState.Reeling;
             StartCoroutine(ReelInBobberRoutine(null));
+            return;
+        }
+
+        // Auto-reel if the player turns away from the bobber beyond a sideways angle.
+        if (bobberInWater != null && playerModel != null && Time.time - castStartTime >= turnAwayGracePeriod)
+        {
+            Vector3 toBobber = bobberInWater.transform.position - playerModel.position;
+            toBobber.y = 0f;
+            Vector3 facing = playerModel.forward;
+            facing.y = 0f;
+            if (toBobber.sqrMagnitude > 0.01f && facing.sqrMagnitude > 0.01f)
+            {
+                float dot = Vector3.Dot(facing.normalized, toBobber.normalized);
+                if (dot < turnAwayDotThreshold)
+                {
+                    Debug.Log("Turned away from bobber — auto-reeling.");
+                    currentState = FishingState.Reeling;
+                    StartCoroutine(ReelInBobberRoutine(null));
+                }
+            }
         }
     }
 
@@ -186,6 +212,7 @@ public class FishingRodController : MonoBehaviour
         danglingBobber?.SetActive(false);
         currentState = FishingState.WaitingForBite;
         castOriginPosition = transform.position;
+        castStartTime = Time.time;
     }
     private void HandleFishBite(BobberController bobber)
     {

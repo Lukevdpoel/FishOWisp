@@ -122,11 +122,17 @@ Material:
     - _EnvironmentReflections: 1
     - _FadeEndDistance: 1.22
     - _FadeStartDistance: 0
-    - _FlattenRadius: 2.23
-    - _FlattenStrength: 1
+    - _FlattenDropAmount: 8.05
+    - _FlattenFalloff: 2
+    - _FlattenRadius: 2.9
+    - _FlattenStrength: 2.97
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
+    - _GrassFlattenDropAmount: 1.71
+    - _GrassFlattenFalloff: 1.64
+    - _GrassFlattenRadius: 1.71
+    - _GrassFlattenStrength: 1.3
     - _HeightBlend: 1.8
     - _MaxTiltDistance: 28.72
     - _Metallic: 0
@@ -164,6 +170,7 @@ Material:
     - _FarColor: {r: 0.3537736, g: 1, b: 0.7230458, a: 0}
     - _NearColor: {r: 0, g: 0, b: 0, a: 1}
     - _NearFarRange: {r: 23.7, g: 45.99, b: 0, a: 0}
+    - _PlayerPos: {r: 0, g: 0, b: 0, a: 0}
     - _PlayerPosition: {r: 0, g: 0, b: 0, a: 0}
     - _PlayerPosition_1: {r: 0, g: 0, b: 0, a: 0}
     - _ShadowColor: {r: 0.41438237, g: 0.7350058, b: 0.9056604, a: 0}

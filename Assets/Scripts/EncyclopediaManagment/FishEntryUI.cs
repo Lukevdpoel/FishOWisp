@@ -7,7 +7,7 @@ public class FishEntryUI : MonoBehaviour
 {
     public Image fishImage;
     public TextMeshProUGUI fishNameText;
-    public TextMeshProUGUI rarityText;
+    public TextMeshProUGUI sizeClassText;
     public TextMeshProUGUI caughtText;
     public TextMeshProUGUI largestCaughtText;
     public TextMeshProUGUI smallestCaughtText;
@@ -28,8 +28,8 @@ public class FishEntryUI : MonoBehaviour
 
         //fishImage.sprite = preset.fishImage;
         fishNameText.text = preset.fishName;
-        if(rarityText != null )
-            rarityText.text = preset.rarity.ToString();
+        if(sizeClassText != null )
+            sizeClassText.text = preset.sizeClass.ToString();
         if( caughtText != null )
             caughtText.text = entry.hasCaught.ToString();
 
@@ -43,9 +43,9 @@ public class FishEntryUI : MonoBehaviour
         else
         {
             if (largestCaughtText != null)
-                largestCaughtText.text = "—";
+                largestCaughtText.text = "ï¿½";
             if (smallestCaughtText != null)
-                smallestCaughtText.text = "—";
+                smallestCaughtText.text = "ï¿½";
         }
 
         if (basePriceText != null)

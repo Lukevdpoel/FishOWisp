@@ -42,7 +42,6 @@ public class RodCasting : MonoBehaviour
     private Camera mainCamera;
 
     private CastingTargetController activeCastingTarget;
-    private int chargeDirection = 1;
 
     void Awake()
     {
@@ -85,7 +84,6 @@ public class RodCasting : MonoBehaviour
     {
         isCharging = true;
         currentThrowForce = minThrowForce;
-        chargeDirection = 1;
 
         targetAimDirection = mainCamera.transform.forward;
         targetAimDirection.y = 0;
@@ -93,6 +91,7 @@ public class RodCasting : MonoBehaviour
         throwDirection = targetAimDirection;
 
         FishingEvents.OnToggleChargeUI?.Invoke(true);
+        FishingEvents.OnChargeProgressNormalized?.Invoke(0f);
 
         if (castingTargetPrefab != null && activeCastingTarget == null)
         {
@@ -112,20 +111,14 @@ public class RodCasting : MonoBehaviour
 
     private void ChargeThrow()
     {
-        currentThrowForce += chargeRate * chargeDirection * Time.deltaTime;
-
-        if (currentThrowForce >= maxThrowForce)
-        {
-            currentThrowForce = maxThrowForce;
-            chargeDirection = -1;
-        }
-        else if (currentThrowForce <= minThrowForce)
-        {
-            currentThrowForce = minThrowForce;
-            chargeDirection = 1;
-        }
+        currentThrowForce += chargeRate * Time.deltaTime;
+        if (currentThrowForce > maxThrowForce) currentThrowForce = maxThrowForce;
 
         FishingEvents.OnUpdateChargeUI?.Invoke(currentThrowForce, maxThrowForce);
+
+        float range = maxThrowForce - minThrowForce;
+        float normalized = range > 0.001f ? (currentThrowForce - minThrowForce) / range : 0f;
+        FishingEvents.OnChargeProgressNormalized?.Invoke(Mathf.Clamp01(normalized));
     }
 
     private void ReleaseCharge()

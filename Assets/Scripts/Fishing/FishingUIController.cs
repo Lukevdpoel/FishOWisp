@@ -9,9 +9,9 @@ public class FishingUIController : MonoBehaviour
     public Slider progressBar;
     public TextMeshProUGUI fishNameText;
 
-    [Header("Charge UI")]
+    [Header("Charge UI (deprecated)")]
+    [Tooltip("Legacy on-screen charge panel. Force-hidden — charge feedback now lives on the camera (zoom/pitch).")]
     public GameObject chargeUIPanel;
-    public Slider chargeSlider;
 
     private void OnEnable()
     {
@@ -23,9 +23,8 @@ public class FishingUIController : MonoBehaviour
         // FIX: Also hide UI when fishing is cancelled (e.g. line snap / fail)
         FishingEvents.OnCancelFishing += HideFightUIOnCancel;
 
-        // Charge UI Events
-        FishingEvents.OnToggleChargeUI += ToggleChargeUI;
-        FishingEvents.OnUpdateChargeUI += UpdateChargeSlider;
+        // Force-hide the legacy charge bar in case anything else tries to enable it.
+        FishingEvents.OnToggleChargeUI += ForceHideChargePanel;
     }
 
     private void OnDisable()
@@ -35,9 +34,13 @@ public class FishingUIController : MonoBehaviour
         FishingEvents.OnFishFightProgressUpdate -= UpdateProgress;
 
         FishingEvents.OnCancelFishing -= HideFightUIOnCancel;
+        FishingEvents.OnToggleChargeUI -= ForceHideChargePanel;
+    }
 
-        FishingEvents.OnToggleChargeUI -= ToggleChargeUI;
-        FishingEvents.OnUpdateChargeUI -= UpdateChargeSlider;
+    private void Awake()
+    {
+        // Hide as early as possible so the legacy bar never flashes on screen.
+        HideChargePanel();
     }
 
     void Start()
@@ -46,11 +49,19 @@ public class FishingUIController : MonoBehaviour
         {
             fightUIPanel.SetActive(false);
         }
-        if (chargeUIPanel != null)
+        HideChargePanel();
+        Debug.Log($"[FishingUIController] Start ran. chargeUIPanel={(chargeUIPanel != null ? chargeUIPanel.name : "NULL")}, hidden.");
+    }
+
+    private void HideChargePanel()
+    {
+        if (chargeUIPanel != null && chargeUIPanel.activeSelf)
         {
             chargeUIPanel.SetActive(false);
         }
     }
+
+    private void ForceHideChargePanel(bool show) => HideChargePanel();
 
     private void ShowFightUI(FishPreset fish)
     {
@@ -88,23 +99,6 @@ public class FishingUIController : MonoBehaviour
         {
             progressBar.maxValue = max;
             progressBar.value = current;
-        }
-    }
-
-    private void ToggleChargeUI(bool show)
-    {
-        if (chargeUIPanel != null)
-        {
-            chargeUIPanel.SetActive(show);
-        }
-    }
-
-    private void UpdateChargeSlider(float current, float max)
-    {
-        if (chargeSlider != null)
-        {
-            chargeSlider.maxValue = max;
-            chargeSlider.value = current;
         }
     }
 }
