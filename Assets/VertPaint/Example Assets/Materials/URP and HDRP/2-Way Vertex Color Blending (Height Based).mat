@@ -101,11 +101,11 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Albedo1:
-        m_Texture: {fileID: 2800000, guid: b33af5871d4c66540b0008128e7b7271, type: 3}
+        m_Texture: {fileID: 2800000, guid: f6858533c237528428ccb60220b0db95, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Albedo2:
-        m_Texture: {fileID: 2800000, guid: 6e45184ff274b2c4196de8509afcd5ac, type: 3}
+        m_Texture: {fileID: 2800000, guid: deaf2639cc0ec6043bc5290797ed0d91, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Albedo3:
@@ -161,11 +161,11 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MSHAO1:
-        m_Texture: {fileID: 2800000, guid: 61938df4d732b6848a45097c6d52ba6b, type: 3}
+        m_Texture: {fileID: 2800000, guid: 9da46f025567df5408a8736d58153b49, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MSHAO2:
-        m_Texture: {fileID: 2800000, guid: 5b81c1e55f6b9f94b89a3bf6899192a1, type: 3}
+        m_Texture: {fileID: 2800000, guid: 9da46f025567df5408a8736d58153b49, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _MSHAO3:
@@ -189,7 +189,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NormalMap1:
-        m_Texture: {fileID: 2800000, guid: afd9dfc5fac4d8c4ca93ee59ee76d3ae, type: 3}
+        m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _NormalMap2:
@@ -374,9 +374,9 @@ Material:
     - _ExcludeFromTUAndAA: 0
     - _HdrpVersion: 2
     - _Height1: 10
-    - _Height1Shift: -0.32
+    - _Height1Shift: -0.97
     - _Height2: 15.07
-    - _Height2Shift: -0.6
+    - _Height2Shift: -1.84
     - _HeightAmplitude: 0.02
     - _HeightCenter: 0.5
     - _HeightMapParametrization: 0
@@ -452,7 +452,7 @@ Material:
     - _TexWorldScale: 1
     - _TexWorldScaleEmissive: 1
     - _Thickness: 1
-    - _TransitionSmoothness: 0.126
+    - _TransitionSmoothness: 0.672
     - _TransmissionEnable: 1
     - _TransparentBackfaceEnable: 0
     - _TransparentCullMode: 2
@@ -483,7 +483,7 @@ Material:
     - _BaseColorMap_MipInfo: {r: 0, g: 0, b: 0, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _Color1: {r: 1, g: 1, b: 1, a: 1}
-    - _Color2: {r: 0.74105555, g: 0.8584906, b: 0.7918939, a: 1}
+    - _Color2: {r: 1, g: 1, b: 1, a: 1}
     - _Color3: {r: 1, g: 1, b: 1, a: 1}
     - _Color4: {r: 1, g: 1, b: 1, a: 1}
     - _DiffusionProfileAsset: {r: 0, g: 0, b: 0, a: 0}
@@ -500,8 +500,8 @@ Material:
     - _Offset4: {r: 0, g: 0, b: 0, a: 0}
     - _SpecularColor: {r: 1, g: 1, b: 1, a: 1}
     - _ThicknessRemap: {r: 0, g: 1, b: 0, a: 0}
-    - _Tiling1: {r: 7, g: 7, b: 0, a: 0}
-    - _Tiling2: {r: 5, g: 5, b: 0, a: 0}
+    - _Tiling1: {r: 1.28, g: 1.03, b: 0, a: 0}
+    - _Tiling2: {r: 1.28, g: 1.03, b: 0, a: 0}
     - _Tiling3: {r: 1, g: 1, b: 0, a: 0}
     - _Tiling4: {r: 1, g: 1, b: 0, a: 0}
     - _TransmittanceColor: {r: 1, g: 1, b: 1, a: 1}

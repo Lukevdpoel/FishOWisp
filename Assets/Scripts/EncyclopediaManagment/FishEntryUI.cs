@@ -43,9 +43,9 @@ public class FishEntryUI : MonoBehaviour
         else
         {
             if (largestCaughtText != null)
-                largestCaughtText.text = "�";
+                largestCaughtText.text = "???";
             if (smallestCaughtText != null)
-                smallestCaughtText.text = "�";
+                smallestCaughtText.text = "???";
         }
 
         if (basePriceText != null)
