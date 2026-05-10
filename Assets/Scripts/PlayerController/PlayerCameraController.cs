@@ -11,6 +11,7 @@ public class PlayerCameraController : MonoBehaviour
         public bool isAiming;
         public Transform activeBountyBoard;
         public Transform activeBobberTransform;
+        public bool isSprinting;
     }
 
     [Header("Camera Reference")]
@@ -71,6 +72,12 @@ public class PlayerCameraController : MonoBehaviour
     [Tooltip("Lerp speed for the bite/nibble pitch offset to reach its target.")]
     public float bitePitchLerpSpeed = 6f;
 
+    [Header("Sprint FOV")]
+    [Tooltip("Degrees added to the camera's base FOV while the player is sprinting.")]
+    [SerializeField] private float sprintFovBoost = 8f;
+    [Tooltip("How fast (per second) the FOV interpolates toward its target. Higher = snappier.")]
+    [SerializeField] private float sprintFovLerpSpeed = 6f;
+
     [Header("Static Camera Settings")]
     [SerializeField] private bool useStaticCamera = false;
     [SerializeField] private Transform staticCameraTarget;
@@ -89,6 +96,8 @@ public class PlayerCameraController : MonoBehaviour
     private float chargeProgressTarget = 0f;
     private float chargeProgress = 0f;
     private float chargeProgressVel = 0f;
+
+    private float baseFov;
 
     public Transform CameraTransform => cameraTransform;
 
@@ -160,6 +169,7 @@ public class PlayerCameraController : MonoBehaviour
             smoothXAngle = cameraXAngle;
             smoothYAngle = cameraYAngle;
             cam = cameraTransform.GetComponent<Camera>();
+            if (cam != null) baseFov = cam.fieldOfView;
             currentPivotPosition = playerModel.position + Vector3.up * pivotHeight;
         }
         if (framingTarget == null) framingTarget = playerModel;
@@ -259,5 +269,11 @@ public class PlayerCameraController : MonoBehaviour
         if (cam == null) cam = cameraTransform.GetComponent<Camera>();
         cameraTransform.position = finalPos;
         cameraTransform.rotation = rotation;
+
+        if (cam != null)
+        {
+            float targetFov = baseFov + (input.isSprinting ? sprintFovBoost : 0f);
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, targetFov, Time.deltaTime * sprintFovLerpSpeed);
+        }
     }
 }

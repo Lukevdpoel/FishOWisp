@@ -68,6 +68,8 @@ public class PlayerController : MonoBehaviour
 
     [HideInInspector] public bool areControlsLocked = false;
 
+    public bool IsSprinting => isSprinting;
+
     private CharacterController characterController;
     private Vector3 targetVelocity;
     private float idleTimer;
@@ -162,6 +164,7 @@ public class PlayerController : MonoBehaviour
                 isAiming = fishingAnimHandler != null && fishingAnimHandler.IsAiming,
                 activeBountyBoard = fishingAnimHandler != null ? fishingAnimHandler.ActiveBountyBoard : null,
                 activeBobberTransform = fishingAnimHandler != null ? fishingAnimHandler.ActiveBobberTransform : null,
+                isSprinting = isSprinting,
             };
             cameraController.UpdateCamera(input);
         }
