@@ -205,6 +205,13 @@ public class FishingRodController : MonoBehaviour
             Debug.Log($"[FishFight] StartCharging BLOCKED — bobberInWater: {(bobberInWater != null ? "exists" : "null")}, activeBobber: {(activeBobber != null ? "exists" : "null")}");
             return;
         }
+        if (BaitInventory.Instance != null && BaitInventory.Instance.SelectedBait == null)
+        {
+            Debug.Log("[FishFight] StartCharging BLOCKED — no bait equipped. Opening inventory so the player can pick one.");
+            InventoryUI inv = FindFirstObjectByType<InventoryUI>();
+            if (inv != null) inv.OpenInventory();
+            return;
+        }
         currentState = FishingState.Charging; FishingEvents.OnStartCharging?.Invoke();
     }
     private void HandleThrow(Vector3 direction, float force)

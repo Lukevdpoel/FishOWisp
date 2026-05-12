@@ -99,7 +99,7 @@ public class PlayerCameraController : MonoBehaviour
 
     private float baseFov;
 
-    public Transform CameraTransform => cameraTransform;
+    public Transform CameraTransform => (useStaticCamera && staticCameraTarget != null) ? staticCameraTarget : cameraTransform;
 
     public void SetCatchCamera(bool active) => isCatchCameraActive = active;
 
@@ -177,14 +177,18 @@ public class PlayerCameraController : MonoBehaviour
 
     public void UpdateCamera(CameraInput input)
     {
-        if (!cameraTransform || input.playerModel == null) return;
-        if (InventoryUI.IsInventoryOpen) return;
+        if (!cameraTransform) return;
 
+        // Static-camera path runs even if playerModel is unassigned, so HandleMovement gets a
+        // valid camera-relative basis from cameraTransform.forward/right.
         if (useStaticCamera)
         {
             if (staticCameraTarget != null) { cameraTransform.position = staticCameraTarget.position; cameraTransform.rotation = staticCameraTarget.rotation; }
             return;
         }
+
+        if (input.playerModel == null) return;
+        if (InventoryUI.IsInventoryOpen) return;
 
         if (float.IsNaN(xVel) || float.IsNaN(yVel) || float.IsNaN(distanceVelocity)) { xVel = 0f; yVel = 0f; distanceVelocity = 0f; }
 

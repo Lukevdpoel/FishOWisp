@@ -10,7 +10,34 @@ public class BaitInventory : GenericSingleton<BaitInventory>
 
     private readonly Dictionary<string, int> counts = new Dictionary<string, int>();
 
+    [Tooltip("The bait currently equipped on the hook. Null = no bait selected.")]
+    [SerializeField] private BaitItem selectedBait;
+
+    public BaitItem SelectedBait => selectedBait;
+
     public event Action OnBaitChanged;
+    public event Action<BaitItem> OnSelectedBaitChanged;
+
+    public void SetSelectedBait(BaitItem bait)
+    {
+        if (selectedBait == bait) return;
+        selectedBait = bait;
+        OnSelectedBaitChanged?.Invoke(selectedBait);
+    }
+
+    // True if the fish preset accepts whatever bait the player currently has equipped.
+    // Null bait or empty preference list both behave as "any bait accepted" so the game
+    // remains playable before a bait-selection UI exists, and so fish without configured
+    // preferences don't get silently filtered out.
+    public static bool PresetAcceptsSelectedBait(FishPreset preset)
+    {
+        if (preset == null) return false;
+        BaitItem equipped = Instance != null ? Instance.SelectedBait : null;
+        if (equipped == null) return true;
+        var prefs = preset.preferredBaits;
+        if (prefs == null || prefs.Count == 0) return true;
+        return prefs.Contains(equipped);
+    }
 
     private string SavePath => Path.Combine(Application.persistentDataPath, "bait.json");
 
@@ -43,6 +70,13 @@ public class BaitInventory : GenericSingleton<BaitInventory>
         counts[bait.id] = have - amount;
         SaveBait();
         OnBaitChanged?.Invoke();
+
+        // Auto-deselect a depleted selection so the UI doesn't keep showing an unusable equipped bait.
+        if (selectedBait == bait && counts[bait.id] <= 0)
+        {
+            selectedBait = null;
+            OnSelectedBaitChanged?.Invoke(null);
+        }
         return true;
     }
 

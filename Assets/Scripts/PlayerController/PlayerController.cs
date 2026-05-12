@@ -62,6 +62,10 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private string sitdownAnimTrigger = "Sitdown";
     [SerializeField] private float sitDownHoldTime = 4f;
 
+    [Header("Static Camera")]
+    [SerializeField] private bool useStaticCamera = false;
+    [SerializeField] private Transform staticCameraTarget;
+
     [Header("Physics")]
     [SerializeField] private float groundedDownForce = -2f;
     [SerializeField] private float speedAnimDampTime = 0.1f;
@@ -101,6 +105,9 @@ public class PlayerController : MonoBehaviour
     private Vector3 ballSpinAxis = Vector3.right;
     private float ballSpinSpeedDeg;
     private float bounceImpactTimer = -1f; // -1 = inactive
+
+    private Vector3 staticCameraOffset;
+    private bool staticCameraOffsetCaptured;
 
     void Start()
     {
@@ -152,6 +159,7 @@ public class PlayerController : MonoBehaviour
         // Run after Animator has evaluated so our scale/rotation writes aren't overwritten by clip curves.
         HandleSquashStretch();
         HandleBallSpin();
+        HandleStaticCameraFollow();
 
         if (cameraController != null)
         {
@@ -202,6 +210,32 @@ public class PlayerController : MonoBehaviour
         if (cameraController != null) cameraController.SetCatchCamera(active);
     }
 
+    private void HandleStaticCameraFollow()
+    {
+        if (!useStaticCamera || staticCameraTarget == null) return;
+
+        if (!staticCameraOffsetCaptured)
+        {
+            // Compute an offset that places the player at the camera's forward-ray hit on the
+            // player's Y plane. This keeps the player centered on screen regardless of where
+            // they spawn, instead of preserving whatever framing existed at scene start.
+            Vector3 camPos = staticCameraTarget.position;
+            Vector3 camForward = staticCameraTarget.forward;
+            float fy = camForward.y;
+            if (Mathf.Abs(fy) > 1e-4f)
+            {
+                float t = (transform.position.y - camPos.y) / fy;
+                staticCameraOffset = -camForward * t;
+            }
+            else
+            {
+                staticCameraOffset = camPos - transform.position;
+            }
+            staticCameraOffsetCaptured = true;
+        }
+        staticCameraTarget.position = transform.position + staticCameraOffset;
+    }
+
     private void HandleMovement()
     {
         float yVelocity = targetVelocity.y;
@@ -230,7 +264,11 @@ public class PlayerController : MonoBehaviour
 
         float currentSpeed = isSprinting ? sprintSpeed : walkSpeed;
 
-        Transform camTransform = cameraController != null ? cameraController.CameraTransform : transform;
+        Transform camTransform;
+        if (useStaticCamera && staticCameraTarget != null)
+            camTransform = staticCameraTarget;
+        else
+            camTransform = cameraController != null ? cameraController.CameraTransform : transform;
         Vector3 camForward = camTransform.forward;
         Vector3 camRight = camTransform.right;
 

@@ -56,7 +56,24 @@ public class FishEntryUI : MonoBehaviour
             pricePerCmText.text = $"+{preset.pricePerCm:F1} / cm";
 
         if (baitText != null)
-            baitText.text = preset.preferredBait.ToString();
+        {
+            if (preset.preferredBaits == null || preset.preferredBaits.Count == 0)
+            {
+                baitText.text = "None";
+            }
+            else
+            {
+                System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                for (int i = 0; i < preset.preferredBaits.Count; i++)
+                {
+                    BaitItem b = preset.preferredBaits[i];
+                    if (b == null) continue;
+                    if (sb.Length > 0) sb.Append(", ");
+                    sb.Append(string.IsNullOrEmpty(b.displayName) ? b.name : b.displayName);
+                }
+                baitText.text = sb.Length > 0 ? sb.ToString() : "None";
+            }
+        }
 
         if (weatherText != null)
             weatherText.text = preset.preferredWeather.ToString();

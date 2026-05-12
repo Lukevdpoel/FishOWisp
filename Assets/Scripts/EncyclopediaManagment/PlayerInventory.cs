@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Sirenix.OdinInspector;
 using UnityEngine;
 
 public class PlayerInventory : GenericSingleton<PlayerInventory>
@@ -9,6 +10,29 @@ public class PlayerInventory : GenericSingleton<PlayerInventory>
     public int inventorySize = 24;
     public int currentCurrency = 100;
     public List<CaughtFish> caughtFishes = new List<CaughtFish>();
+
+    [Header("Debug")]
+    [Tooltip("Amount used by the +/- buttons and the 'Set Coins' button.")]
+    [SerializeField] private int debugCoinAmount = 100;
+
+    [Button("Add Coins", ButtonSizes.Medium), HorizontalGroup("DebugCoins"), GUIColor(0.5f, 1f, 0.5f)]
+    private void DebugAddCoins() => SetCurrency(currentCurrency + debugCoinAmount);
+
+    [Button("Subtract Coins", ButtonSizes.Medium), HorizontalGroup("DebugCoins"), GUIColor(1f, 0.6f, 0.6f)]
+    private void DebugSubtractCoins() => SetCurrency(currentCurrency - debugCoinAmount);
+
+    [Button("Set Coins To Amount", ButtonSizes.Medium)]
+    private void DebugSetCoins() => SetCurrency(debugCoinAmount);
+
+    [Button("Reset Coins To 0", ButtonSizes.Small)]
+    private void DebugResetCoins() => SetCurrency(0);
+
+    private void SetCurrency(int value)
+    {
+        currentCurrency = Mathf.Max(0, value);
+        if (Application.isPlaying) SaveInventory();
+        OnInventoryChanged?.Invoke();
+    }
 
     public event Action OnInventoryChanged;
 
@@ -60,6 +84,16 @@ public class PlayerInventory : GenericSingleton<PlayerInventory>
         currentCurrency += amount;
         SaveInventory();
         OnInventoryChanged?.Invoke();
+    }
+
+    public bool TrySpendCurrency(int amount)
+    {
+        if (amount <= 0) return false;
+        if (currentCurrency < amount) return false;
+        currentCurrency -= amount;
+        SaveInventory();
+        OnInventoryChanged?.Invoke();
+        return true;
     }
 
     private void SaveInventory()

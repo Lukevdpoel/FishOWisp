@@ -53,6 +53,11 @@ public class FishingZone : MonoBehaviour
     [Tooltip("Time window in seconds for tracking attract spam.")]
     public float scareWindow = 2f;
 
+    private static bool MatchesEquippedBait(FishRipple fish)
+    {
+        return fish != null && BaitInventory.PresetAcceptsSelectedBait(fish.preset);
+    }
+
     private FishRipple currentlyAttractedFish;
     private List<FishRipple> followerFish = new List<FishRipple>();
     private float respawnTimer;
@@ -307,6 +312,7 @@ public class FishingZone : MonoBehaviour
                 if (fish == null) continue;
                 if (fish.CurrentState == FishRipple.FishState.Scared) continue;
                 if (fish.CurrentState == FishRipple.FishState.Nibbling) continue;
+                if (!MatchesEquippedBait(fish)) continue;
                 if (fish.CurrentState == FishRipple.FishState.Wandering)
                 {
                     if (attractCallRadius > 0f
@@ -561,6 +567,7 @@ public class FishingZone : MonoBehaviour
             if (fish == null) continue;
             if (fish == currentlyAttractedFish) continue;
             if (fish.CurrentState != FishRipple.FishState.Attracted) continue;
+            if (!MatchesEquippedBait(fish)) continue;
 
             float d = HorizontalDistance(fish.transform.position, bobberPos);
             if (d < bestDist)

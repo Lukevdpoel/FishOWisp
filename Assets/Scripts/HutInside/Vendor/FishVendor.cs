@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class FishVendor : MonoBehaviour
@@ -6,26 +8,129 @@ public class FishVendor : MonoBehaviour
     [Tooltip("Optional: Multiplier for fish prices (e.g. 1.2 for 20% bonus)")]
     public float priceMultiplier = 1.0f;
 
+    [Header("Bait Shop")]
+    [Tooltip("How many bait units the player receives per purchase.")]
+    [Min(1)] public int baitStackSize = 5;
+    [Tooltip("Bait this vendor will sell. Each entry has a BaitItem and the price for one stack.")]
+    public List<BaitOffer> baitOffers = new List<BaitOffer>();
+
+    [Header("Interaction")]
+    [Tooltip("Player must be within this distance to open the shop with E.")]
+    [Min(0f)] public float interactionRadius = 3f;
+    [Tooltip("Key the player presses to open/close this vendor's shop.")]
+    public KeyCode interactKey = KeyCode.E;
+
     [Header("Feedback")]
     public ParticleSystem sellParticles;
-    // You could add AudioSource here for a "Cha-ching" sound
+    public ParticleSystem buyParticles;
+
+    public static event Action OnVendorInventoryChanged;
+    public static event Action OnCurrentShoppingVendorChanged;
+    public static FishVendor CurrentShoppingVendor { get; private set; }
+
+    private Transform playerTransform;
+
+    [Serializable]
+    public class BaitOffer
+    {
+        public BaitItem bait;
+        [Min(0)] public int pricePerStack = 25;
+    }
+
+    private void Start()
+    {
+        ResolvePlayerTransform();
+    }
+
+    private void Update()
+    {
+        if (Input.GetKeyDown(interactKey))
+        {
+            if (CurrentShoppingVendor == this)
+            {
+                CloseShop();
+            }
+            else if (CurrentShoppingVendor == null && IsPlayerInRange())
+            {
+                OpenShop();
+            }
+        }
+    }
+
+    private void ResolvePlayerTransform()
+    {
+        // PlayerController owns the CharacterController and is what actually moves around. Its
+        // transform.root often points at a static rig parent ("Dev") that stays at world origin,
+        // so we deliberately use the PlayerController's own transform here.
+        PlayerController pc = FindFirstObjectByType<PlayerController>();
+        if (pc != null)
+        {
+            playerTransform = pc.transform;
+            return;
+        }
+
+        GameObject tagged = GameObject.FindGameObjectWithTag("Player");
+        if (tagged != null) playerTransform = tagged.transform;
+    }
+
+    private bool IsPlayerInRange()
+    {
+        if (playerTransform == null) ResolvePlayerTransform();
+        if (playerTransform == null) return false;
+        return (playerTransform.position - transform.position).sqrMagnitude
+               <= interactionRadius * interactionRadius;
+    }
+
+    public void OpenShop()
+    {
+        CurrentShoppingVendor = this;
+        OnCurrentShoppingVendorChanged?.Invoke();
+
+        InventoryUI inv = FindFirstObjectByType<InventoryUI>();
+        if (inv != null && !InventoryUI.IsInventoryOpen) inv.OpenInventory();
+    }
+
+    public void CloseShop()
+    {
+        if (CurrentShoppingVendor != this) return;
+        CurrentShoppingVendor = null;
+        OnCurrentShoppingVendorChanged?.Invoke();
+
+        InventoryUI inv = FindFirstObjectByType<InventoryUI>();
+        if (inv != null && InventoryUI.IsInventoryOpen) inv.CloseInventory();
+    }
 
     public void SellFishToVendor(CaughtFish fish)
     {
         if (fish == null) return;
 
-        // Calculate Value
         int baseValue = fish.GetValue();
         int finalValue = Mathf.RoundToInt(baseValue * priceMultiplier);
 
-        // Add to Player Currency via Inventory Singleton
-        // We use a custom method in PlayerInventory to handle the transaction logic
         PlayerInventory.Instance.TransactionAddCurrency(finalValue);
 
-        // Feedback
         Debug.Log($"Sold {fish.preset.fishName} for {finalValue} coins!");
 
         if (sellParticles != null)
             sellParticles.Play();
+    }
+
+    public bool TryBuyBait(BaitOffer offer)
+    {
+        if (offer == null || offer.bait == null) return false;
+        if (PlayerInventory.Instance == null || BaitInventory.Instance == null) return false;
+
+        if (!PlayerInventory.Instance.TrySpendCurrency(offer.pricePerStack))
+        {
+            Debug.Log($"Not enough coins to buy {offer.bait.displayName} x{baitStackSize} ({offer.pricePerStack} required).");
+            return false;
+        }
+
+        BaitInventory.Instance.AddBait(offer.bait, baitStackSize);
+
+        if (buyParticles != null) buyParticles.Play();
+        OnVendorInventoryChanged?.Invoke();
+        Debug.Log($"Bought {offer.bait.displayName} x{baitStackSize} for {offer.pricePerStack} coins.");
+        return true;
     }
 }

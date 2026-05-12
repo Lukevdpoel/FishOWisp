@@ -19,11 +19,11 @@ public class InventoryUI : MonoBehaviour
     [Header("Tooltip System")]
     public InventoryTooltip tooltip;
 
-    [Header("Physics Settings")]
-    public float blowForce = 8000f;
-    public Vector2 normalizedSpawnPoint = new Vector2(0.5f, 0.5f);
-    public float spawnSpacing = 120f;
-    public float blowSpread = 0.8f;
+    [Header("Layout Settings")]
+    [Tooltip("Horizontal spacing between fish slots in pixels.")]
+    public float slotSpacing = 120f;
+    [Tooltip("Pixels of left padding inside the container before the first slot.")]
+    public float leftPadding = 40f;
 
     [Header("3D Inspection Settings")]
     public float modelDistance = 3.5f;
@@ -57,7 +57,6 @@ public class InventoryUI : MonoBehaviour
     public Button closeButton;
 
     private List<InventorySlotUI> spawnedSlots = new List<InventorySlotUI>();
-    private EdgeCollider2D containerBoundary;
     private Camera cachedCamera;
 
     private GameObject currentDraggedModel;
@@ -79,8 +78,6 @@ public class InventoryUI : MonoBehaviour
 
         if (closeButton != null)
             closeButton.onClick.AddListener(CloseInventory);
-
-        SetupBoundaries();
     }
 
     private void OnDestroy()
@@ -273,50 +270,16 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
-    private void SetupBoundaries()
-    {
-        if (physicsContainer == null) return;
-
-        containerBoundary = physicsContainer.GetComponent<EdgeCollider2D>();
-        if (containerBoundary == null)
-        {
-            containerBoundary = physicsContainer.gameObject.AddComponent<EdgeCollider2D>();
-        }
-
-        UpdateBoundaryShape();
-    }
-
-    private void UpdateBoundaryShape()
-    {
-        if (containerBoundary == null) return;
-
-        RectTransform rect = physicsContainer.GetComponent<RectTransform>();
-        if (rect == null) return;
-
-        Vector3[] corners = new Vector3[4];
-        rect.GetLocalCorners(corners);
-
-        Vector2[] points = new Vector2[5];
-        points[0] = corners[0]; // Bottom Left
-        points[1] = corners[1]; // Top Left
-        points[2] = corners[2]; // Top Right
-        points[3] = corners[3]; // Bottom Right
-        points[4] = corners[0]; // Close Loop
-
-        containerBoundary.points = points;
-    }
-
     public void ToggleInventory()
     {
-        if (uiPanel.activeSelf) CloseInventory();
+        if (IsInventoryOpen) CloseInventory();
         else OpenInventory();
     }
 
     public void OpenInventory()
     {
         IsInventoryOpen = true;
-        uiPanel.SetActive(true);
-        UpdateBoundaryShape();
+        if (uiPanel != null) uiPanel.SetActive(true);
         RefreshInventory();
 
         Cursor.lockState = CursorLockMode.None;
@@ -328,7 +291,7 @@ public class InventoryUI : MonoBehaviour
     public void CloseInventory()
     {
         IsInventoryOpen = false;
-        uiPanel.SetActive(false);
+        if (uiPanel != null) uiPanel.SetActive(false);
         if (tooltip != null) tooltip.HideTooltip();
 
         if (currentDraggedModel != null) Destroy(currentDraggedModel);
@@ -337,6 +300,13 @@ public class InventoryUI : MonoBehaviour
         Cursor.visible = false;
 
         ToggleInputScripts(true);
+
+        // Closing the inventory by any route (I key, close button) also ends any active shopping
+        // session so the shop panel doesn't reappear next time the inventory opens.
+        if (FishVendor.CurrentShoppingVendor != null)
+        {
+            FishVendor.CurrentShoppingVendor.CloseShop();
+        }
     }
 
     private void ToggleInputScripts(bool enable)
@@ -351,7 +321,7 @@ public class InventoryUI : MonoBehaviour
     {
         if (physicsContainer == null)
         {
-            Debug.LogError("InventoryUI: Physics Container is missing! Assign it in Inspector.");
+            Debug.LogError("InventoryUI: Container is missing! Assign it in Inspector.");
             return;
         }
 
@@ -364,39 +334,31 @@ public class InventoryUI : MonoBehaviour
         if (PlayerInventory.Instance == null) return;
 
         List<CaughtFish> inventoryData = PlayerInventory.Instance.caughtFishes;
-        RectTransform containerRect = physicsContainer.GetComponent<RectTransform>();
 
-        Vector3[] corners = new Vector3[4];
-        containerRect.GetLocalCorners(corners);
-
-        Vector3 bottomLeft = corners[0];
-        Vector3 topRight = corners[2];
-        float width = topRight.x - bottomLeft.x;
-        float height = topRight.y - bottomLeft.y;
-
-        float spawnX = bottomLeft.x + (width * normalizedSpawnPoint.x);
-        float spawnY = bottomLeft.y + (height * normalizedSpawnPoint.y);
-        Vector3 baseSpawnOrigin = new Vector3(spawnX, spawnY, 0);
-
-        int cols = Mathf.CeilToInt(Mathf.Sqrt(inventoryData.Count));
-        int rows = Mathf.CeilToInt((float)inventoryData.Count / cols);
-
-        int i = 0;
-        foreach (CaughtFish fish in inventoryData)
+        for (int i = 0; i < inventoryData.Count; i++)
         {
+            CaughtFish fish = inventoryData[i];
+
             GameObject newSlotObj = Instantiate(inventorySlotPrefab, physicsContainer, false);
             newSlotObj.SetActive(true);
             newSlotObj.transform.localScale = Vector3.one;
 
-            int row = i / cols;
-            int col = i % cols;
+            RectTransform slotRect = newSlotObj.GetComponent<RectTransform>();
+            if (slotRect != null)
+            {
+                slotRect.anchorMin = new Vector2(0f, 0.5f);
+                slotRect.anchorMax = new Vector2(0f, 0.5f);
+                slotRect.pivot = new Vector2(0.5f, 0.5f);
+                slotRect.anchoredPosition = new Vector2(leftPadding + i * slotSpacing, 0f);
+            }
 
-            float xOffset = (col - (cols - 1) / 2f) * spawnSpacing;
-            float yOffset = (row - (rows - 1) / 2f) * spawnSpacing;
-
-            Vector3 positionJitter = Random.insideUnitCircle * (spawnSpacing * 0.4f);
-
-            newSlotObj.transform.localPosition = baseSpawnOrigin + new Vector3(xOffset, yOffset, 0) + positionJitter;
+            // Strip any leftover physics components from the previous floating-bubble layout.
+            var floating = newSlotObj.GetComponent<InventoryFloatingItem>();
+            if (floating != null) Destroy(floating);
+            var rb2d = newSlotObj.GetComponent<Rigidbody2D>();
+            if (rb2d != null) Destroy(rb2d);
+            var col2d = newSlotObj.GetComponent<BoxCollider2D>();
+            if (col2d != null) Destroy(col2d);
 
             InventorySlotUI slotScript = newSlotObj.GetComponent<InventorySlotUI>();
             if (slotScript != null)
@@ -409,27 +371,6 @@ public class InventoryUI : MonoBehaviour
                 );
                 spawnedSlots.Add(slotScript);
             }
-
-            BoxCollider2D boxCol = newSlotObj.GetComponent<BoxCollider2D>();
-            RectTransform slotRect = newSlotObj.GetComponent<RectTransform>();
-            if (boxCol == null) boxCol = newSlotObj.AddComponent<BoxCollider2D>();
-            if (slotRect != null) boxCol.size = slotRect.rect.size;
-
-            InventoryFloatingItem physicsItem = newSlotObj.GetComponent<InventoryFloatingItem>();
-            if (physicsItem == null) physicsItem = newSlotObj.AddComponent<InventoryFloatingItem>();
-
-            Vector3 centerToItem = newSlotObj.transform.localPosition - baseSpawnOrigin;
-            Vector2 outwardDirection = centerToItem.normalized;
-            if (outwardDirection == Vector2.zero) outwardDirection = Random.insideUnitCircle.normalized;
-
-            Vector2 randomChaos = Random.insideUnitCircle * blowSpread;
-            Vector2 finalDirection = (outwardDirection + randomChaos).normalized;
-
-            float randomizedForce = blowForce * Random.Range(0.7f, 1.4f);
-
-            physicsItem.Init(finalDirection * randomizedForce);
-
-            i++;
         }
     }
 }

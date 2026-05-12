@@ -411,6 +411,18 @@ public class BobberController : MonoBehaviour
     {
         if (hookedFish != null) return;
 
+        if (BaitInventory.Instance != null)
+        {
+            BaitItem equipped = BaitInventory.Instance.SelectedBait;
+            if (equipped != null)
+            {
+                if (!BaitInventory.Instance.TryConsume(equipped, 1))
+                {
+                    Debug.LogWarning($"[BobberController] Tried to consume {equipped.displayName} but the player had none.");
+                }
+            }
+        }
+
         hookedFish = new CaughtFish(fishPreset);
         Debug.Log($"{hookedFish.GetDisplayName()} is on the line!");
         FishingEvents.OnFishBite?.Invoke(this);

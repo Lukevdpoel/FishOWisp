@@ -475,6 +475,8 @@ public class FishRipple : MonoBehaviour
     {
         // Passive auto-attract: if the bobber is sitting inside this fish's awareness radius
         // (and we're not being told to give the lead fish space), wake up and approach as a follower.
+        // Bait mismatch is *not* gated here — wrong-species fish still gather visually so the pond
+        // doesn't look empty. Only the bite/lead promotion in FishingZone is gated by bait.
         if (bobberTransform != null && !shouldAvoidBobber && actionRadius > 0f)
         {
             float bobberDist = GetHorizontalDistance(transform.position, bobberTransform.position);

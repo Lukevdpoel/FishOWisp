@@ -1,5 +1,6 @@
 // FishPreset.cs
 // This ScriptableObject holds data for a single type of fish.
+using System.Collections.Generic;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "NewFishPreset", menuName = "Fishing/Fish Preset")]
@@ -10,7 +11,6 @@ public class FishPreset : ScriptableObject
     [TextArea]
     public string description;
     public Sprite fishImage;
-    // The variable name is now corrected to 'fishPrefab' (capital P) to match the other scripts.
     public GameObject fishPrefab;
 
     [Header("Size")]
@@ -25,21 +25,10 @@ public class FishPreset : ScriptableObject
 
     [Header("Economy & Conditions")]
     public int basePrice;
-    public float pricePerCm; // The added value per cm above the minimum size
-    public BaitType preferredBait;
+    public float pricePerCm;
+    [Tooltip("Bait this fish is attracted to. Drag BaitItem assets from ScriptableObjects/Bait_Scriptable here.")]
+    public List<BaitItem> preferredBaits = new List<BaitItem>();
     public WeatherType preferredWeather;
-
-    // --- MODIFIED: Removed the extra 'physicalModelPrefab' line ---
-}
-
-// These enums define the possible options for the fields above.
-public enum BaitType
-{
-    Worm,
-    Insect,
-    Minnow,
-    Bread,
-    Synthetic
 }
 
 public enum WeatherType

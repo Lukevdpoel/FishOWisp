@@ -19,12 +19,12 @@ MonoBehaviour:
   fishImage: {fileID: 0}
   fishPrefab: {fileID: 62222655418891038, guid: b25f1c69d0084f24c9af64eb52d7644a, type: 3}
   sizeClass: 3
+  isLegendary: 0
   minLengthCm: 45
   maxLengthCm: 120
-  rarity: 3
-  catchProbability: 0.669
-  basePrice: 69
+  catchProbability: 0.005
+  basePrice: 18
   pricePerCm: 1
-  preferredBait: 0
+  preferredBaits:
+  - {fileID: 11400000, guid: 675b0f0aa1ddd4a49a9c19e15293a9d2, type: 2}
   preferredWeather: 0
-  cameraviewdistance: 0

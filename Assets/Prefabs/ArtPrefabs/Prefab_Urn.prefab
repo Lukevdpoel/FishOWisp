@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 1443025464548817476}
   - component: {fileID: 3698065486016232508}
   - component: {fileID: 1802203219991415577}
+  - component: {fileID: 7856181631737215827}
   m_Layer: 24
   m_Name: Prefab_Urn
   m_TagString: Pot
@@ -150,12 +151,40 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::BaitDropper
   dropTable:
   - bait: {fileID: 11400000, guid: 11ccbd758765b2a4a8e806319dce81c0, type: 2}
-    chance: 1
+    chance: 0
     minCount: 1
     maxCount: 2
+  - bait: {fileID: 11400000, guid: e936b5f9f7fc306488dc57f867b11d37, type: 2}
+    chance: 0
+    minCount: 1
+    maxCount: 1
+  - bait: {fileID: 11400000, guid: 675b0f0aa1ddd4a49a9c19e15293a9d2, type: 2}
+    chance: 0
+    minCount: 1
+    maxCount: 1
   firstHitOnly: 0
   popupSpawnHeight: 0.6
   popupRiseDistance: 1.2
   popupDuration: 1.1
   popupScale: 0.17
   popupStaggerSeconds: 0.15
+--- !u!114 &7856181631737215827
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4799853658776177713}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 51d90f3a80e15c84da53cd0cd6d28eb3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CurrencyDropper
+  dropChance: 0.284
+  minAmount: 1
+  maxAmount: 8
+  icon: {fileID: 21300000, guid: 00fd71f5de4db79439f3417296d08175, type: 3}
+  popupSpawnHeight: 0.6
+  popupRiseDistance: 1.2
+  popupDuration: 1.4
+  popupScale: 0.25

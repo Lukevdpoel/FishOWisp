@@ -30,8 +30,11 @@ public class PotShatter : MonoBehaviour
         if (hasShattered) return;
         hasShattered = true;
 
-        BaitDropper dropper = GetComponent<BaitDropper>();
-        if (dropper != null) dropper.Drop(impactPoint);
+        BaitDropper baitDropper = GetComponent<BaitDropper>();
+        if (baitDropper != null) baitDropper.Drop(impactPoint);
+
+        CurrencyDropper currencyDropper = GetComponent<CurrencyDropper>();
+        if (currencyDropper != null) currencyDropper.Drop(impactPoint);
 
         if (shatteredPrefab == null)
         {
