@@ -2194,11 +2194,20 @@ MonoBehaviour:
   baitStackSize: 5
   baitOffers:
   - bait: {fileID: 11400000, guid: 675b0f0aa1ddd4a49a9c19e15293a9d2, type: 2}
-    pricePerStack: 25
+    pricePerStack: 15
   - bait: {fileID: 11400000, guid: 11ccbd758765b2a4a8e806319dce81c0, type: 2}
-    pricePerStack: 25
+    pricePerStack: 15
   - bait: {fileID: 11400000, guid: e936b5f9f7fc306488dc57f867b11d37, type: 2}
-    pricePerStack: 25
+    pricePerStack: 15
+  timeOfDayOffers:
+  - displayName: Night Lantern
+    icon: {fileID: 0}
+    price: 100
+    mode: 2
+  - displayName: Force Day
+    icon: {fileID: 0}
+    price: 100
+    mode: 1
   interactionRadius: 4.5
   interactKey: 101
   sellParticles: {fileID: 0}
@@ -2559,13 +2568,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1624931530}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: 0.99992424, z: -0, w: 0.012310959}
-  m_LocalPosition: {x: 18.7, y: -2.1850858, z: 21.12}
+  m_LocalRotation: {x: -0, y: 0.9191407, z: -0, w: 0.39392945}
+  m_LocalPosition: {x: 17.04, y: -1.934, z: 21.66}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 2018839475}
-  m_LocalEulerAnglesHint: {x: 0, y: 178.589, z: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 133.602, z: 0}
 --- !u!114 &1624931532
 MonoBehaviour:
   m_ObjectHideFlags: 0

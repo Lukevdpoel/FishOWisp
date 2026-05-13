@@ -17,6 +17,14 @@ public class FishAimIndicator : MonoBehaviour
     [Tooltip("Extra GameObjects to enable only when the fish is legendary (e.g. a second rotated star).")]
     public GameObject[] legendaryOnlyExtras;
 
+    [Header("Bait Hint")]
+    [Tooltip("UI Image whose sprite is overwritten with the fish's preferred-bait icon. Leave empty if the indicator is a world-space SpriteRenderer.")]
+    public Image baitIconTarget;
+    [Tooltip("World-space SpriteRenderer whose sprite is overwritten with the fish's preferred-bait icon. If left empty, the script auto-finds a SpriteRenderer in this prefab's children at runtime.")]
+    public SpriteRenderer baitSpriteTarget;
+    [Tooltip("Hide the bait icon target when the fish has no preferred bait listed. If false, the existing sprite stays as-is.")]
+    public bool hideBaitIconWhenNoPreference = true;
+
     public void ApplyPreset(FishPreset preset)
     {
         bool legendary = preset != null && preset.isLegendary;
@@ -40,6 +48,43 @@ public class FishAimIndicator : MonoBehaviour
             {
                 if (legendaryOnlyExtras[i] != null)
                     legendaryOnlyExtras[i].SetActive(legendary);
+            }
+        }
+
+        BaitItem bait = null;
+        if (preset != null && preset.preferredBaits != null)
+        {
+            for (int i = 0; i < preset.preferredBaits.Count; i++)
+            {
+                if (preset.preferredBaits[i] != null) { bait = preset.preferredBaits[i]; break; }
+            }
+        }
+        Sprite baitSprite = bait != null ? bait.icon : null;
+
+        if (baitIconTarget != null)
+        {
+            if (baitSprite != null)
+            {
+                baitIconTarget.sprite = baitSprite;
+                baitIconTarget.enabled = true;
+            }
+            else if (hideBaitIconWhenNoPreference)
+            {
+                baitIconTarget.enabled = false;
+            }
+        }
+
+        SpriteRenderer sr = baitSpriteTarget != null ? baitSpriteTarget : GetComponentInChildren<SpriteRenderer>(true);
+        if (sr != null)
+        {
+            if (baitSprite != null)
+            {
+                sr.sprite = baitSprite;
+                sr.enabled = true;
+            }
+            else if (hideBaitIconWhenNoPreference)
+            {
+                sr.enabled = false;
             }
         }
     }

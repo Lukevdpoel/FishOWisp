@@ -175,13 +175,41 @@ public class FishingZone : MonoBehaviour
             return;
         }
 
-        ripple.preset = fishPool.availableFish[Random.Range(0, fishPool.availableFish.Count)];
+        FishPreset chosen = PickEligibleFish();
+        if (chosen == null)
+        {
+            // No fish in this pool match the active world weather (e.g. only Night-only fish
+            // listed but it's currently Sunny). Skip this spawn; the respawn timer will try again.
+            Destroy(rippleObj);
+            return;
+        }
+        ripple.preset = chosen;
         ripple.Initialize(zoneCollider, waterSurfaceY, aimIndicatorPrefab);
 
         if (currentBobber != null)
             ripple.SetBobberTransform(currentBobber.transform);
 
         activeFish.Add(ripple);
+    }
+
+    // Strict gating: a fish only spawns when its preferredWeather matches the current
+    // active fishing weather. WorldStateManager reports Night while ForcedNight is
+    // active, otherwise Sunny — so Night-only fish appear only after the player buys
+    // the Night time-of-day option at the vendor.
+    private FishPreset PickEligibleFish()
+    {
+        WeatherType active = WorldStateManager.Instance != null
+            ? WorldStateManager.Instance.GetActiveFishingWeather()
+            : WeatherType.Sunny;
+
+        List<FishPreset> eligible = new List<FishPreset>();
+        for (int i = 0; i < fishPool.availableFish.Count; i++)
+        {
+            FishPreset f = fishPool.availableFish[i];
+            if (f != null && f.preferredWeather == active) eligible.Add(f);
+        }
+        if (eligible.Count == 0) return null;
+        return eligible[Random.Range(0, eligible.Count)];
     }
 
     private void ResetRespawnTimer()

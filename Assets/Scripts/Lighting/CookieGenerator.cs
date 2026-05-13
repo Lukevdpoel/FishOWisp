@@ -34,6 +34,9 @@ public class CookieGenerator : MonoBehaviour
     void Update()
     {
         if (cookieRT == null || generatorMaterial == null || cloudNoiseTexture == null) return;
+#if UNITY_EDITOR
+        if (UnityEditor.EditorApplication.isPaused) return;
+#endif
 
         // 1. Force Cookie Assignment
         if (!Application.isPlaying && targetLight != null && targetLight.cookie != cookieRT)

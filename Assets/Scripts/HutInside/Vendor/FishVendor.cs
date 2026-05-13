@@ -14,6 +14,10 @@ public class FishVendor : MonoBehaviour
     [Tooltip("Bait this vendor will sell. Each entry has a BaitItem and the price for one stack.")]
     public List<BaitOffer> baitOffers = new List<BaitOffer>();
 
+    [Header("Time-of-Day Shop")]
+    [Tooltip("Buyable permanent time-of-day overrides. Each entry sets the world to Day or Night until another is bought.")]
+    public List<TimeOfDayOffer> timeOfDayOffers = new List<TimeOfDayOffer>();
+
     [Header("Interaction")]
     [Tooltip("Player must be within this distance to open the shop with E.")]
     [Min(0f)] public float interactionRadius = 3f;
@@ -35,6 +39,18 @@ public class FishVendor : MonoBehaviour
     {
         public BaitItem bait;
         [Min(0)] public int pricePerStack = 25;
+    }
+
+    [Serializable]
+    public class TimeOfDayOffer
+    {
+        [Tooltip("Display name shown on the buy button row, e.g. 'Night Lantern' or 'Sunshine Stone'.")]
+        public string displayName = "Night Lantern";
+        [Tooltip("Optional icon shown to the left of the row.")]
+        public Sprite icon;
+        [Min(0)] public int price = 200;
+        [Tooltip("Which permanent override this entry sets when bought.")]
+        public WorldStateManager.TimeMode mode = WorldStateManager.TimeMode.ForcedNight;
     }
 
     private void Start()
@@ -131,6 +147,38 @@ public class FishVendor : MonoBehaviour
         if (buyParticles != null) buyParticles.Play();
         OnVendorInventoryChanged?.Invoke();
         Debug.Log($"Bought {offer.bait.displayName} x{baitStackSize} for {offer.pricePerStack} coins.");
+        return true;
+    }
+
+    public bool TryBuyTimeOfDay(TimeOfDayOffer offer)
+    {
+        if (offer == null) return false;
+        if (PlayerInventory.Instance == null) return false;
+
+        WorldStateManager world = WorldStateManager.Instance;
+        if (world == null)
+        {
+            Debug.LogWarning("[FishVendor] No WorldStateManager available; cannot apply time override.");
+            return false;
+        }
+
+        if (world.CurrentTimeMode == offer.mode)
+        {
+            Debug.Log($"{offer.displayName} already active.");
+            return false;
+        }
+
+        if (!PlayerInventory.Instance.TrySpendCurrency(offer.price))
+        {
+            Debug.Log($"Not enough coins to buy {offer.displayName} ({offer.price} required).");
+            return false;
+        }
+
+        world.SetTimeMode(offer.mode);
+
+        if (buyParticles != null) buyParticles.Play();
+        OnVendorInventoryChanged?.Invoke();
+        Debug.Log($"Bought {offer.displayName} for {offer.price} coins. Time mode: {offer.mode}");
         return true;
     }
 }

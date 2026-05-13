@@ -24,9 +24,17 @@ public class CrossFadeDayNight : MonoBehaviour
     void Update()
     {
         if (dawnVolume == null || nightVolume == null) return;
-        if (GameTimeManager.Instance == null) return;
 
-        float time = GameTimeManager.Instance.CurrentHour;
+        float time;
+        if (WorldStateManager.Instance != null)
+        {
+            time = WorldStateManager.Instance.GetEffectiveHour();
+        }
+        else if (GameTimeManager.Instance != null)
+        {
+            time = GameTimeManager.Instance.CurrentHour;
+        }
+        else return;
 
         float dawnWeight = 0f;
         float nightWeight = 0f;

@@ -127,6 +127,9 @@ public class FoliageTrailRenderer : MonoBehaviour
     void LateUpdate()
     {
         if (!ready) return;
+#if UNITY_EDITOR
+        if (UnityEditor.EditorApplication.isPaused) return;
+#endif
 
         frameCounter++;
         bool tick = (frameCounter % updateInterval) == 0;

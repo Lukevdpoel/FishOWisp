@@ -293,6 +293,17 @@ public class PlayerController : MonoBehaviour
         targetVelocity = new Vector3(newHorizontal.x, yVelocity, newHorizontal.z);
     }
 
+    public void SetFacing(Quaternion worldRotation)
+    {
+        if (playerModel == null) return;
+        Vector3 flatForward = worldRotation * Vector3.forward;
+        flatForward.y = 0f;
+        if (flatForward.sqrMagnitude < 0.0001f) return;
+        Quaternion flat = Quaternion.LookRotation(flatForward.normalized);
+        playerModel.rotation = flat;
+        targetModelRotation = flat;
+    }
+
     private void HandleRotation()
     {
         if (areControlsLocked) return;

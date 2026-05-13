@@ -51,37 +51,46 @@ public class SceneTransitionManager : GenericSingleton<SceneTransitionManager>
 
     private IEnumerator OnSceneLoadedRoutine()
     {
-        // 1. CRITICAL WAIT: Wait 1 frame so the new scene can initialize first.
-        // This prevents the Player Prefab's own Start() script from overwriting our teleport.
+        // Wait two frames so the new scene's Awake AND Start have both run before we teleport.
+        yield return null;
         yield return null;
 
         // --- POSITIONING LOGIC ---
         if (!string.IsNullOrEmpty(currentSpawnID))
         {
-            GameObject player = GameObject.FindGameObjectWithTag("Player");
             SpawnPoint point = FindSpawnPoint(currentSpawnID);
 
-            if (player != null && point != null)
+            // The CharacterController is the GameObject that *is* the character physically.
+            // In PlayerMaster the CC is on a nested child with a non-zero local offset relative to the
+            // PlayerMaster root, so we must teleport the CC's transform directly (NOT transform.root) for
+            // the visible character to land at the spawn point gizmo.
+            CharacterController cc = FindFirstObjectByType<CharacterController>(FindObjectsInactive.Include);
+
+            if (cc != null && point != null)
             {
-                // Disable CharacterController to prevent it from fighting the teleport
-                CharacterController cc = player.GetComponent<CharacterController>();
-                if (cc != null) cc.enabled = false;
+                Transform characterTransform = cc.transform;
 
-                // Teleport the player
-                player.transform.position = point.transform.position;
-                player.transform.rotation = point.transform.rotation;
-
-                // Force Unity to acknowledge the move immediately
+                cc.enabled = false;
+                characterTransform.SetPositionAndRotation(point.transform.position, point.transform.rotation);
                 Physics.SyncTransforms();
+                cc.enabled = true;
 
-                if (cc != null) cc.enabled = true;
+                // The visible facing is controlled by PlayerController's playerModel transform, not the
+                // CharacterController. Drive it explicitly so it doesn't slerp back to the pre-teleport facing.
+                PlayerController playerController = cc.GetComponentInParent<PlayerController>();
+                if (playerController == null) playerController = cc.GetComponentInChildren<PlayerController>(true);
+                if (playerController != null) playerController.SetFacing(point.transform.rotation);
 
-                Debug.Log($"Teleport successful: Player moved to {currentSpawnID}");
+                Debug.Log($"[SceneTransition] Teleported '{characterTransform.name}' to spawn '{currentSpawnID}' at {point.transform.position}.");
             }
             else
             {
-                Debug.LogWarning($"Teleport Failed: Player found? {player != null}, SpawnPoint found? {point != null}");
+                string available = string.Join(", ", FindObjectsByType<SpawnPoint>(FindObjectsInactive.Include, FindObjectsSortMode.None).Select(p => p.spawnID));
+                Debug.LogWarning($"[SceneTransition] Teleport failed (spawnID='{currentSpawnID}'). CharacterController found? {cc != null}. SpawnPoint found? {point != null}. Available spawn IDs in scene: [{available}].");
             }
+
+            // Clear so a later scene load without an ID doesn't re-apply this teleport.
+            currentSpawnID = "";
         }
         // -------------------------
 
@@ -139,7 +148,8 @@ public class SceneTransitionManager : GenericSingleton<SceneTransitionManager>
 
     private SpawnPoint FindSpawnPoint(string id)
     {
-        SpawnPoint[] points = FindObjectsOfType<SpawnPoint>();
+        // Include inactive in case the spawn point sits under a disabled grouping object.
+        SpawnPoint[] points = FindObjectsByType<SpawnPoint>(FindObjectsInactive.Include, FindObjectsSortMode.None);
         return points.FirstOrDefault(p => p.spawnID == id);
     }
 }

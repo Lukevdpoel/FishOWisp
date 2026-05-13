@@ -9,6 +9,9 @@ public class CRT_Ticker : MonoBehaviour
     void Update()
     {
         if (customTexture == null) return;
+#if UNITY_EDITOR
+        if (UnityEditor.EditorApplication.isPaused) return;
+#endif
 
         // 1. Force the texture to initialize if it hasn't (fixes black screen on start)
         if (!customTexture.IsCreated())
