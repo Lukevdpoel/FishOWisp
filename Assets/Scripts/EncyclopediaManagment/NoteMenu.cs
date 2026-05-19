@@ -13,6 +13,7 @@ public class NoteMenu : MonoBehaviour
     public float uiDelay = 0.5f;
 
     private bool isNoteOpen = false;
+    public bool IsNoteOpen => isNoteOpen;
 
     private string debugInfo = "NoteMenu: waiting...";
 
@@ -61,7 +62,7 @@ public class NoteMenu : MonoBehaviour
         StartCoroutine(ShowUIRoutine());
     }
 
-    void CloseNotebook()
+    public void CloseNotebook()
     {
         isNoteOpen = false;
 

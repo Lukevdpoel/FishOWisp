@@ -39,6 +39,7 @@ public class BaitShopUI : MonoBehaviour
     private readonly List<WorldRowUI> worldRows = new List<WorldRowUI>();
     private readonly List<BaitCellUI> baitCells = new List<BaitCellUI>();
     private bool lastVisible = true;
+    private InventoryUI registeredInventory;
 
     private class WorldRowUI
     {
@@ -58,6 +59,7 @@ public class BaitShopUI : MonoBehaviour
     {
         EnsureCanvasParent();
         BuildPanel();
+        RegisterWithInventory();
         SyncActiveVendor();
 
         if (PlayerInventory.Instance != null)
@@ -80,6 +82,33 @@ public class BaitShopUI : MonoBehaviour
         FishVendor.OnVendorInventoryChanged -= RefreshAffordability;
         FishVendor.OnCurrentShoppingVendorChanged -= SyncActiveVendor;
         WorldStateManager.OnWorldStateChanged -= RefreshStatusLine;
+
+        UnregisterFromInventory();
+    }
+
+    // The InventoryUI closes itself on any left-click that lands outside its known UI
+    // roots. The shop panel is built at runtime here and isn't wired in the scene, so
+    // without this registration clicks on Buy buttons would be classified as "outside"
+    // and dismiss the inventory before the button's onClick can fire.
+    private void RegisterWithInventory()
+    {
+        InventoryUI inv = FindFirstObjectByType<InventoryUI>();
+        if (inv == null) return;
+        RectTransform self = transform as RectTransform;
+        if (self == null) return;
+        if (!inv.additionalClickThroughRoots.Contains(self))
+        {
+            inv.additionalClickThroughRoots.Add(self);
+        }
+        registeredInventory = inv;
+    }
+
+    private void UnregisterFromInventory()
+    {
+        if (registeredInventory == null) return;
+        RectTransform self = transform as RectTransform;
+        if (self != null) registeredInventory.additionalClickThroughRoots.Remove(self);
+        registeredInventory = null;
     }
 
     private void Update()
@@ -231,8 +260,16 @@ public class BaitShopUI : MonoBehaviour
         }
 
         // ---- Bait section ----
-        int baitCount = activeVendor.baitOffers != null ? activeVendor.baitOffers.Count : 0;
-        if (baitCount > 0)
+        int sellableCount = 0;
+        if (activeVendor.baitOffers != null)
+        {
+            for (int i = 0; i < activeVendor.baitOffers.Count; i++)
+            {
+                FishVendor.BaitOffer o = activeVendor.baitOffers[i];
+                if (o != null && o.bait != null && !o.bait.isAlwaysAvailable) sellableCount++;
+            }
+        }
+        if (sellableCount > 0)
         {
             CreateSectionHeader("Bait", cursorY);
             cursorY -= 28f;
@@ -369,12 +406,15 @@ public class BaitShopUI : MonoBehaviour
         stripRect.sizeDelta = new Vector2(-32f, baitCellHeight);
 
         int count = activeVendor.baitOffers.Count;
+        int displayIndex = 0;
         for (int i = 0; i < count; i++)
         {
             FishVendor.BaitOffer offer = activeVendor.baitOffers[i];
             if (offer == null || offer.bait == null) continue;
-            BaitCellUI cell = CreateBaitCell(stripRect, offer, activeVendor.baitStackSize, i);
+            if (offer.bait.isAlwaysAvailable) continue; // Always-available bait is never sold.
+            BaitCellUI cell = CreateBaitCell(stripRect, offer, activeVendor.baitStackSize, displayIndex);
             baitCells.Add(cell);
+            displayIndex++;
         }
     }
 

@@ -134,6 +134,7 @@ public class FishVendor : MonoBehaviour
     public bool TryBuyBait(BaitOffer offer)
     {
         if (offer == null || offer.bait == null) return false;
+        if (offer.bait.isAlwaysAvailable) return false; // Always-available bait can't be purchased.
         if (PlayerInventory.Instance == null || BaitInventory.Instance == null) return false;
 
         if (!PlayerInventory.Instance.TrySpendCurrency(offer.pricePerStack))

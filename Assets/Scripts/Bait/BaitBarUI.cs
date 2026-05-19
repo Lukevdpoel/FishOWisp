@@ -263,7 +263,7 @@ public class BaitBarUI : MonoBehaviour
         }
 
         int actualCount = inv.GetCount(slot.bait);
-        if (actualCount <= 0) return; // Can't equip what you don't have.
+        if (actualCount <= 0 && !slot.bait.isAlwaysAvailable) return; // Can't equip what you don't have.
 
         inv.SetSelectedBait(slot.bait);
     }
@@ -280,11 +280,12 @@ public class BaitBarUI : MonoBehaviour
 
             int actual = BaitInventory.Instance.GetCount(s.bait);
             bool isEquipped = selected == s.bait;
+            bool isInfinite = s.bait.isAlwaysAvailable;
             int displayed = Mathf.Max(0, actual - (isEquipped ? 1 : 0));
 
-            s.countText.text = displayed.ToString();
+            s.countText.text = isInfinite ? "∞" : displayed.ToString();
 
-            bool inStock = actual > 0;
+            bool inStock = isInfinite || actual > 0;
             if (isEquipped)
             {
                 s.background.color = slotEquippedColor;

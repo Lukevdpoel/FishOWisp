@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 using TMPro;
 
@@ -25,6 +26,12 @@ public class FishingUIController : MonoBehaviour
 
         // Force-hide the legacy charge bar in case anything else tries to enable it.
         FishingEvents.OnToggleChargeUI += ForceHideChargePanel;
+
+        SceneManager.sceneLoaded += OnSceneLoaded;
+
+        // Re-hide on every enable so a scene reload can't leave the legacy bar visible.
+        HideChargePanel();
+        HideFightPanel();
     }
 
     private void OnDisable()
@@ -35,6 +42,16 @@ public class FishingUIController : MonoBehaviour
 
         FishingEvents.OnCancelFishing -= HideFightUIOnCancel;
         FishingEvents.OnToggleChargeUI -= ForceHideChargePanel;
+
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        // After a scene swap, panels can come back active even if the script instance is fresh.
+        // Force them off so the player doesn't see a phantom charge bar on the next scene.
+        HideChargePanel();
+        HideFightPanel();
     }
 
     private void Awake()
@@ -45,19 +62,23 @@ public class FishingUIController : MonoBehaviour
 
     void Start()
     {
-        if (fightUIPanel != null)
-        {
-            fightUIPanel.SetActive(false);
-        }
+        HideFightPanel();
         HideChargePanel();
-        Debug.Log($"[FishingUIController] Start ran. chargeUIPanel={(chargeUIPanel != null ? chargeUIPanel.name : "NULL")}, hidden.");
     }
 
     private void HideChargePanel()
     {
-        if (chargeUIPanel != null && chargeUIPanel.activeSelf)
+        if (chargeUIPanel != null)
         {
             chargeUIPanel.SetActive(false);
+        }
+    }
+
+    private void HideFightPanel()
+    {
+        if (fightUIPanel != null)
+        {
+            fightUIPanel.SetActive(false);
         }
     }
 

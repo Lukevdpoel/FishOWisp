@@ -53,6 +53,12 @@ public class RodCasting : MonoBehaviour
         FishingEvents.OnStartCharging += BeginCharging;
         FishingEvents.OnCancelCharging += ReleaseCharge;
         FishingEvents.OnCancelFishing += Cancel;
+
+        // After a scene swap, ensure stale charge state from a previous scene can't
+        // leave the casting target or charge UI hanging in the new scene.
+        isCharging = false;
+        FishingEvents.OnToggleChargeUI?.Invoke(false);
+        DestroyCastingTarget();
     }
 
     private void OnDisable()

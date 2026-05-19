@@ -13,4 +13,7 @@ public class BaitItem : ScriptableObject
     public Sprite icon;
 
     [TextArea] public string description;
+
+    [Tooltip("If true, this bait is treated as infinite: it can never be bought, dropped, or consumed, and is always equipped at full stock.")]
+    public bool isAlwaysAvailable;
 }

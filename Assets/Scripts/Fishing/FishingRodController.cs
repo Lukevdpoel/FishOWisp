@@ -363,6 +363,14 @@ public class FishingRodController : MonoBehaviour
     private void HandleReelingCompleted(CaughtFish fishToInventory)
     {
         Debug.Log($"[FishFight] HandleReelingCompleted — fish: {(fishToInventory != null ? fishToInventory.GetDisplayName() : "NULL")}, inspectionHandler: {(inspectionHandler != null ? "valid" : "NULL")}");
+
+        // FishingLine.ReelInBobberRoutine also fires this, but it can bail out early
+        // (yield break when the bobber is destroyed mid-animation by ReelInBobberRoutine here),
+        // leaving subscribers like BaitBarUI stuck thinking fishing is still active.
+        // Fire it from the one path every reel funnels through so the bait UI never gets
+        // locked out after a catch or after reeling back an empty line.
+        FishingEvents.OnReelingCompleted?.Invoke();
+
         if (fishToInventory != null && inspectionHandler != null)
         {
             currentState = FishingState.InspectingCatch;

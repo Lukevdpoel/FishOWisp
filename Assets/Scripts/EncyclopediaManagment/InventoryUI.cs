@@ -9,7 +9,7 @@ public class InventoryUI : MonoBehaviour
     public static bool IsInventoryOpen { get; private set; }
 
     [Header("Keybindings")]
-    public KeyCode toggleKey = KeyCode.I;
+    public KeyCode toggleKey = KeyCode.B;
 
     [Header("Main References")]
     public GameObject uiPanel;
@@ -56,11 +56,35 @@ public class InventoryUI : MonoBehaviour
     public List<MonoBehaviour> scriptsToDisableInput = new List<MonoBehaviour>();
     public Button closeButton;
 
+    [Tooltip("Clicking anywhere outside the inventory panel closes it. The bait bar is " +
+             "always treated as 'inside'. Add any other UI roots here that should also keep " +
+             "the inventory open when clicked.")]
+    public List<RectTransform> additionalClickThroughRoots = new List<RectTransform>();
+
     private List<InventorySlotUI> spawnedSlots = new List<InventorySlotUI>();
     private Camera cachedCamera;
 
+    // Returns the active main camera. The cached ref can go stale when something else swaps the
+    // MainCamera tag at runtime (e.g. ShopDoorController switching to an interior camera), so we
+    // refresh whenever the cached camera becomes null or inactive.
+    private Camera ActiveCamera
+    {
+        get
+        {
+            if (cachedCamera == null || !cachedCamera.isActiveAndEnabled)
+                cachedCamera = Camera.main;
+            return cachedCamera;
+        }
+    }
+
     private GameObject currentDraggedModel;
     private CaughtFish currentDraggedFishData;
+
+    // Click-away-to-close support.
+    private PointerEventData clickPointerData;
+    private List<RaycastResult> clickRaycastResults;
+    private BaitBarUI baitBar;
+    private int openedFrame = -1;
 
     private void Start()
     {
@@ -68,9 +92,17 @@ public class InventoryUI : MonoBehaviour
         IsInventoryOpen = false;
         ToggleInputScripts(true);
 
+        clickRaycastResults = new List<RaycastResult>();
+        baitBar = FindFirstObjectByType<BaitBarUI>();
+
         if (PlayerInventory.Instance != null)
         {
             PlayerInventory.Instance.OnInventoryChanged += RefreshInventory;
+        }
+
+        if (BaitInventory.Instance != null)
+        {
+            BaitInventory.Instance.OnSelectedBaitChanged += HandleSelectedBaitChanged;
         }
 
         if (uiPanel != null) uiPanel.SetActive(false);
@@ -88,6 +120,11 @@ public class InventoryUI : MonoBehaviour
         {
             PlayerInventory.Instance.OnInventoryChanged -= RefreshInventory;
         }
+
+        if (BaitInventory.Instance != null)
+        {
+            BaitInventory.Instance.OnSelectedBaitChanged -= HandleSelectedBaitChanged;
+        }
     }
 
     private void Update()
@@ -97,7 +134,65 @@ public class InventoryUI : MonoBehaviour
             ToggleInventory();
         }
 
+        // Click-away-to-close: a left click that lands outside the inventory panel
+        // (and outside the bait bar) closes the menu. Skipped on the frame it opened
+        // so the very click that opened it can't immediately close it again, and
+        // skipped mid-drag so dropping a fish doesn't count as a click-away.
+        if (IsInventoryOpen
+            && Time.frameCount != openedFrame
+            && currentDraggedModel == null
+            && Input.GetMouseButtonDown(0)
+            && !IsPointerOverInventoryUI())
+        {
+            CloseInventory();
+            return;
+        }
+
         HandleFishDrag();
+    }
+
+    private bool IsPointerOverInventoryUI()
+    {
+        if (EventSystem.current == null) return true; // Can't tell — err on keeping it open.
+
+        if (clickPointerData == null)
+            clickPointerData = new PointerEventData(EventSystem.current);
+        clickPointerData.position = Input.mousePosition;
+
+        clickRaycastResults.Clear();
+        EventSystem.current.RaycastAll(clickPointerData, clickRaycastResults);
+
+        foreach (var result in clickRaycastResults)
+        {
+            Transform hit = result.gameObject.transform;
+
+            if (uiPanel != null && hit.IsChildOf(uiPanel.transform))
+                return true;
+
+            // The bait bar only exists while the inventory is open, so clicks on it
+            // must count as "inside" — otherwise closing on mouse-down would kill the
+            // slot button before its mouse-up click can register a bait selection.
+            if (baitBar != null && hit.IsChildOf(baitBar.transform))
+                return true;
+
+            foreach (var root in additionalClickThroughRoots)
+            {
+                if (root != null && hit.IsChildOf(root))
+                    return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void HandleSelectedBaitChanged(BaitItem bait)
+    {
+        // Picking a bait (e.g. from the bait bar that pops up when casting without bait)
+        // dismisses the inventory automatically.
+        if (bait != null && IsInventoryOpen)
+        {
+            CloseInventory();
+        }
     }
 
     private void HandleFishDrag()
@@ -112,7 +207,7 @@ public class InventoryUI : MonoBehaviour
             }
 
             // 2. Position Logic
-            Ray ray = cachedCamera.ScreenPointToRay(Input.mousePosition);
+            Ray ray = ActiveCamera.ScreenPointToRay(Input.mousePosition);
             currentDraggedModel.transform.position = ray.GetPoint(modelDistance);
 
             // 3. Rotation
@@ -135,7 +230,7 @@ public class InventoryUI : MonoBehaviour
         else
         {
             // 2. Check World Block
-            Ray ray = cachedCamera.ScreenPointToRay(Input.mousePosition);
+            Ray ray = ActiveCamera.ScreenPointToRay(Input.mousePosition);
 
             // Calculate mask: All layers EXCEPT the ignore list.
             int finalMask = ~raycastIgnoreLayers.value;
@@ -258,7 +353,7 @@ public class InventoryUI : MonoBehaviour
         {
             currentDraggedModel = Instantiate(fish.preset.fishPrefab);
 
-            Ray ray = cachedCamera.ScreenPointToRay(Input.mousePosition);
+            Ray ray = ActiveCamera.ScreenPointToRay(Input.mousePosition);
             currentDraggedModel.transform.position = ray.GetPoint(modelDistance);
 
             currentDraggedModel.transform.rotation = Quaternion.identity;
@@ -279,6 +374,7 @@ public class InventoryUI : MonoBehaviour
     public void OpenInventory()
     {
         IsInventoryOpen = true;
+        openedFrame = Time.frameCount;
         if (uiPanel != null) uiPanel.SetActive(true);
         RefreshInventory();
 

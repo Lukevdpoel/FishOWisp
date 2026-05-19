@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using Sirenix.OdinInspector;
 using UnityEngine;
 
 public class BaitInventory : GenericSingleton<BaitInventory>
@@ -8,6 +9,7 @@ public class BaitInventory : GenericSingleton<BaitInventory>
     [Tooltip("All bait items the game knows about. Add every BaitItem asset here so save/load can resolve them by id.")]
     [SerializeField] private List<BaitItem> registeredBaits = new List<BaitItem>();
 
+    [ShowInInspector, ReadOnly, DictionaryDrawerSettings(KeyLabel = "Bait ID", ValueLabel = "Count")]
     private readonly Dictionary<string, int> counts = new Dictionary<string, int>();
 
     [Tooltip("The bait currently equipped on the hook. Null = no bait selected.")]
@@ -50,12 +52,14 @@ public class BaitInventory : GenericSingleton<BaitInventory>
     public int GetCount(BaitItem bait)
     {
         if (bait == null || string.IsNullOrEmpty(bait.id)) return 0;
+        if (bait.isAlwaysAvailable) return int.MaxValue;
         return counts.TryGetValue(bait.id, out int n) ? n : 0;
     }
 
     public void AddBait(BaitItem bait, int amount = 1)
     {
         if (bait == null || string.IsNullOrEmpty(bait.id) || amount <= 0) return;
+        if (bait.isAlwaysAvailable) return;
         counts[bait.id] = GetCount(bait) + amount;
         SaveBait();
         OnBaitChanged?.Invoke();
@@ -65,6 +69,7 @@ public class BaitInventory : GenericSingleton<BaitInventory>
     public bool TryConsume(BaitItem bait, int amount = 1)
     {
         if (bait == null || amount <= 0) return false;
+        if (bait.isAlwaysAvailable) return true;
         int have = GetCount(bait);
         if (have < amount) return false;
         counts[bait.id] = have - amount;
@@ -81,6 +86,36 @@ public class BaitInventory : GenericSingleton<BaitInventory>
     }
 
     public IReadOnlyList<BaitItem> RegisteredBaits => registeredBaits;
+
+    public void SetCount(BaitItem bait, int amount)
+    {
+        if (bait == null || string.IsNullOrEmpty(bait.id)) return;
+        if (bait.isAlwaysAvailable) return;
+        amount = Mathf.Max(0, amount);
+        counts[bait.id] = amount;
+        SaveBait();
+        OnBaitChanged?.Invoke();
+
+        if (amount <= 0 && selectedBait == bait)
+        {
+            selectedBait = null;
+            OnSelectedBaitChanged?.Invoke(null);
+        }
+    }
+
+    [Button("Clear All Bait")]
+    public void ClearAllBait()
+    {
+        counts.Clear();
+        if (selectedBait != null)
+        {
+            selectedBait = null;
+            OnSelectedBaitChanged?.Invoke(null);
+        }
+        SaveBait();
+        OnBaitChanged?.Invoke();
+        Debug.Log("[BaitInventory] Cleared all bait counts.");
+    }
 
     private void SaveBait()
     {

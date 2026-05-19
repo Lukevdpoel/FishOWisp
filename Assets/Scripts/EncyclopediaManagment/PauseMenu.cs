@@ -47,9 +47,41 @@ public class PauseMenu : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Escape))
         {
-            if (isPaused) Resume();
-            else Pause();
+            if (isPaused)
+            {
+                Resume();
+            }
+            else if (!TryCloseOtherUIs())
+            {
+                Pause();
+            }
         }
+    }
+
+    // Returns true if any other UI was open and got closed by this press, so the pause
+    // menu itself does NOT open on the same Esc press. The next Esc will then open it.
+    private bool TryCloseOtherUIs()
+    {
+        bool closedAny = false;
+
+        NoteMenu note = FindFirstObjectByType<NoteMenu>();
+        if (note != null && note.IsNoteOpen)
+        {
+            note.CloseNotebook();
+            closedAny = true;
+        }
+
+        if (InventoryUI.IsInventoryOpen)
+        {
+            InventoryUI inv = FindFirstObjectByType<InventoryUI>();
+            if (inv != null)
+            {
+                inv.CloseInventory();
+                closedAny = true;
+            }
+        }
+
+        return closedAny;
     }
 
     public void Resume()

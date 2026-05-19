@@ -42,6 +42,7 @@ public class BaitDropper : MonoBehaviour
         foreach (DropEntry entry in dropTable)
         {
             if (entry == null || entry.bait == null) continue;
+            if (entry.bait.isAlwaysAvailable) continue; // Always-available bait is never collected.
             if (Random.value > entry.chance) continue;
 
             int amount = Random.Range(entry.minCount, entry.maxCount + 1);
