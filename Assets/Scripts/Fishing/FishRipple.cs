@@ -32,12 +32,14 @@ public class FishRipple : MonoBehaviour
     [Range(0f, 1f)]
     public float attractPauseChance = 0.3f;
 
-    [Header("Lose Interest")]
-    [Tooltip("Seconds without an attract press before the fish can lose interest.")]
-    public float loseInterestDelay = 3f;
-    [Tooltip("Once eligible, chance per second the fish loses interest and drifts back.")]
-    public float loseInterestChancePerSec = 0.25f;
-    [Tooltip("How far the fish drifts away when it loses interest.")]
+    [Header("Commit Behavior")]
+    [Tooltip("Distance at which the lead starts committing — weave amplitude and pause chance fade out and speed ramps up the closer it gets to the bobber. Must be larger than nibbleRange.")]
+    public float commitDistance = 3f;
+    [Tooltip("How much commit damps the weave amplitude near the bobber. 1 = weave shrinks to zero at nibbleRange, 0 = weave unchanged.")]
+    [Range(0f, 1f)] public float commitWeaveDamping = 0.85f;
+    [Tooltip("Bonus added to attractSpeed at full commit (dist == nibbleRange). 0.6 = 60% faster on final approach.")]
+    public float commitSpeedBoost = 0.6f;
+    [Tooltip("How far the fish drifts away when the lead is lost (caught, reeled, scared).")]
     public float loseInterestDriftDistance = 3f;
 
     [Header("Wake")]
@@ -79,6 +81,8 @@ public class FishRipple : MonoBehaviour
     public float glimpseFadeIn = 0.35f;
     [Tooltip("Seconds the glimpse takes to fade out.")]
     public float glimpseFadeOut = 0.6f;
+    [Tooltip("Debug: keep the bait indicator fully visible at all times, ignoring aim-mode gating and the glimpse fade cycle.")]
+    public bool alwaysShowIndicator = false;
 
     [Header("Timing")]
     public float scareCooldown = 5f;
@@ -105,9 +109,6 @@ public class FishRipple : MonoBehaviour
     private Vector3 weaveOffset;
     private float weaveTimer;
     private float attractPauseTimer;
-    private float lastAttractInputTime;
-    private bool isDriftingBack;
-    private Vector3 driftTarget;
 
     // Scared
     private Vector3 scareDirection;
@@ -216,8 +217,6 @@ public class FishRipple : MonoBehaviour
         weaveTimer = 0f;
         weaveOffset = Vector3.zero;
         attractPauseTimer = 0f;
-        lastAttractInputTime = Time.time;
-        isDriftingBack = false;
     }
 
     public void SetFollower(bool follower)
@@ -257,12 +256,6 @@ public class FishRipple : MonoBehaviour
                 PickNewWanderTarget();
             }
         }
-    }
-
-    public void NotifyAttractInput()
-    {
-        lastAttractInputTime = Time.time;
-        isDriftingBack = false;
     }
 
     public void Scare()
@@ -355,6 +348,21 @@ public class FishRipple : MonoBehaviour
     private void UpdateGlimpse()
     {
         if (indicatorInstance == null) return;
+
+        if (alwaysShowIndicator)
+        {
+            if (glimpseAlpha != 1f) { glimpseAlpha = 1f; }
+            glimpsePhase = GlimpsePhase.Holding;
+            ApplyGlimpseAlpha();
+            Camera cam = Camera.main;
+            if (cam != null)
+            {
+                indicatorInstance.transform.rotation = Quaternion.LookRotation(
+                    indicatorInstance.transform.position - cam.transform.position
+                );
+            }
+            return;
+        }
 
         if (!isAimingActive)
         {
@@ -564,33 +572,11 @@ public class FishRipple : MonoBehaviour
 
         float dist = GetHorizontalDistance(transform.position, bobberPos);
 
-        // Passive engagement: while the bobber sits inside our awareness radius, suppress lose-interest
-        // (the fish stays curious as long as the lure is nearby). If the bobber leaves the radius and
-        // we self-attracted as a follower, gracefully drift back to wandering.
-        if (actionRadius > 0f && dist <= actionRadius)
-        {
-            lastAttractInputTime = Time.time;
-        }
-        else if (actionRadius > 0f && isFollower && dist > actionRadius)
+        // Self-attracted followers drift back to wandering once the bobber leaves the awareness radius.
+        if (actionRadius > 0f && isFollower && dist > actionRadius)
         {
             StopFollowing();
             return;
-        }
-
-        // If drifting back after losing interest
-        if (isDriftingBack)
-        {
-            float driftDist = GetHorizontalDistance(transform.position, driftTarget);
-            if (driftDist < 0.3f)
-            {
-                isDriftingBack = false;
-            }
-            else
-            {
-                MoveToward(driftTarget, swimSpeed);
-                FaceMovementDirection(driftTarget);
-                return;
-            }
         }
 
         if (!isFollower && dist < nibbleRange)
@@ -599,50 +585,35 @@ public class FishRipple : MonoBehaviour
             return;
         }
 
-        // Lose interest if player hasn't attracted recently
-        float timeSinceAttract = Time.time - lastAttractInputTime;
-        if (timeSinceAttract > loseInterestDelay)
-        {
-            if (Random.value < loseInterestChancePerSec * Time.deltaTime)
-            {
-                // Drift away from bobber a bit
-                Vector3 awayDir = (transform.position - bobberPos);
-                awayDir.y = 0;
-                if (awayDir.sqrMagnitude > 0.01f) awayDir.Normalize();
-                else awayDir = Random.insideUnitSphere; awayDir.y = 0; awayDir.Normalize();
+        // Commit ramp: as the lead closes on the bobber, weave/pauses fade out and speed ramps up,
+        // so the approach reads as a deliberate closing rather than indecisive hovering. The fish
+        // never gives up on its own — only player misplay (scare/reel) can break the approach.
+        float commitSpan = Mathf.Max(0.01f, commitDistance - nibbleRange);
+        float commitFactor = isFollower ? 0f : Mathf.Clamp01(1f - (dist - nibbleRange) / commitSpan);
+        float effectiveWeaveAmp = weaveAmplitude * (1f - commitFactor * commitWeaveDamping);
+        float effectivePauseChance = attractPauseChance * (1f - commitFactor);
+        float effectiveSpeed = attractSpeed * (1f + commitFactor * commitSpeedBoost);
 
-                driftTarget = transform.position + awayDir * loseInterestDriftDistance;
-                driftTarget.y = waterSurfaceY;
-                driftTarget = ClampToBounds(driftTarget);
-                isDriftingBack = true;
-                return;
-            }
-        }
-
-        // Pause briefly sometimes (fish hesitates)
         if (attractPauseTimer > 0f)
         {
             attractPauseTimer -= Time.deltaTime;
             return;
         }
 
-        // Update weave offset periodically
         weaveTimer -= Time.deltaTime;
         if (weaveTimer <= 0f)
         {
-            // Pick a perpendicular offset to the bobber direction
             Vector3 toBobber = (bobberPos - transform.position);
             toBobber.y = 0;
             if (toBobber.sqrMagnitude > 0.01f)
             {
                 Vector3 perp = Vector3.Cross(toBobber.normalized, Vector3.up);
-                weaveOffset = perp * Random.Range(-weaveAmplitude, weaveAmplitude);
+                weaveOffset = perp * Random.Range(-effectiveWeaveAmp, effectiveWeaveAmp);
             }
 
             weaveTimer = Random.Range(weaveIntervalMin, weaveIntervalMax);
 
-            // Random chance to pause
-            if (Random.value < attractPauseChance)
+            if (Random.value < effectivePauseChance)
             {
                 attractPauseTimer = Random.Range(attractPauseMin, attractPauseMax);
             }
@@ -664,7 +635,7 @@ public class FishRipple : MonoBehaviour
         Vector3 targetPos = approachCenter + weaveOffset;
         targetPos.y = waterSurfaceY;
 
-        MoveToward(targetPos, attractSpeed);
+        MoveToward(targetPos, effectiveSpeed);
         FaceMovementDirection(targetPos);
     }
 

@@ -302,20 +302,8 @@ public class FishingZone : MonoBehaviour
             }
             else
             {
-                // Notify the fish the player is still engaging — resets lose-interest timer
-                currentlyAttractedFish.NotifyAttractInput();
-
                 // Re-call attract — this handles the "too close = scare" check inside FishRipple
                 currentlyAttractedFish.AttractToBobber();
-
-                // Refresh interest for follower fish too, so the school keeps approaching
-                for (int i = 0; i < followerFish.Count; i++)
-                {
-                    if (followerFish[i] != null && followerFish[i].CurrentState == FishRipple.FishState.Attracted)
-                    {
-                        followerFish[i].NotifyAttractInput();
-                    }
-                }
 
                 // If it got scared from being too close, clear it
                 if (currentlyAttractedFish.CurrentState == FishRipple.FishState.Scared)

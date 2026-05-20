@@ -62,15 +62,19 @@ public class PlayerCameraController : MonoBehaviour
     [SerializeField] private float collisionRadius = 0.2f;
     [SerializeField] private float zoomDampTime = 0.1f;
 
-    [Header("Bite Reaction Pitch")]
+    [Header("Nibble Reaction Pitch")]
     [Tooltip("Degrees to pitch the camera down on each individual nibble. Positive = look down.")]
     public float nibblePitchOffset = 5f;
     [Tooltip("How long the nibble pitch is held before releasing back to neutral.")]
     public float nibblePitchHoldTime = 0.25f;
-    [Tooltip("Degrees to pitch the camera down while a fish is biting (reaction window). Holds until success or failure.")]
-    public float bitePitchOffset = 12f;
-    [Tooltip("Lerp speed for the bite/nibble pitch offset to reach its target.")]
-    public float bitePitchLerpSpeed = 6f;
+    [Tooltip("Lerp speed for the nibble pitch offset to reach its target.")]
+    public float nibblePitchLerpSpeed = 6f;
+
+    [Header("Bite Reaction Zoom")]
+    [Tooltip("Degrees subtracted from base FOV while a fish is biting (reaction window). Larger = stronger zoom-in. Holds until success or failure.")]
+    public float biteFovZoom = 15f;
+    [Tooltip("How fast (per second) the FOV interpolates toward its target during the bite zoom.")]
+    public float biteFovLerpSpeed = 8f;
 
     [Header("Sprint FOV")]
     [Tooltip("Degrees added to the camera's base FOV while the player is sprinting.")]
@@ -90,7 +94,7 @@ public class PlayerCameraController : MonoBehaviour
     private Vector3 pivotVelocity;
 
     private float nibbleHoldTimer = 0f;
-    private bool isBitePitchActive = false;
+    private bool isBiteActive = false;
     private float currentPitchOffset = 0f;
 
     private float chargeProgressTarget = 0f;
@@ -107,8 +111,8 @@ public class PlayerCameraController : MonoBehaviour
     {
         FishingEvents.OnFishNibble += HandleFishNibble;
         FishingEvents.OnFishBite += HandleFishBite;
-        FishingEvents.OnHookFishSuccess += HandleBitePitchRelease;
-        FishingEvents.OnCancelFishing += HandleBitePitchRelease;
+        FishingEvents.OnHookFishSuccess += HandleBiteRelease;
+        FishingEvents.OnCancelFishing += HandleBiteRelease;
 
         FishingEvents.OnChargeProgressNormalized += HandleChargeProgress;
         FishingEvents.OnCancelCharging += HandleChargeEnded;
@@ -120,8 +124,8 @@ public class PlayerCameraController : MonoBehaviour
     {
         FishingEvents.OnFishNibble -= HandleFishNibble;
         FishingEvents.OnFishBite -= HandleFishBite;
-        FishingEvents.OnHookFishSuccess -= HandleBitePitchRelease;
-        FishingEvents.OnCancelFishing -= HandleBitePitchRelease;
+        FishingEvents.OnHookFishSuccess -= HandleBiteRelease;
+        FishingEvents.OnCancelFishing -= HandleBiteRelease;
 
         FishingEvents.OnChargeProgressNormalized -= HandleChargeProgress;
         FishingEvents.OnCancelCharging -= HandleChargeEnded;
@@ -143,18 +147,15 @@ public class PlayerCameraController : MonoBehaviour
     private bool hasLoggedChargeEvent;
 
     private void HandleFishNibble(BobberController b) { nibbleHoldTimer = nibblePitchHoldTime; }
-    private void HandleFishBite(BobberController b) { isBitePitchActive = true; nibbleHoldTimer = 0f; }
-    private void HandleBitePitchRelease() { isBitePitchActive = false; }
+    private void HandleFishBite(BobberController b) { isBiteActive = true; nibbleHoldTimer = 0f; }
+    private void HandleBiteRelease() { isBiteActive = false; }
 
-    private void UpdateBitePitchOffset()
+    private void UpdateNibblePitchOffset()
     {
         if (nibbleHoldTimer > 0f) nibbleHoldTimer -= Time.deltaTime;
 
-        float target = 0f;
-        if (isBitePitchActive) target = bitePitchOffset;
-        else if (nibbleHoldTimer > 0f) target = nibblePitchOffset;
-
-        currentPitchOffset = Mathf.Lerp(currentPitchOffset, target, Time.deltaTime * bitePitchLerpSpeed);
+        float target = nibbleHoldTimer > 0f ? nibblePitchOffset : 0f;
+        currentPitchOffset = Mathf.Lerp(currentPitchOffset, target, Time.deltaTime * nibblePitchLerpSpeed);
     }
 
     public void Initialize(Transform playerModel)
@@ -226,7 +227,7 @@ public class PlayerCameraController : MonoBehaviour
             cameraXAngle = Mathf.LerpAngle(cameraXAngle, targetRot.eulerAngles.y, Time.deltaTime * fightCameraLerpSpeed);
         }
 
-        UpdateBitePitchOffset();
+        UpdateNibblePitchOffset();
 
         chargeProgress = Mathf.SmoothDamp(chargeProgress, chargeProgressTarget, ref chargeProgressVel, chargeSmoothTime, chargeMaxSpeed, Time.deltaTime);
         float chargePitchOffset = -chargePitchUpAngle * chargeProgress;
@@ -276,8 +277,19 @@ public class PlayerCameraController : MonoBehaviour
 
         if (cam != null)
         {
-            float targetFov = baseFov + (input.isSprinting ? sprintFovBoost : 0f);
-            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, targetFov, Time.deltaTime * sprintFovLerpSpeed);
+            float targetFov;
+            float fovLerpSpeed;
+            if (isBiteActive)
+            {
+                targetFov = baseFov - biteFovZoom;
+                fovLerpSpeed = biteFovLerpSpeed;
+            }
+            else
+            {
+                targetFov = baseFov + (input.isSprinting ? sprintFovBoost : 0f);
+                fovLerpSpeed = sprintFovLerpSpeed;
+            }
+            cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, targetFov, Time.deltaTime * fovLerpSpeed);
         }
     }
 }

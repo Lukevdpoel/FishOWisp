@@ -12,6 +12,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     [SerializeField] private string reelInAnim = "ReelIn";
     [SerializeField] private string isFightingAnimBool = "IsFighting";
     [SerializeField] private string isReelingDuringFightAnimBool = "IsReelingDuringFight";
+    [SerializeField] private string isWaitingForBiteAnimBool = "IsWaitingForBite";
     [SerializeField] private string rodDirectionAnimFloat = "RodDirection";
     public string attractAnim = "Attract";
     public string biteReactionAnim = "BiteReaction";
@@ -28,6 +29,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     private int hashReelIn;
     private int hashIsFighting;
     private int hashIsReelingDuringFight;
+    private int hashIsWaitingForBite;
     private int hashRodDirection;
     private int hashAttract;
     private int hashBiteReaction;
@@ -39,6 +41,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         hashReelIn = Animator.StringToHash(reelInAnim);
         hashIsFighting = Animator.StringToHash(isFightingAnimBool);
         hashIsReelingDuringFight = Animator.StringToHash(isReelingDuringFightAnimBool);
+        hashIsWaitingForBite = Animator.StringToHash(isWaitingForBiteAnimBool);
         hashRodDirection = Animator.StringToHash(rodDirectionAnimFloat);
         hashAttract = Animator.StringToHash(attractAnim);
         hashBiteReaction = Animator.StringToHash(biteReactionAnim);
@@ -58,6 +61,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         FishingEvents.OnStartCharging += OnCastStart;
         FishingEvents.OnCancelCharging += OnCastEnd;
         FishingEvents.OnCancelFishing += OnCastEnd;
+        FishingEvents.OnCancelFishing += OnFishingCanceled;
         FishingEvents.OnThrowBobber += OnThrowBobber;
         FishingEvents.OnStartReelingDuringFight += StartReelingDuringFightAnim;
         FishingEvents.OnStopReelingDuringFight += StopReelingDuringFightAnim;
@@ -84,6 +88,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         FishingEvents.OnStartCharging -= OnCastStart;
         FishingEvents.OnCancelCharging -= OnCastEnd;
         FishingEvents.OnCancelFishing -= OnCastEnd;
+        FishingEvents.OnCancelFishing -= OnFishingCanceled;
         FishingEvents.OnThrowBobber -= OnThrowBobber;
         FishingEvents.OnStartReelingDuringFight -= StartReelingDuringFightAnim;
         FishingEvents.OnStopReelingDuringFight -= StopReelingDuringFightAnim;
@@ -100,17 +105,20 @@ public class PlayerFishingAnimHandler : MonoBehaviour
 
     private void OnCastStart() => IsCasting = true;
     private void OnCastEnd() { IsCasting = false; IsFightingFish = false; }
+    private void OnFishingCanceled() { SetWaitingForBite(false); }
     private void OnStartAiming() => IsAiming = true;
     private void OnStopAiming() => IsAiming = false;
-    private void OnThrowBobber(Vector3 direction, float force) => IsCasting = false;
+    private void OnThrowBobber(Vector3 direction, float force) { IsCasting = false; SetWaitingForBite(true); }
     private void OnBobberLanded(BobberController bobber) { ActiveBobberTransform = bobber.transform; }
     private void OnFishFightEnd(bool success) { IsFightingFish = false; StopFightingAnimation(); }
 
+    private void SetWaitingForBite(bool value) { if (animator) animator.SetBool(hashIsWaitingForBite, value); }
+
     private void PlayStartChargingAnim() { if (animator) animator.SetTrigger(hashStartCharging); }
     private void PlayThrowAnim(Vector3 direction, float force) { if (animator) animator.SetTrigger(hashThrow); }
-    private void PlayReelInAnim() { if (animator) animator.SetTrigger(hashReelIn); }
+    private void PlayReelInAnim() { SetWaitingForBite(false); if (animator) animator.SetTrigger(hashReelIn); }
     private void PlayAttractAnim() { if (animator) animator.SetTrigger(hashAttract); }
-    private void PlayBiteReactionAnim(BobberController b) { if (animator) animator.SetTrigger(hashBiteReaction); }
+    private void PlayBiteReactionAnim(BobberController b) { SetWaitingForBite(false); if (animator) animator.SetTrigger(hashBiteReaction); }
     private void StartReelingDuringFightAnim() { if (animator) animator.SetBool(hashIsReelingDuringFight, true); }
     private void StopReelingDuringFightAnim() { if (animator) animator.SetBool(hashIsReelingDuringFight, false); }
 
