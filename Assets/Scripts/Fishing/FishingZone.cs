@@ -22,7 +22,7 @@ public class FishingZone : MonoBehaviour
 
     [Header("Bobber Splash Scare")]
     [Tooltip("Fish within this radius of the bobber landing spot get scared.")]
-    public float splashScareRadius = 4f;
+    public float splashScareRadius = 2f;
 
     [Header("Multi-Fish Attract")]
     [Tooltip("Maximum number of follower fish that join the lead fish on each attract call. Set 0 to disable followers.")]

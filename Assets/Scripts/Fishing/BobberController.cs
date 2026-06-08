@@ -110,6 +110,11 @@ public class BobberController : MonoBehaviour
     [Header("Visuals")]
     public GameObject bobberVisuals;
 
+    [Header("Camera")]
+    [Tooltip("Child Transform that defines the camera pose used while the bobber is in the water. Parent it under the bobber and position/rotate it however the in-water camera should sit. Leave null to fall back to the formula in PlayerCameraController.")]
+    [SerializeField] private Transform cameraAnchor;
+    public Transform CameraAnchor => cameraAnchor;
+
     // Internal State
     private Rigidbody rb;
     private AudioSource audioSource;
