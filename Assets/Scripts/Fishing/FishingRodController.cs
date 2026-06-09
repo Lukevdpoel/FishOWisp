@@ -37,9 +37,17 @@ public class FishingRodController : MonoBehaviour
     public float turnAwayGracePeriod = 0.5f;
 
     [Header("Fish Fight Settings")]
-    public float maxFightProgress = 100f;
-    public float initialFightProgress = 30f;
+    public float maxFightProgress = 40f;
+    public float initialFightProgress = 15f;
     public float fallbackFightProgressRate = 10f;
+
+    [Header("Reel-In Pull")]
+    [Tooltip("Horizontal distance from the player at which the fish counts as caught (once the minimum reel meter is also full). Player height doesn't matter — only XZ distance is checked.")]
+    public float catchDistance = 3.0f;
+    [Tooltip("How fast (m/s) the bobber is pulled horizontally toward the player while the player holds reel during a rest phase.")]
+    public float reelPullSpeed = 2.0f;
+    [Tooltip("Pulling stops once the bobber is this far INSIDE the catch radius — guarantees the catch check passes instead of stalling on the boundary.")]
+    public float pullStopInset = 0.2f;
 
     private Coroutine fishFightCoroutine;
     private Coroutine fishEscapeCoroutine;
@@ -83,7 +91,6 @@ public class FishingRodController : MonoBehaviour
 
     private void HandleBobberLanded(BobberController bobber)
     {
-        if (bobberInWater != null && bobberInWater != bobber) Destroy(bobberInWater.gameObject);
         bobberInWater = bobber;
     }
 
@@ -271,7 +278,7 @@ public class FishingRodController : MonoBehaviour
     {
         float lastProgress = currentFightProgress;
         wasReelingLastFrame = false;
-        while (currentFightProgress < maxFightProgress && currentFightProgress > 0)
+        while (currentFightProgress > 0)
         {
             if (minigameUI != null)
             {
@@ -284,28 +291,78 @@ public class FishingRodController : MonoBehaviour
             }
             else { currentFightProgress += Time.deltaTime * fallbackFightProgressRate; }
 
-            bool isGainingProgress = currentFightProgress > lastProgress;
-            if (isGainingProgress != wasReelingLastFrame)
+            bool isReelingNow = minigameUI != null ? minigameUI.IsReeling : currentFightProgress > lastProgress;
+            if (isReelingNow != wasReelingLastFrame)
             {
-                if (isGainingProgress) FishingEvents.OnStartReelingDuringFight?.Invoke();
+                if (isReelingNow) FishingEvents.OnStartReelingDuringFight?.Invoke();
                 else FishingEvents.OnStopReelingDuringFight?.Invoke();
-                wasReelingLastFrame = isGainingProgress;
+                wasReelingLastFrame = isReelingNow;
             }
+
+            // Physically pull the bobber toward the player while reeling — but only when the bobber
+            // is still in water and not already inside the catch radius. That keeps the fish from
+            // being dragged onto shore visually and from over-shooting into the player.
+            if (isReelingNow) TryPullBobberTowardPlayer();
 
             lastProgress = currentFightProgress;
             FishingEvents.OnFishFightProgressUpdate?.Invoke(currentFightProgress, maxFightProgress);
+
+            // Catch fires only when both gates pass: hidden minimum reel meter is full AND the
+            // bobber is physically close enough. Close-hooked fish still need real reel time.
+            if (currentFightProgress >= maxFightProgress && IsBobberWithinCatchRange())
+            {
+                break;
+            }
+
             yield return null;
         }
         FishingEvents.OnStopReelingDuringFight?.Invoke();
-        if (currentFightProgress >= maxFightProgress) WinFishFight();
+        if (currentFightProgress >= maxFightProgress && IsBobberWithinCatchRange()) WinFishFight();
         else { if (minigameUI != null) minigameUI.Deactivate(); StartCoroutine(FailRoutine()); }
+    }
+
+    private void TryPullBobberTowardPlayer()
+    {
+        if (activeBobber == null || playerModel == null) return;
+        if (!activeBobber.IsInWater) return;
+
+        Rigidbody bobberRb = activeBobber.GetComponent<Rigidbody>();
+        if (bobberRb == null || bobberRb.isKinematic) return;
+
+        Vector3 bobberPos = bobberRb.position;
+        Vector3 toPlayer = playerModel.position - bobberPos;
+        toPlayer.y = 0f;
+
+        float horizontalDist = toPlayer.magnitude;
+        // Pull until the bobber is well INSIDE the catch radius, so IsBobberWithinCatchRange()
+        // reliably passes once the reel meter fills. Stopping outside the boundary would
+        // strand the bobber in a dead zone and the catch would never trigger.
+        float pullStopDistance = Mathf.Max(0.05f, catchDistance - pullStopInset);
+        if (horizontalDist <= pullStopDistance) return;
+        if (horizontalDist < 0.001f) return;
+
+        Vector3 step = (toPlayer / horizontalDist) * Mathf.Min(reelPullSpeed * Time.deltaTime, horizontalDist - pullStopDistance);
+        Vector3 next = new Vector3(bobberPos.x + step.x, bobberPos.y, bobberPos.z + step.z);
+        bobberRb.MovePosition(next);
+
+        // Drag the struggle tether anchor along with the bobber so it doesn't keep yanking the
+        // bobber back toward the original hook spot as the player reels it in.
+        activeBobber.ShiftStruggleAnchor(new Vector3(step.x, 0f, step.z));
+    }
+
+    private bool IsBobberWithinCatchRange()
+    {
+        if (activeBobber == null || playerModel == null) return false;
+        Vector3 delta = activeBobber.transform.position - playerModel.position;
+        delta.y = 0f;
+        return delta.sqrMagnitude <= catchDistance * catchDistance;
     }
     private void CancelFishingAction()
     {
         if (currentState != FishingState.Cooldown)
         {
             StopAiming();
-            if (bobberInWater != null) Destroy(bobberInWater.gameObject);
+            // Bobber lifecycle is owned by FishingLine — it parks the persistent instance on OnCancelFishing.
             ResetFishingState();
         }
     }
@@ -354,7 +411,7 @@ public class FishingRodController : MonoBehaviour
                 elapsed += Time.deltaTime;
                 yield return null;
             }
-            if (bobberToReelTransform != null) Destroy(bobberToReelTransform.gameObject);
+            // Don't destroy — FishingLine parks the persistent bobber when OnReelingCompleted fires.
         }
 
         HandleReelingCompleted(fishToInventory);

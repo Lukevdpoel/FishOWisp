@@ -115,14 +115,21 @@ public class BobberController : MonoBehaviour
     [SerializeField] private Transform cameraAnchor;
     public Transform CameraAnchor => cameraAnchor;
 
+    [Header("Line Attachment")]
+    [Tooltip("Child Transform where the fishing line connects to this bobber. Leave null to attach at the bobber's root.")]
+    [SerializeField] private Transform lineAttachPoint;
+    public Transform LineAttachPoint => lineAttachPoint != null ? lineAttachPoint : transform;
+
     // Internal State
     private Rigidbody rb;
     private AudioSource audioSource;
     private bool isInWater = false;
+    private bool isInFlight = false;
     private bool hasSplashed = false;
     private bool hasPlayedSplashSound = false;
     private bool hasPlayedImpactSound = false;
     private float initialLinearDamping; // Unity 6 Name
+    private float initialAngularDamping;
     private float waterSurfaceY;
 
     private CaughtFish hookedFish;
@@ -146,8 +153,21 @@ public class BobberController : MonoBehaviour
     public CaughtFish HookedFish => hookedFish;
     public GameObject ActiveFishModel => activeFishModel;
     public Vector3 StruggleDirection => struggleDirection;
+    public bool IsInWater => isInWater;
+    public float WaterSurfaceY => waterSurfaceY;
 
     public void SetPlayerTransform(Transform player) { playerTransform = player; }
+
+    /// <summary>
+    /// Slide the struggle tether anchor by a world-space delta. Called by the rod while the
+    /// player is actively reeling, so the fish's "home" spot moves with it instead of yanking
+    /// the bobber back toward the original hook point as it gets close to the player.
+    /// </summary>
+    public void ShiftStruggleAnchor(Vector3 delta)
+    {
+        if (!hasStruggleAnchor) return;
+        struggleAnchor += delta;
+    }
 
     void Awake()
     {
@@ -158,15 +178,15 @@ public class BobberController : MonoBehaviour
         if (rb != null)
         {
             initialLinearDamping = rb.linearDamping;
+            initialAngularDamping = rb.angularDamping;
         }
     }
 
     void Start()
     {
-        if (rb != null)
-        {
-            rb.AddTorque(Random.insideUnitSphere * airTumbleTorque, ForceMode.Impulse);
-        }
+        // Air-tumble torque is now applied explicitly on launch via ApplyAirTumbleTorque(). Applying
+        // it here used to be OK because the bobber was destroyed each cast, but with a persistent
+        // instance + Free angular motion on the joint, spawn-time torque spins the bobber forever.
     }
 
     void Update()
@@ -189,10 +209,11 @@ public class BobberController : MonoBehaviour
                 UpdateStruggleMovement();
             }
         }
-        else
+        else if (isInFlight)
         {
-            // --- NEW: APPLY EXTRA GRAVITY ---
-            // This pushes the bobber down faster when it is flying through the air.
+            // Extra gravity makes the cast arc snappy instead of moon-floaty. Only applied during
+            // active flight — the bobber is always dynamic now (joint-tethered), so we must NOT
+            // apply this while it dangles from the rod or it would yank against the joint.
             if (rb != null && !rb.isKinematic)
             {
                 rb.AddForce(Vector3.down * extraGravity, ForceMode.Acceleration);
@@ -262,6 +283,7 @@ public class BobberController : MonoBehaviour
     private void EnterWater()
     {
         isInWater = true;
+        isInFlight = false;
 
         // UNITY 6 FIX: Apply Water Drag
         if (rb != null)
@@ -524,6 +546,60 @@ public class BobberController : MonoBehaviour
     public void StopBiteEffects()
     {
         isSubmerged = false;
+    }
+
+    public void ResetForCast()
+    {
+        // FishingRodController disables this component during its reel-in arc. Re-enable so FixedUpdate
+        // (extra gravity, buoyancy) runs again on the next cast.
+        enabled = true;
+
+        CancelNibbleSequence();
+        StopAllCoroutines();
+
+        isInWater = false;
+        isInFlight = false;
+        isSubmerged = false;
+        hasSplashed = false;
+        hasPlayedSplashSound = false;
+        hasPlayedImpactSound = false;
+        isStruggling = false;
+        hasStruggleAnchor = false;
+        hookedFish = null;
+
+        if (activeFishModel != null)
+        {
+            Destroy(activeFishModel);
+            activeFishModel = null;
+        }
+        if (bobberVisuals != null) bobberVisuals.SetActive(true);
+
+        if (activeWakeInstance != null)
+        {
+            Destroy(activeWakeInstance);
+            activeWakeInstance = null;
+        }
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.linearDamping = initialLinearDamping;
+            rb.angularDamping = initialAngularDamping;
+        }
+    }
+
+    public void ApplyAirTumbleTorque()
+    {
+        if (rb != null && !rb.isKinematic)
+        {
+            rb.AddTorque(Random.insideUnitSphere * airTumbleTorque, ForceMode.Impulse);
+        }
+    }
+
+    public void BeginFlight()
+    {
+        isInFlight = true;
     }
 
     void OnDestroy()

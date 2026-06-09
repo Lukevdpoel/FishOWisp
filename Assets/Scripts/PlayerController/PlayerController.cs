@@ -7,7 +7,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Animator animator;
     [SerializeField] private Transform playerModel;
     [SerializeField] private GameObject normalMeshRoot;
-    [SerializeField] private GameObject ballMeshRoot;
 
     [Header("Component References")]
     [SerializeField] private PlayerCameraController cameraController;
@@ -50,11 +49,11 @@ public class PlayerController : MonoBehaviour
         new Keyframe(1f, 1f));
     [SerializeField] private float bounceImpactDuration = 0.35f;
 
-    [Header("Ball Form Transitions")]
+    [Header("Tucked-Jump Transitions")]
     [SerializeField] private string ballTransitionInTrigger = "BallTransitionIn";
     [SerializeField] private string ballTransitionOutTrigger = "BallTransitionOut";
 
-    [Header("Ball Spin")]
+    [Header("Airborne Tumble")]
     [SerializeField] private float ballSpinDegPerUnitSpeed = 30f;
     [SerializeField, Range(0f, 1f)] private float ballSpinAxisJitter = 0.35f;
     [SerializeField, Range(0f, 0.5f)] private float ballSpinSpeedJitter = 0.2f;
@@ -101,8 +100,7 @@ public class PlayerController : MonoBehaviour
     private Vector3 originalModelScale = Vector3.one;
     private Vector3 originalModelLocalPosition;
     private Vector3 originalNormalMeshScale = Vector3.one;
-    private Vector3 originalBallMeshScale = Vector3.one;
-    private Quaternion ballMeshRotationRelativeToPlayer = Quaternion.identity;
+    private Quaternion originalNormalMeshLocalRotation = Quaternion.identity;
     private Vector3 ballSpinAxis = Vector3.right;
     private float ballSpinSpeedDeg;
     private float bounceImpactTimer = -1f; // -1 = inactive
@@ -125,18 +123,11 @@ public class PlayerController : MonoBehaviour
             originalModelScale = playerModel.localScale;
             originalModelLocalPosition = playerModel.localPosition;
         }
-        if (normalMeshRoot) originalNormalMeshScale = normalMeshRoot.transform.localScale;
-        if (ballMeshRoot)
+        if (normalMeshRoot)
         {
-            originalBallMeshScale = ballMeshRoot.transform.localScale;
-            // Capture how the ball mesh is oriented relative to the player's facing, so we can re-apply the
-            // same relative orientation each jump regardless of which way the player is currently facing.
-            if (playerModel)
-                ballMeshRotationRelativeToPlayer = Quaternion.Inverse(playerModel.rotation) * ballMeshRoot.transform.rotation;
-            else
-                ballMeshRotationRelativeToPlayer = ballMeshRoot.transform.rotation;
+            originalNormalMeshScale = normalMeshRoot.transform.localScale;
+            originalNormalMeshLocalRotation = normalMeshRoot.transform.localRotation;
         }
-        SetBallMeshActive(false);
 
         if (cameraController != null) cameraController.Initialize(playerModel);
     }
@@ -170,7 +161,7 @@ public class PlayerController : MonoBehaviour
 
         // Run after Animator has evaluated so our scale/rotation writes aren't overwritten by clip curves.
         HandleSquashStretch();
-        HandleBallSpin();
+        HandleAirborneTumble();
         HandleStaticCameraFollow();
 
         if (cameraController != null)
@@ -517,7 +508,7 @@ public class PlayerController : MonoBehaviour
                 {
                     jumpPhase = JumpPhase.Charging;
                     chargeTimer = 0f;
-                    ResetBallMeshRotation();
+                    ResetTumbleRotation();
                     if (animator) animator.SetTrigger(hashBallIn);
                     NotifyOfAction();
                 }
@@ -545,7 +536,7 @@ public class PlayerController : MonoBehaviour
                 {
                     jumpPhase = JumpPhase.None;
                     airborneSinceLaunch = false;
-                    ResetBallMeshRotation();
+                    ResetTumbleRotation();
                     if (animator) animator.SetTrigger(hashBallOut);
                 }
                 break;
@@ -568,7 +559,7 @@ public class PlayerController : MonoBehaviour
 
         jumpPhase = JumpPhase.Launched;
         airborneSinceLaunch = false;
-        SeedBallSpin();
+        SeedAirborneTumble();
         NotifyOfAction();
     }
 
@@ -582,7 +573,7 @@ public class PlayerController : MonoBehaviour
         bounceImpactTimer = 0f;
     }
 
-    private void SeedBallSpin()
+    private void SeedAirborneTumble()
     {
         // Forward tumble around local X, with a small random tilt so it doesn't look mechanical.
         Vector3 jitter = new Vector3(
@@ -594,39 +585,22 @@ public class PlayerController : MonoBehaviour
         float rate = launchHorizontalSpeed * ballSpinDegPerUnitSpeed;
         ballSpinSpeedDeg = rate * (1f + Random.Range(-ballSpinSpeedJitter, ballSpinSpeedJitter));
 
-        ResetBallMeshRotation();
+        ResetTumbleRotation();
     }
 
-    private void ResetBallMeshRotation()
+    private void ResetTumbleRotation()
     {
-        if (!ballMeshRoot) return;
-        Quaternion playerFacing = playerModel ? playerModel.rotation : Quaternion.identity;
-        ballMeshRoot.transform.rotation = playerFacing * ballMeshRotationRelativeToPlayer;
+        if (!normalMeshRoot) return;
+        normalMeshRoot.transform.localRotation = originalNormalMeshLocalRotation;
     }
 
-    private void HandleBallSpin()
+    private void HandleAirborneTumble()
     {
-        if (!ballMeshRoot) return;
+        if (!normalMeshRoot) return;
         if (jumpPhase != JumpPhase.Launched && jumpPhase != JumpPhase.Bounced) return;
         if (characterController.isGrounded) return;
 
-        ballMeshRoot.transform.Rotate(ballSpinAxis, ballSpinSpeedDeg * Time.deltaTime, Space.Self);
-    }
-
-    // Public so animation events on the ball-in / ball-out clips can call it for frame-perfect mesh swap timing.
-    // Toggles Renderers instead of GameObjects so the Animator keeps running — otherwise disabling the normal
-    // mesh's GameObject would freeze its Animator mid-clip and the Morph Out animation event would never fire.
-    public void SetBallMeshActive(bool active)
-    {
-        SetRenderersEnabled(normalMeshRoot, !active);
-        SetRenderersEnabled(ballMeshRoot, active);
-    }
-
-    private static void SetRenderersEnabled(GameObject root, bool enabled)
-    {
-        if (!root) return;
-        foreach (var r in root.GetComponentsInChildren<Renderer>(true))
-            r.enabled = enabled;
+        normalMeshRoot.transform.Rotate(ballSpinAxis, ballSpinSpeedDeg * Time.deltaTime, Space.Self);
     }
 
     private void HandleSquashStretch()
@@ -675,12 +649,10 @@ public class PlayerController : MonoBehaviour
             playerModel.localScale = Vector3.Lerp(playerModel.localScale, targetScale, scaleLerpSpeed * Time.deltaTime);
         playerModel.localPosition = Vector3.Lerp(playerModel.localPosition, targetPos, scaleLerpSpeed * Time.deltaTime);
 
-        // Belt-and-suspenders: keep mesh-root scales at their captured originals so stale scaling from a
+        // Belt-and-suspenders: keep the mesh-root scale at its captured original so stale scaling from a
         // previous code path can never compound with playerModel's scale.
         if (normalMeshRoot && normalMeshRoot.transform.localScale != originalNormalMeshScale)
             normalMeshRoot.transform.localScale = originalNormalMeshScale;
-        if (ballMeshRoot && ballMeshRoot.transform.localScale != originalBallMeshScale)
-            ballMeshRoot.transform.localScale = originalBallMeshScale;
     }
 
     private static float VolumePreserveXZ(float yScale)

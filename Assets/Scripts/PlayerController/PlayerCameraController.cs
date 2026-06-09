@@ -52,14 +52,31 @@ public class PlayerCameraController : MonoBehaviour
     [SerializeField] private float aimCameraLerpSpeed = 4f;
 
     [Header("Bobber Follow Camera Settings")]
-    [Tooltip("Height above the bobber the camera floats while following.")]
+    [Tooltip("Height above the bobber the camera pivots around while orbiting in water.")]
     [SerializeField] private float bobberFollowHeight = 1.8f;
-    [Tooltip("Horizontal distance from the bobber, placed on the player side so the camera looks back toward the bobber from the player's general direction.")]
+    [Tooltip("Orbit radius around the bobber while in water. Mouse drives the orbit angle.")]
     [SerializeField] private float bobberFollowDistance = 3f;
     [Tooltip("How fast the camera blends INTO the bobber pose when the bobber lands in water. Higher = snappier.")]
     [SerializeField] private float bobberFollowLerpSpeed = 4f;
     [Tooltip("Seconds the camera takes to snap from the in-water pose back to the player orbit pose when the reel button is pressed. Keep low so the camera lands at the player well before the bobber arc finishes.")]
     [SerializeField] private float bobberReturnDuration = 0.35f;
+    [Tooltip("When true, the in-water camera orbits the bobber using mouse input. When false, falls back to the bobber prefab's CameraAnchor (or a fixed pose) like the old behavior.")]
+    [SerializeField] private bool bobberOrbitWithMouse = true;
+    [Tooltip("Minimum height the in-water camera stays above the water surface. Prevents the camera from clipping through the water plane when pitched down.")]
+    [SerializeField] private float bobberCameraWaterClearance = 0.4f;
+
+    [Header("Fight Camera Framing (over-shoulder)")]
+    [Tooltip("Side offset (m) from the player while fighting a fish. Positive = right side of the player (relative to the player→bobber line).")]
+    [SerializeField] private float fightShoulderSide = 1.4f;
+    [Tooltip("How far back behind the player the over-shoulder camera sits.")]
+    [SerializeField] private float fightShoulderBack = 1.2f;
+    [Tooltip("Height above the player's feet for the over-shoulder camera.")]
+    [SerializeField] private float fightShoulderHeight = 1.7f;
+    [Tooltip("Where the camera aims along the player→bobber line, 0 = at the player, 1 = at the bobber. ~0.4 frames both nicely.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float fightFramingAimT = 0.4f;
+    [Tooltip("Lerp speed for the over-shoulder pose. Higher = snappier transition into the over-shoulder framing when the fight starts.")]
+    [SerializeField] private float fightFramingLerpSpeed = 4f;
 
     [Header("Charge Camera Settings")]
     [Tooltip("How many units closer to the player the camera moves at FULL charge (subtracted from the normal/aim distance).")]
@@ -137,6 +154,12 @@ public class PlayerCameraController : MonoBehaviour
     private CameraPose returnFromPose;
     private float returnT;
 
+    // Smoothed over-shoulder fight pose. Ramps from the orbit pose into the framing pose so the
+    // transition into a fish fight is smooth instead of a snap.
+    private Vector3 fightSmoothedPos;
+    private Quaternion fightSmoothedRot = Quaternion.identity;
+    private bool fightSmoothedInitialized;
+
     public Transform CameraTransform => (useStaticCamera && staticCameraTarget != null) ? staticCameraTarget : cameraTransform;
 
     public void SetCatchCamera(bool active) => isCatchCameraActive = active;
@@ -155,6 +178,7 @@ public class PlayerCameraController : MonoBehaviour
 
         FishingEvents.OnBobberLandedInWater += HandleBobberLanded;
         FishingEvents.OnStartReeling += HandleStartReeling;
+        FishingEvents.OnHookFishSuccess += HandleBobberFollowEnd;
         FishingEvents.OnReelingCompleted += HandleBobberFollowEnd;
         FishingEvents.OnCancelFishing += HandleBobberFollowEnd;
     }
@@ -173,6 +197,7 @@ public class PlayerCameraController : MonoBehaviour
 
         FishingEvents.OnBobberLandedInWater -= HandleBobberLanded;
         FishingEvents.OnStartReeling -= HandleStartReeling;
+        FishingEvents.OnHookFishSuccess -= HandleBobberFollowEnd;
         FishingEvents.OnReelingCompleted -= HandleBobberFollowEnd;
         FishingEvents.OnCancelFishing -= HandleBobberFollowEnd;
     }
@@ -228,6 +253,13 @@ public class PlayerCameraController : MonoBehaviour
     {
         // Fade the blend out (used for the hooked-fish path; empty-line path already cleared it).
         bobberCameraBlendTarget = 0f;
+
+        // Drop the live follow reference immediately so ComputeBobberCameraPose stops sampling the
+        // bobber's moving Transform while the blend fades. The persistent bobber instance no longer
+        // disappears on reel-end like the old destroyed-bobber flow did, so without this the camera
+        // keeps tracking the bobber back to the rod and through the next cast.
+        bobberFollowTarget = null;
+        bobberFollowController = null;
     }
 
     private void UpdateNibblePitchOffset()
@@ -351,13 +383,20 @@ public class PlayerCameraController : MonoBehaviour
                 cameraYAngle = Mathf.LerpAngle(cameraYAngle, dialogueCameraYAngle, Time.deltaTime * dialogueCameraLerpSpeed);
             }
         }
-        else if (!input.isFightingFish && !isCatchCameraActive && !input.areControlsLocked && !bobberCameraDominant)
+        else if (!input.isFightingFish && !isCatchCameraActive && !input.areControlsLocked)
         {
-            float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
-            float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
-            cameraXAngle += mouseX;
-            cameraYAngle -= mouseY;
-            cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
+            // Mouse orbit is allowed even while the bobber is dominant — the bobber pose reuses
+            // these angles to orbit around the bobber pivot, mirroring the normal player orbit.
+            // Returning-to-player is the one in-water case where orbit input is suppressed so the
+            // camera doesn't fight the one-shot return lerp.
+            if (!isReturningToPlayer)
+            {
+                float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
+                float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
+                cameraXAngle += mouseX;
+                cameraYAngle -= mouseY;
+                cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
+            }
         }
         else if (isCatchCameraActive)
         {
@@ -415,12 +454,99 @@ public class PlayerCameraController : MonoBehaviour
 
         playerCameraPose.position = currentPivotPosition + cameraDirection * currentCameraDistance;
         playerCameraPose.rotation = rotation;
+
+        ApplyFightFramingOverride(input);
+    }
+
+    private void ApplyFightFramingOverride(CameraInput input)
+    {
+        if (!input.isFightingFish || input.activeBobberTransform == null)
+        {
+            // Reset smoothing so the next fight onset starts from the current orbit pose, not stale state.
+            fightSmoothedPos = playerCameraPose.position;
+            fightSmoothedRot = playerCameraPose.rotation;
+            fightSmoothedInitialized = false;
+            return;
+        }
+
+        Vector3 playerPos = input.playerModel.position;
+        Vector3 bobberPos = input.activeBobberTransform.position;
+
+        Vector3 toBobber = bobberPos - playerPos;
+        toBobber.y = 0f;
+        Vector3 forward = toBobber.sqrMagnitude > 0.0001f ? toBobber.normalized : input.playerModel.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.0001f) forward = Vector3.forward;
+        forward.Normalize();
+
+        Vector3 right = Vector3.Cross(Vector3.up, forward).normalized;
+
+        Vector3 targetPos = playerPos
+                            + right * fightShoulderSide
+                            - forward * fightShoulderBack
+                            + Vector3.up * fightShoulderHeight;
+
+        // Aim along the player→bobber line so both are framed. fightFramingAimT picks a point
+        // between the player's torso and the bobber for the camera to look at.
+        Vector3 playerLookAnchor = playerPos + Vector3.up * (fightShoulderHeight * 0.7f);
+        Vector3 lookAt = Vector3.Lerp(playerLookAnchor, bobberPos, fightFramingAimT);
+        Vector3 lookDir = lookAt - targetPos;
+        Quaternion targetRot = lookDir.sqrMagnitude > 0.0001f
+            ? Quaternion.LookRotation(lookDir.normalized)
+            : playerCameraPose.rotation;
+
+        if (!fightSmoothedInitialized)
+        {
+            fightSmoothedPos = playerCameraPose.position;
+            fightSmoothedRot = playerCameraPose.rotation;
+            fightSmoothedInitialized = true;
+        }
+
+        float t = 1f - Mathf.Exp(-fightFramingLerpSpeed * Time.deltaTime);
+        fightSmoothedPos = Vector3.Lerp(fightSmoothedPos, targetPos, t);
+        fightSmoothedRot = Quaternion.Slerp(fightSmoothedRot, targetRot, t);
+
+        playerCameraPose.position = fightSmoothedPos;
+        playerCameraPose.rotation = fightSmoothedRot;
     }
 
     private void ComputeBobberCameraPose(CameraInput input)
     {
-        // Preferred path: read the pose straight off a child anchor Transform on the bobber prefab.
-        // This lets designers place the in-water camera visually instead of tuning numeric offsets.
+        Vector3 bobberPos = bobberFollowTarget.position;
+        Vector3 bobberPivot = bobberPos + Vector3.up * bobberFollowHeight;
+
+        // Mouse-orbit path: reuse the same orbit angles ComputePlayerCameraPose drives, but pivot
+        // around the bobber. This lets the player rotate the view around the in-water bobber
+        // exactly like they would around the player on land.
+        if (bobberOrbitWithMouse)
+        {
+            Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f);
+            Vector3 cameraDirection = -(rotation * Vector3.forward);
+            Vector3 orbitPos = bobberPivot + cameraDirection * bobberFollowDistance;
+
+            // Don't let the camera dip below the water plane. If the orbit pitch would put it
+            // below the surface (+ a small clearance), lift it back up and aim it at the pivot
+            // from the new position so the framing stays sensible.
+            if (bobberFollowController != null && bobberFollowController.IsInWater)
+            {
+                float minY = bobberFollowController.WaterSurfaceY + bobberCameraWaterClearance;
+                if (orbitPos.y < minY)
+                {
+                    orbitPos.y = minY;
+                    Vector3 liftedLookDir = bobberPivot - orbitPos;
+                    if (liftedLookDir.sqrMagnitude > 0.0001f)
+                    {
+                        rotation = Quaternion.LookRotation(liftedLookDir.normalized);
+                    }
+                }
+            }
+
+            bobberCameraPose.position = orbitPos;
+            bobberCameraPose.rotation = rotation;
+            return;
+        }
+
+        // Legacy path: read the pose from a child anchor on the bobber prefab if one exists.
         Transform anchor = bobberFollowController != null ? bobberFollowController.CameraAnchor : null;
         if (anchor != null)
         {
@@ -429,10 +555,8 @@ public class PlayerCameraController : MonoBehaviour
             return;
         }
 
-        // Fallback: derive a pose from bobberFollowHeight / bobberFollowDistance when no anchor is set.
-        Vector3 bobberPos = bobberFollowTarget.position;
+        // Final fallback: fixed pose looking back toward the bobber from the player's side.
         Vector3 playerPos = input.playerModel.position;
-
         Vector3 toBobber = bobberPos - playerPos;
         toBobber.y = 0f;
         Vector3 awayFromBobber;
@@ -447,14 +571,14 @@ public class PlayerCameraController : MonoBehaviour
             awayFromBobber = fwd.sqrMagnitude > 0.0001f ? -fwd.normalized : -Vector3.forward;
         }
 
-        Vector3 targetPos = bobberPos + Vector3.up * bobberFollowHeight + awayFromBobber * bobberFollowDistance;
-        Vector3 lookDir = bobberPos - targetPos;
-        Quaternion targetRot = lookDir.sqrMagnitude > 0.0001f
+        Vector3 fallbackPos = bobberPivot + awayFromBobber * bobberFollowDistance;
+        Vector3 lookDir = bobberPos - fallbackPos;
+        Quaternion fallbackRot = lookDir.sqrMagnitude > 0.0001f
             ? Quaternion.LookRotation(lookDir.normalized)
             : cameraTransform.rotation;
 
-        bobberCameraPose.position = targetPos;
-        bobberCameraPose.rotation = targetRot;
+        bobberCameraPose.position = fallbackPos;
+        bobberCameraPose.rotation = fallbackRot;
     }
 
     private void UpdateFov(CameraInput input)

@@ -15,13 +15,19 @@ public class DirectionalFishingMinigame : MonoBehaviour
     public float restDuration = 3.0f;
 
     [Header("Scoring")]
-    public float clickFillAmount = 5.0f;
+    [Tooltip("How fast the hidden reel meter fills per second while the player holds reel during the rest phase.")]
+    public float holdFillRate = 20f;
     public float progressLossRate = 10f;
     public float progressLossFloor = -1f;
 
     // State
     public bool IsResting { get; private set; }
     public bool IsAligned { get; private set; }
+    /// <summary>
+    /// True while the player is actively holding the reel button during a rest phase.
+    /// FishingRodController reads this to physically pull the bobber toward the player.
+    /// </summary>
+    public bool IsReeling { get; private set; }
 
     /// <summary>
     /// Current rod direction from -1 (left) to 1 (right). Driven by mouse X delta.
@@ -39,6 +45,7 @@ public class DirectionalFishingMinigame : MonoBehaviour
         enabled = true;
         RodDirection = 0f;
         fishScreenDirection = 0f;
+        IsReeling = false;
 
         IsResting = true;
         phaseTimer = restDuration;
@@ -104,9 +111,10 @@ public class DirectionalFishingMinigame : MonoBehaviour
 
         FishingEvents.OnRodDirectionUpdate?.Invoke(RodDirection);
 
-        if (Input.GetMouseButtonDown(0))
+        IsReeling = Input.GetMouseButton(0);
+        if (IsReeling)
         {
-            currentProgress += clickFillAmount;
+            currentProgress += holdFillRate * Time.deltaTime;
         }
 
         return Mathf.Clamp(currentProgress, 0f, maxProgress);
@@ -117,6 +125,9 @@ public class DirectionalFishingMinigame : MonoBehaviour
         ProcessPlayerInput();
 
         FishingEvents.OnRodDirectionUpdate?.Invoke(RodDirection);
+
+        // No reeling progress during a struggle — the fish is fighting back.
+        IsReeling = false;
 
         if (IsAligned)
         {
