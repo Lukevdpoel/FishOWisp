@@ -26,6 +26,10 @@ public class PlayerCameraController : MonoBehaviour
 
     [Header("Camera Orbit")]
     [SerializeField] private float cameraSpeed = 120f;
+    [Tooltip("Degrees per second the camera yaws at full right-stick deflection.")]
+    [SerializeField] private float gamepadLookSpeedX = 150f;
+    [Tooltip("Degrees per second the camera pitches at full right-stick deflection.")]
+    [SerializeField] private float gamepadLookSpeedY = 90f;
     [SerializeField] private Vector2 cameraYClamp = new Vector2(20f, 55f);
     [SerializeField] private float pivotHeight = 1.3f;
     [SerializeField, Range(0f, 1f)] private float screenYTarget = 0.25f;
@@ -121,46 +125,27 @@ public class PlayerCameraController : MonoBehaviour
 
     private bool isCatchCameraActive = false;
     private float startDistance, cameraXAngle, cameraYAngle, smoothXAngle, smoothYAngle, xVel, yVel;
-    private Camera cam;
     private float currentCameraDistance, distanceVelocity;
     private Vector3 currentPivotPosition;
     private Vector3 pivotVelocity;
 
-    private float nibbleHoldTimer = 0f;
-    private bool isBiteActive = false;
-    private float currentPitchOffset = 0f;
+    private readonly CameraFovTracker fovTracker = new CameraFovTracker();
+    private readonly CameraReactionTracker reactionTracker = new CameraReactionTracker();
+    private readonly BobberCameraTracker bobberTracker = new BobberCameraTracker();
+    private readonly FightFramingHelper fightFraming = new FightFramingHelper();
 
-    private float chargeProgressTarget = 0f;
-    private float chargeProgress = 0f;
-    private float chargeProgressVel = 0f;
-
-    private float baseFov;
-
-    // Two-rig camera system: orbit code writes to playerCameraPose, bobber-follow code writes to
-    // bobberCameraPose, and the actual cameraTransform interpolates between them by bobberCameraBlend.
+    // Player-side orbit pose; bobber side lives in bobberTracker.
     private CameraPose playerCameraPose;
-    private CameraPose bobberCameraPose;
-    private bool hasBobberCameraPose;
-    private float bobberCameraBlend;
-    private float bobberCameraBlendTarget;
-
-    private Transform bobberFollowTarget;
-    private BobberController bobberFollowController;
-
-    // Dedicated reel-press return: a one-shot fixed-duration lerp from the snapshot in-water pose
-    // back to the player orbit pose. Bypasses the bobber blend so the camera can't appear to track
-    // the bobber on its way back.
-    private bool isReturningToPlayer;
-    private CameraPose returnFromPose;
-    private float returnT;
 
     // Smoothed over-shoulder fight pose. Ramps from the orbit pose into the framing pose so the
     // transition into a fish fight is smooth instead of a snap.
-    private Vector3 fightSmoothedPos;
-    private Quaternion fightSmoothedRot = Quaternion.identity;
-    private bool fightSmoothedInitialized;
 
     public Transform CameraTransform => (useStaticCamera && staticCameraTarget != null) ? staticCameraTarget : cameraTransform;
+
+    // True while the in-water bobber/lure camera owns the view — the mouse is orbiting the
+    // bobber, so gameplay cursor rules (locked + hidden) should apply even though player
+    // controls are locked for fishing.
+    public bool IsBobberCameraActive => bobberTracker.BobberCameraDominant;
 
     public void SetCatchCamera(bool active) => isCatchCameraActive = active;
 
@@ -170,6 +155,10 @@ public class PlayerCameraController : MonoBehaviour
         FishingEvents.OnFishBite += HandleFishBite;
         FishingEvents.OnHookFishSuccess += HandleBiteRelease;
         FishingEvents.OnCancelFishing += HandleBiteRelease;
+        // Reeling always returns the camera to neutral. Without this, a bite the rod ignores
+        // (e.g. a lure strike landing the same moment the player reels in) zooms the FOV in
+        // with no event left to ever release it.
+        FishingEvents.OnStartReeling += HandleBiteRelease;
 
         FishingEvents.OnChargeProgressNormalized += HandleChargeProgress;
         FishingEvents.OnCancelCharging += HandleChargeEnded;
@@ -179,7 +168,7 @@ public class PlayerCameraController : MonoBehaviour
         FishingEvents.OnBobberLandedInWater += HandleBobberLanded;
         FishingEvents.OnStartReeling += HandleStartReeling;
         FishingEvents.OnHookFishSuccess += HandleBobberFollowEnd;
-        FishingEvents.OnReelingCompleted += HandleBobberFollowEnd;
+        FishingEvents.OnStartReeling += HandleBobberFollowEnd;
         FishingEvents.OnCancelFishing += HandleBobberFollowEnd;
     }
 
@@ -189,6 +178,7 @@ public class PlayerCameraController : MonoBehaviour
         FishingEvents.OnFishBite -= HandleFishBite;
         FishingEvents.OnHookFishSuccess -= HandleBiteRelease;
         FishingEvents.OnCancelFishing -= HandleBiteRelease;
+        FishingEvents.OnStartReeling -= HandleBiteRelease;
 
         FishingEvents.OnChargeProgressNormalized -= HandleChargeProgress;
         FishingEvents.OnCancelCharging -= HandleChargeEnded;
@@ -198,77 +188,38 @@ public class PlayerCameraController : MonoBehaviour
         FishingEvents.OnBobberLandedInWater -= HandleBobberLanded;
         FishingEvents.OnStartReeling -= HandleStartReeling;
         FishingEvents.OnHookFishSuccess -= HandleBobberFollowEnd;
-        FishingEvents.OnReelingCompleted -= HandleBobberFollowEnd;
+        FishingEvents.OnStartReeling -= HandleBobberFollowEnd;
         FishingEvents.OnCancelFishing -= HandleBobberFollowEnd;
     }
 
     private void HandleChargeProgress(float t)
     {
-        chargeProgressTarget = Mathf.Clamp01(t);
+        reactionTracker.SetChargeProgress(t);
         if (!hasLoggedChargeEvent)
         {
             hasLoggedChargeEvent = true;
             Debug.Log($"[ChargeCam] First charge event received. zoomAmount={chargeZoomAmount}, pitchUp={chargePitchUpAngle}, startDistance={startDistance}");
         }
     }
-    private void HandleChargeEnded() { chargeProgressTarget = 0f; }
-    private void HandleChargeReleased(Vector3 dir, float force) { chargeProgressTarget = 0f; }
+    private void HandleChargeEnded() { reactionTracker.ClearChargeProgress(); }
+    private void HandleChargeReleased(Vector3 dir, float force) { reactionTracker.ClearChargeProgress(); }
     private bool hasLoggedChargeEvent;
 
-    private void HandleFishNibble(BobberController b) { nibbleHoldTimer = nibblePitchHoldTime; }
-    private void HandleFishBite(BobberController b) { isBiteActive = true; nibbleHoldTimer = 0f; }
-    private void HandleBiteRelease() { isBiteActive = false; }
+    private void HandleFishNibble(BobberController b) { reactionTracker.OnNibble(nibblePitchHoldTime); }
+    private void HandleFishBite(BobberController b) { fovTracker.OnBiteStart(); reactionTracker.OnBite(); }
+    private void HandleBiteRelease() { fovTracker.OnBiteRelease(); }
 
-    private void HandleBobberLanded(BobberController b)
-    {
-        if (b == null) return;
-        // Any new bobber cast cancels a pending reel-return; only happens if the player throws
-        // again before the previous return finished.
-        isReturningToPlayer = false;
-        bobberFollowController = b;
-        bobberFollowTarget = b.transform;
-        bobberCameraBlendTarget = 1f;
-    }
+    private void HandleBobberLanded(BobberController b) => bobberTracker.OnBobberLanded(b);
 
-    // On an empty-line reel start: tear the bobber rig down completely. With blend = 0, no return
-    // lerp, and no bobber pose, the next UpdateCamera frame sets cameraTransform = playerCameraPose
-    // directly — a hard snap to the player orbit pose. Smoothing can be added back later once this
-    // baseline behavior is verified working. When a fish is hooked we keep the bobber camera live
-    // until the catch camera takes over.
+    // Empty-line reel: tear the bobber rig down. Hooked-fish path keeps the rig live until the
+    // catch camera takes over.
     private void HandleStartReeling()
     {
-        if (bobberFollowTarget == null) return;
-        if (bobberFollowController == null || bobberFollowController.HookedFish == null)
-        {
-            bobberCameraBlend = 0f;
-            bobberCameraBlendTarget = 0f;
-            hasBobberCameraPose = false;
-            bobberFollowTarget = null;
-            bobberFollowController = null;
-            isReturningToPlayer = false;
-        }
+        if (!bobberTracker.HasFollowTarget) return;
+        if (!bobberTracker.HasHookedFish) bobberTracker.HardClear();
     }
 
-    private void HandleBobberFollowEnd()
-    {
-        // Fade the blend out (used for the hooked-fish path; empty-line path already cleared it).
-        bobberCameraBlendTarget = 0f;
-
-        // Drop the live follow reference immediately so ComputeBobberCameraPose stops sampling the
-        // bobber's moving Transform while the blend fades. The persistent bobber instance no longer
-        // disappears on reel-end like the old destroyed-bobber flow did, so without this the camera
-        // keeps tracking the bobber back to the rod and through the next cast.
-        bobberFollowTarget = null;
-        bobberFollowController = null;
-    }
-
-    private void UpdateNibblePitchOffset()
-    {
-        if (nibbleHoldTimer > 0f) nibbleHoldTimer -= Time.deltaTime;
-
-        float target = nibbleHoldTimer > 0f ? nibblePitchOffset : 0f;
-        currentPitchOffset = Mathf.Lerp(currentPitchOffset, target, Time.deltaTime * nibblePitchLerpSpeed);
-    }
+    private void HandleBobberFollowEnd() => bobberTracker.OnFollowEnd();
 
     public void Initialize(Transform playerModel)
     {
@@ -281,8 +232,7 @@ public class PlayerCameraController : MonoBehaviour
             cameraYAngle = initialCameraAngles.x;
             smoothXAngle = cameraXAngle;
             smoothYAngle = cameraYAngle;
-            cam = cameraTransform.GetComponent<Camera>();
-            if (cam != null) baseFov = cam.fieldOfView;
+            fovTracker.Initialize(cameraTransform.GetComponent<Camera>());
             currentPivotPosition = playerModel.position + Vector3.up * pivotHeight;
             playerCameraPose.position = cameraTransform.position;
             playerCameraPose.rotation = cameraTransform.rotation;
@@ -303,58 +253,50 @@ public class PlayerCameraController : MonoBehaviour
         }
 
         if (input.playerModel == null) return;
-        if (InventoryUI.IsInventoryOpen) return;
+        if (InventoryUI.IsInventoryOpen || NoteMenu.IsNotebookOpen) return;
 
         ComputePlayerCameraPose(input);
 
-        if (bobberFollowTarget != null)
-        {
-            ComputeBobberCameraPose(input);
-            hasBobberCameraPose = true;
-        }
+        bobberTracker.ComputePose(input.playerModel, cameraTransform,
+            smoothXAngle, smoothYAngle,
+            bobberFollowHeight, bobberFollowDistance,
+            bobberOrbitWithMouse, bobberCameraWaterClearance);
 
-        // Dedicated reel-press return takes priority over the blend system. Lerp directly from
-        // the snapshot pose to the live player orbit pose over bobberReturnDuration.
-        if (isReturningToPlayer)
+        // Dedicated reel-press return takes priority over the blend system. Currently no caller
+        // ever flips IsReturningToPlayer to true; kept for forward compatibility.
+        if (bobberTracker.IsReturningToPlayer)
         {
-            float dur = Mathf.Max(bobberReturnDuration, 0.0001f);
-            returnT += Time.deltaTime / dur;
-            if (returnT >= 1f)
+            bobberTracker.AdvanceReturnT(bobberReturnDuration);
+            if (!bobberTracker.IsReturningToPlayer)
             {
                 cameraTransform.position = playerCameraPose.position;
                 cameraTransform.rotation = playerCameraPose.rotation;
-                isReturningToPlayer = false;
             }
             else
             {
-                float t = returnT * returnT * (3f - 2f * returnT); // smoothstep ease
-                cameraTransform.position = Vector3.Lerp(returnFromPose.position, playerCameraPose.position, t);
-                cameraTransform.rotation = Quaternion.Slerp(returnFromPose.rotation, playerCameraPose.rotation, t);
+                float rt = bobberTracker.ReturnT;
+                float t = rt * rt * (3f - 2f * rt); // smoothstep ease
+                var from = bobberTracker.ReturnFromPose;
+                cameraTransform.position = Vector3.Lerp(from.position, playerCameraPose.position, t);
+                cameraTransform.rotation = Quaternion.Slerp(from.rotation, playerCameraPose.rotation, t);
             }
             UpdateFov(input);
             return;
         }
 
-        float blendT = 1f - Mathf.Exp(-bobberFollowLerpSpeed * Time.deltaTime);
-        bobberCameraBlend = Mathf.Lerp(bobberCameraBlend, bobberCameraBlendTarget, blendT);
+        bobberTracker.TickBlend(bobberFollowLerpSpeed);
 
-        if (hasBobberCameraPose && bobberCameraBlend > 0.001f)
+        if (bobberTracker.HasBobberCameraPose && bobberTracker.BlendValue > 0.001f)
         {
-            cameraTransform.position = Vector3.Lerp(playerCameraPose.position, bobberCameraPose.position, bobberCameraBlend);
-            cameraTransform.rotation = Quaternion.Slerp(playerCameraPose.rotation, bobberCameraPose.rotation, bobberCameraBlend);
+            var bp = bobberTracker.CurrentBobberPose;
+            cameraTransform.position = Vector3.Lerp(playerCameraPose.position, bp.position, bobberTracker.BlendValue);
+            cameraTransform.rotation = Quaternion.Slerp(playerCameraPose.rotation, bp.rotation, bobberTracker.BlendValue);
         }
         else
         {
             cameraTransform.position = playerCameraPose.position;
             cameraTransform.rotation = playerCameraPose.rotation;
-
-            if (bobberCameraBlendTarget <= 0.001f && hasBobberCameraPose)
-            {
-                bobberCameraBlend = 0f;
-                hasBobberCameraPose = false;
-                bobberFollowTarget = null;
-                bobberFollowController = null;
-            }
+            bobberTracker.ReleaseIfFadedOut();
         }
 
         UpdateFov(input);
@@ -366,10 +308,10 @@ public class PlayerCameraController : MonoBehaviour
 
         bool isDialogueCamera = input.areControlsLocked && DialogueManager.Instance != null && DialogueManager.Instance.IsDialogueActive();
         bool isBoardCamera = input.areControlsLocked && input.isBountyBoardActive && input.activeBountyBoard != null;
-        // While the bobber camera is dominant OR we're in the middle of a reel-return lerp, freeze
-        // the player's mouse-driven orbit so the pose the camera lands on is exactly the pre-throw
-        // aim direction.
-        bool bobberCameraDominant = bobberCameraBlend > 0.01f || isReturningToPlayer;
+        // Fishing locks player controls, but while the bobber/lure camera owns the view the
+        // mouse must still orbit — the bobber pose is built from these same angles, so this is
+        // what lets the player rotate around the bobber exactly like around the player.
+        bool bobberCameraDominant = bobberTracker.BobberCameraDominant;
 
         if (isDialogueCamera || isBoardCamera)
         {
@@ -383,18 +325,18 @@ public class PlayerCameraController : MonoBehaviour
                 cameraYAngle = Mathf.LerpAngle(cameraYAngle, dialogueCameraYAngle, Time.deltaTime * dialogueCameraLerpSpeed);
             }
         }
-        else if (!input.isFightingFish && !isCatchCameraActive && !input.areControlsLocked)
+        else if (!input.isFightingFish && !isCatchCameraActive
+                 && (!input.areControlsLocked || bobberCameraDominant))
         {
-            // Mouse orbit is allowed even while the bobber is dominant — the bobber pose reuses
-            // these angles to orbit around the bobber pivot, mirroring the normal player orbit.
             // Returning-to-player is the one in-water case where orbit input is suppressed so the
             // camera doesn't fight the one-shot return lerp.
-            if (!isReturningToPlayer)
+            if (!bobberTracker.IsReturningToPlayer)
             {
                 float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
                 float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
-                cameraXAngle += mouseX;
-                cameraYAngle -= mouseY;
+                Vector2 stickLook = GamepadInput.Look;
+                cameraXAngle += mouseX + stickLook.x * gamepadLookSpeedX * Time.deltaTime;
+                cameraYAngle -= mouseY + stickLook.y * gamepadLookSpeedY * Time.deltaTime;
                 cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
             }
         }
@@ -409,13 +351,12 @@ public class PlayerCameraController : MonoBehaviour
             cameraXAngle = Mathf.LerpAngle(cameraXAngle, targetRot.eulerAngles.y, Time.deltaTime * fightCameraLerpSpeed);
         }
 
-        UpdateNibblePitchOffset();
-
-        chargeProgress = Mathf.SmoothDamp(chargeProgress, chargeProgressTarget, ref chargeProgressVel, chargeSmoothTime, chargeMaxSpeed, Time.deltaTime);
+        reactionTracker.Tick(nibblePitchOffset, nibblePitchLerpSpeed, chargeSmoothTime, chargeMaxSpeed);
+        float chargeProgress = reactionTracker.ChargeProgress;
         float chargePitchOffset = -chargePitchUpAngle * chargeProgress;
 
         smoothXAngle = Mathf.SmoothDampAngle(smoothXAngle, cameraXAngle, ref xVel, cameraSmoothTime);
-        smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle + currentPitchOffset + chargePitchOffset, ref yVel, cameraSmoothTime);
+        smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle + reactionTracker.CurrentNibblePitchOffset + chargePitchOffset, ref yVel, cameraSmoothTime);
 
         Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f);
         Vector3 cameraDirection = -(rotation * Vector3.forward);
@@ -455,149 +396,16 @@ public class PlayerCameraController : MonoBehaviour
         playerCameraPose.position = currentPivotPosition + cameraDirection * currentCameraDistance;
         playerCameraPose.rotation = rotation;
 
-        ApplyFightFramingOverride(input);
-    }
-
-    private void ApplyFightFramingOverride(CameraInput input)
-    {
-        if (!input.isFightingFish || input.activeBobberTransform == null)
-        {
-            // Reset smoothing so the next fight onset starts from the current orbit pose, not stale state.
-            fightSmoothedPos = playerCameraPose.position;
-            fightSmoothedRot = playerCameraPose.rotation;
-            fightSmoothedInitialized = false;
-            return;
-        }
-
-        Vector3 playerPos = input.playerModel.position;
-        Vector3 bobberPos = input.activeBobberTransform.position;
-
-        Vector3 toBobber = bobberPos - playerPos;
-        toBobber.y = 0f;
-        Vector3 forward = toBobber.sqrMagnitude > 0.0001f ? toBobber.normalized : input.playerModel.forward;
-        forward.y = 0f;
-        if (forward.sqrMagnitude < 0.0001f) forward = Vector3.forward;
-        forward.Normalize();
-
-        Vector3 right = Vector3.Cross(Vector3.up, forward).normalized;
-
-        Vector3 targetPos = playerPos
-                            + right * fightShoulderSide
-                            - forward * fightShoulderBack
-                            + Vector3.up * fightShoulderHeight;
-
-        // Aim along the player→bobber line so both are framed. fightFramingAimT picks a point
-        // between the player's torso and the bobber for the camera to look at.
-        Vector3 playerLookAnchor = playerPos + Vector3.up * (fightShoulderHeight * 0.7f);
-        Vector3 lookAt = Vector3.Lerp(playerLookAnchor, bobberPos, fightFramingAimT);
-        Vector3 lookDir = lookAt - targetPos;
-        Quaternion targetRot = lookDir.sqrMagnitude > 0.0001f
-            ? Quaternion.LookRotation(lookDir.normalized)
-            : playerCameraPose.rotation;
-
-        if (!fightSmoothedInitialized)
-        {
-            fightSmoothedPos = playerCameraPose.position;
-            fightSmoothedRot = playerCameraPose.rotation;
-            fightSmoothedInitialized = true;
-        }
-
-        float t = 1f - Mathf.Exp(-fightFramingLerpSpeed * Time.deltaTime);
-        fightSmoothedPos = Vector3.Lerp(fightSmoothedPos, targetPos, t);
-        fightSmoothedRot = Quaternion.Slerp(fightSmoothedRot, targetRot, t);
-
-        playerCameraPose.position = fightSmoothedPos;
-        playerCameraPose.rotation = fightSmoothedRot;
-    }
-
-    private void ComputeBobberCameraPose(CameraInput input)
-    {
-        Vector3 bobberPos = bobberFollowTarget.position;
-        Vector3 bobberPivot = bobberPos + Vector3.up * bobberFollowHeight;
-
-        // Mouse-orbit path: reuse the same orbit angles ComputePlayerCameraPose drives, but pivot
-        // around the bobber. This lets the player rotate the view around the in-water bobber
-        // exactly like they would around the player on land.
-        if (bobberOrbitWithMouse)
-        {
-            Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f);
-            Vector3 cameraDirection = -(rotation * Vector3.forward);
-            Vector3 orbitPos = bobberPivot + cameraDirection * bobberFollowDistance;
-
-            // Don't let the camera dip below the water plane. If the orbit pitch would put it
-            // below the surface (+ a small clearance), lift it back up and aim it at the pivot
-            // from the new position so the framing stays sensible.
-            if (bobberFollowController != null && bobberFollowController.IsInWater)
-            {
-                float minY = bobberFollowController.WaterSurfaceY + bobberCameraWaterClearance;
-                if (orbitPos.y < minY)
-                {
-                    orbitPos.y = minY;
-                    Vector3 liftedLookDir = bobberPivot - orbitPos;
-                    if (liftedLookDir.sqrMagnitude > 0.0001f)
-                    {
-                        rotation = Quaternion.LookRotation(liftedLookDir.normalized);
-                    }
-                }
-            }
-
-            bobberCameraPose.position = orbitPos;
-            bobberCameraPose.rotation = rotation;
-            return;
-        }
-
-        // Legacy path: read the pose from a child anchor on the bobber prefab if one exists.
-        Transform anchor = bobberFollowController != null ? bobberFollowController.CameraAnchor : null;
-        if (anchor != null)
-        {
-            bobberCameraPose.position = anchor.position;
-            bobberCameraPose.rotation = anchor.rotation;
-            return;
-        }
-
-        // Final fallback: fixed pose looking back toward the bobber from the player's side.
-        Vector3 playerPos = input.playerModel.position;
-        Vector3 toBobber = bobberPos - playerPos;
-        toBobber.y = 0f;
-        Vector3 awayFromBobber;
-        if (toBobber.sqrMagnitude > 0.0001f)
-        {
-            awayFromBobber = -toBobber.normalized;
-        }
-        else
-        {
-            Vector3 fwd = input.playerModel.forward;
-            fwd.y = 0f;
-            awayFromBobber = fwd.sqrMagnitude > 0.0001f ? -fwd.normalized : -Vector3.forward;
-        }
-
-        Vector3 fallbackPos = bobberPivot + awayFromBobber * bobberFollowDistance;
-        Vector3 lookDir = bobberPos - fallbackPos;
-        Quaternion fallbackRot = lookDir.sqrMagnitude > 0.0001f
-            ? Quaternion.LookRotation(lookDir.normalized)
-            : cameraTransform.rotation;
-
-        bobberCameraPose.position = fallbackPos;
-        bobberCameraPose.rotation = fallbackRot;
+        fightFraming.Apply(
+            ref playerCameraPose.position, ref playerCameraPose.rotation,
+            input.isFightingFish, input.playerModel, input.activeBobberTransform,
+            fightShoulderSide, fightShoulderBack, fightShoulderHeight,
+            fightFramingAimT, fightFramingLerpSpeed);
     }
 
     private void UpdateFov(CameraInput input)
     {
-        if (cam == null) cam = cameraTransform.GetComponent<Camera>();
-        if (cam == null) return;
-
-        float targetFov;
-        float fovLerpSpeed;
-        if (isBiteActive)
-        {
-            targetFov = baseFov - biteFovZoom;
-            fovLerpSpeed = biteFovLerpSpeed;
-        }
-        else
-        {
-            targetFov = baseFov + (input.isSprinting ? sprintFovBoost : 0f);
-            fovLerpSpeed = sprintFovLerpSpeed;
-        }
-        cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, targetFov, Time.deltaTime * fovLerpSpeed);
+        fovTracker.Tick(cameraTransform, input.isSprinting,
+            biteFovZoom, biteFovLerpSpeed, sprintFovBoost, sprintFovLerpSpeed);
     }
 }

@@ -22,7 +22,16 @@ MonoBehaviour:
   isLegendary: 0
   minLengthCm: 40
   maxLengthCm: 150
-  catchProbability: 0.235
+  spawnChance: 35.4
+  catchProbability: 0.5
+  attractedTo: 1
+  awarenessRadius: 7
+  swimFrequency: 0.74
+  swimBodyWaves: 0.55
+  swimWaveAmplitude: 0.05
+  swimSideAmplitude: 0.01
+  swimPivotAmount: 0.04
+  swimMaskStart: 0.5
   basePrice: 6
   pricePerCm: 1
   preferredBaits:

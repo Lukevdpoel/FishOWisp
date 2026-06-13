@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class ModelViewer : GenericSingleton<ModelViewer>
 {
@@ -6,7 +7,15 @@ public class ModelViewer : GenericSingleton<ModelViewer>
     public Transform modelContainer;
     public Transform camera;
 
+    [Header("Uncaught Display")]
+    [Tooltip("Unlit black silhouette for fish the player hasn't caught yet — the same material " +
+             "the underwater swimmers wear (M_FishSilhouette_Sway), so the display sway keeps " +
+             "driving its sine. Leave empty to fall back to a plain unlit black (the sway then " +
+             "deforms the mesh on the CPU instead).")]
+    public Material uncaughtSilhouetteMaterial;
+
     private GameObject currentModel;
+    private static Material fallbackSilhouette;
 
     private void Start()
     {
@@ -20,8 +29,10 @@ public class ModelViewer : GenericSingleton<ModelViewer>
     /// <summary>
     /// Swap the model being displayed by instantiating the provided prefab.
     /// Pass null to clear the model and disable the camera.
+    /// Pass revealed = false for a fish the player hasn't caught: the model renders as the
+    /// same unlit black silhouette the underwater swimmers use, still swaying.
     /// </summary>
-    public void ShowModel(FishPreset prefab)
+    public void ShowModel(FishPreset prefab, bool revealed = true)
     {
         // Destroy previous model if it exists
         if (currentModel != null)
@@ -58,6 +69,27 @@ public class ModelViewer : GenericSingleton<ModelViewer>
             {
                 renderer.gameObject.layer = 22;
             }
+
+            // Mystery entry: black out the whole model before FishDisplaySway is added, so
+            // the sway picks up (and instances) the silhouette material for its sine clock.
+            if (!revealed) ApplySilhouette(renderers);
+
+            // The notebook holds Time.timeScale at 0 while this viewer is visible — any
+            // Animator the fish prefab carries must tick on unscaled time to keep moving.
+            foreach (Animator anim in currentModel.GetComponentsInChildren<Animator>(true))
+            {
+                anim.updateMode = AnimatorUpdateMode.UnscaledTime;
+            }
+
+            // Display idle: the same procedural swim the fish has in the water, scaled to
+            // calm museum-pose values from the species' own swim settings — eels undulate,
+            // pikes barely flex. Runs on unscaled time so it keeps swaying while the game
+            // is paused. Harmless no-op until the fish shader carries the FishSway function.
+            FishDisplaySway sway = currentModel.AddComponent<FishDisplaySway>();
+            sway.frequency = prefab.swimFrequency * 0.6f;
+            sway.bodyWaves = prefab.swimBodyWaves;
+            sway.waveAmplitude = prefab.swimWaveAmplitude * 0.5f;
+            sway.maskStart = prefab.swimMaskStart;
         }
     }
 
@@ -67,5 +99,39 @@ public class ModelViewer : GenericSingleton<ModelViewer>
     public void HideViewer()
     {
         ShowModel(null);
+    }
+
+    // Same treatment as the underwater swimmers (FishModelVisual.ApplySilhouette): every
+    // material slot goes flat black and the renderers opt out of anything lighting could
+    // use to shade the shape.
+    private void ApplySilhouette(MeshRenderer[] renderers)
+    {
+        Material mat = uncaughtSilhouetteMaterial != null ? uncaughtSilhouetteMaterial : GetFallbackSilhouette();
+        foreach (MeshRenderer renderer in renderers)
+        {
+            Material[] mats = new Material[renderer.sharedMaterials.Length];
+            for (int m = 0; m < mats.Length; m++) mats[m] = mat;
+            renderer.sharedMaterials = mats;
+
+            renderer.shadowCastingMode = ShadowCastingMode.Off;
+            renderer.receiveShadows = false;
+            renderer.lightProbeUsage = LightProbeUsage.Off;
+            renderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+        }
+    }
+
+    private static Material GetFallbackSilhouette()
+    {
+        if (fallbackSilhouette == null)
+        {
+            Shader shader = Shader.Find("Universal Render Pipeline/Unlit");
+            if (shader == null) shader = Shader.Find("Unlit/Color");
+            fallbackSilhouette = new Material(shader) { name = "FishSilhouette (viewer runtime)" };
+            if (fallbackSilhouette.HasProperty("_BaseColor"))
+                fallbackSilhouette.SetColor("_BaseColor", Color.black);
+            if (fallbackSilhouette.HasProperty("_Color"))
+                fallbackSilhouette.SetColor("_Color", Color.black);
+        }
+        return fallbackSilhouette;
     }
 }

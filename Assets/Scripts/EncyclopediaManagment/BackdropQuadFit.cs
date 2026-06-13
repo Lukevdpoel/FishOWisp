@@ -9,7 +9,12 @@ public class BackdropQuadFit : MonoBehaviour
     [Tooltip("Distance in front of the camera to place the quad (along the camera's local +Z).")]
     public float distance = 1f;
 
-    void LateUpdate()
+    void LateUpdate() => Fit();
+
+    // Public so NoteMenu can force-fit on the same frame it activates the backdrop camera,
+    // before that camera renders. Relying on LateUpdate alone is brittle when the GameObject
+    // was inactive moments earlier — first-frame render can beat the LateUpdate tick.
+    public void Fit()
     {
         if (targetCamera == null) return;
         if (!targetCamera.orthographic) return;

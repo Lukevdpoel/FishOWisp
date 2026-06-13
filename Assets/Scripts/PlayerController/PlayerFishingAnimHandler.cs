@@ -17,6 +17,14 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     public string attractAnim = "Attract";
     public string biteReactionAnim = "BiteReaction";
 
+    [Header("Charge Cancel")]
+    [Tooltip("Base locomotion/idle state the cast animation snaps to when a charge is cancelled " +
+             "(let go of RT mid-charge). Must match the default state name in the Animator.")]
+    [SerializeField] private string defaultLocomotionState = "Locomotion";
+    [Tooltip("Blend time used when a cancelled charge returns to the default pose. Keep tiny for " +
+             "an effectively immediate cut.")]
+    [SerializeField] private float cancelTransitionDuration = 0.05f;
+
     public bool IsFightingFish { get; private set; }
     public bool IsCasting { get; private set; }
     public bool IsAiming { get; private set; }
@@ -33,9 +41,11 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     private int hashRodDirection;
     private int hashAttract;
     private int hashBiteReaction;
+    private int hashLocomotion;
 
     private void Awake()
     {
+        hashLocomotion = Animator.StringToHash(defaultLocomotionState);
         hashStartCharging = Animator.StringToHash(startChargingAnim);
         hashThrow = Animator.StringToHash(throwAnim);
         hashReelIn = Animator.StringToHash(reelInAnim);
@@ -53,7 +63,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     {
         FishingEvents.OnStartCharging += PlayStartChargingAnim;
         FishingEvents.OnThrowBobber += PlayThrowAnim;
-        FishingEvents.OnHookFishSuccess += PlayReelInAnim;
+        FishingEvents.OnHookFishSuccess += OnHookSuccess;
         FishingEvents.OnFishFightBegin += StartFightingAnimation;
         FishingEvents.OnCancelFishing += StopFightingAnimation;
         FishingEvents.OnFishFightEnd += OnFishFightEnd;
@@ -71,6 +81,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         FishingEvents.OnRodDirectionUpdate += OnRodDirectionUpdate;
         FishingEvents.OnAttractFish += PlayAttractAnim;
         FishingEvents.OnFishBite += PlayBiteReactionAnim;
+        FishingEvents.OnChargeCanceled += SnapToDefaultPose;
 
         BountyBoard.OnBountyBoardStateChange += HandleBountyBoard;
         DialogueManager.OnDialogueStateChange += OnDialogueStateChanged;
@@ -80,7 +91,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     {
         FishingEvents.OnStartCharging -= PlayStartChargingAnim;
         FishingEvents.OnThrowBobber -= PlayThrowAnim;
-        FishingEvents.OnHookFishSuccess -= PlayReelInAnim;
+        FishingEvents.OnHookFishSuccess -= OnHookSuccess;
         FishingEvents.OnFishFightBegin -= StartFightingAnimation;
         FishingEvents.OnCancelFishing -= StopFightingAnimation;
         FishingEvents.OnFishFightEnd -= OnFishFightEnd;
@@ -98,6 +109,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         FishingEvents.OnRodDirectionUpdate -= OnRodDirectionUpdate;
         FishingEvents.OnAttractFish -= PlayAttractAnim;
         FishingEvents.OnFishBite -= PlayBiteReactionAnim;
+        FishingEvents.OnChargeCanceled -= SnapToDefaultPose;
 
         BountyBoard.OnBountyBoardStateChange -= HandleBountyBoard;
         DialogueManager.OnDialogueStateChange -= OnDialogueStateChanged;
@@ -105,7 +117,39 @@ public class PlayerFishingAnimHandler : MonoBehaviour
 
     private void OnCastStart() => IsCasting = true;
     private void OnCastEnd() { IsCasting = false; IsFightingFish = false; }
-    private void OnFishingCanceled() { SetWaitingForBite(false); }
+    private void OnFishingCanceled() { SetWaitingForBite(false); ClearStaleTriggers(); }
+
+    // Charge cancelled (let go of RT mid-charge): the StartCharging windup otherwise lingers in
+    // its state until the exit-time transition fires, so force the default locomotion pose for an
+    // immediate return to idle. Reset the windup/throw triggers first so a latched one can't yank
+    // the animator straight back out of locomotion.
+    private void SnapToDefaultPose()
+    {
+        IsCasting = false;
+        if (animator == null) return;
+        animator.ResetTrigger(hashStartCharging);
+        animator.ResetTrigger(hashThrow);
+        animator.CrossFadeInFixedTime(hashLocomotion, cancelTransitionDuration, 0);
+    }
+
+    // Triggers latch forever if no transition consumes them, and a latched ReelIn hijacks the
+    // next cast: the Throw state has an instant ReelIn-conditioned exit, so the throw animation
+    // gets replaced by the reel animation. Cancel/fail is exactly where one-shots can be left
+    // dangling (the fight pose is entered via the IsFighting bool, abandoning pending triggers),
+    // so sweep them all here.
+    private void ClearStaleTriggers()
+    {
+        if (animator == null) return;
+        animator.ResetTrigger(hashReelIn);
+        animator.ResetTrigger(hashAttract);
+        animator.ResetTrigger(hashBiteReaction);
+    }
+
+    // At hook time the ReelIn trigger can never play: OnFishFightBegin fires in the same frame
+    // and the AnyState→fight transition outranks it, so SetTrigger here would only latch and
+    // corrupt a later cast (the post-loss "casting plays the reel animation" bug). Only the
+    // waiting-for-bite flag needs clearing.
+    private void OnHookSuccess() { SetWaitingForBite(false); }
     private void OnStartAiming() => IsAiming = true;
     private void OnStopAiming() => IsAiming = false;
     private void OnThrowBobber(Vector3 direction, float force) { IsCasting = false; SetWaitingForBite(true); }
@@ -115,7 +159,9 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     private void SetWaitingForBite(bool value) { if (animator) animator.SetBool(hashIsWaitingForBite, value); }
 
     private void PlayStartChargingAnim() { if (animator) animator.SetTrigger(hashStartCharging); }
-    private void PlayThrowAnim(Vector3 direction, float force) { if (animator) animator.SetTrigger(hashThrow); }
+    // ResetTrigger(ReelIn) first: the Throw state exits instantly into Reel when ReelIn is set,
+    // so a stale ReelIn would swallow the entire throw animation.
+    private void PlayThrowAnim(Vector3 direction, float force) { if (animator) { animator.ResetTrigger(hashReelIn); animator.SetTrigger(hashThrow); } }
     private void PlayReelInAnim() { SetWaitingForBite(false); if (animator) animator.SetTrigger(hashReelIn); }
     private void PlayAttractAnim() { if (animator) animator.SetTrigger(hashAttract); }
     private void PlayBiteReactionAnim(BobberController b) { SetWaitingForBite(false); if (animator) animator.SetTrigger(hashBiteReaction); }

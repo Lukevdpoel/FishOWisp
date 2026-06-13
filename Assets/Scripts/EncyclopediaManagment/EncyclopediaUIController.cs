@@ -5,11 +5,6 @@ using UnityEngine.EventSystems;
 
 public class EncyclopediaUIController : MonoBehaviour
 {
-#if UNITY_EDITOR
-    [Header("Debug")]
-    public bool debugIgnoreCaughtRequirement = true;
-#endif
-
     [Header("Lifecycle")]
     [Tooltip("The GameObject whose active-in-hierarchy state drives the encyclopedia. " +
              "Typically the Canvas_UI parent under the notebook's encyclopedia page. " +
@@ -55,10 +50,37 @@ public class EncyclopediaUIController : MonoBehaviour
             ApplyLiveState(shouldBeLive);
         }
 
-        if (isLive && Input.GetMouseButtonDown(0))
+        if (isLive)
         {
-            CheckForSlotClick();
+            if (Input.GetMouseButtonDown(0)) CheckForSlotClick();
+
+            // D-pad cycles linearly through the fish raster — but only while the notebook
+            // is actually open. isLive should already imply that (Canvas_UI deactivates on
+            // close), but the explicit gate guarantees the D-pad can never reach the
+            // encyclopedia from gameplay or from the inventory's slot navigation.
+            if (NoteMenu.IsNotebookOpen)
+            {
+                if (GamepadInput.DpadNextPressed) CycleSelection(1);
+                else if (GamepadInput.DpadPrevPressed) CycleSelection(-1);
+            }
         }
+    }
+
+    /// <summary>
+    /// Moves the selection forward/backward through the spawned grid slots, wrapping at
+    /// the ends. Reuses the click path so details/3D preview update exactly like a click.
+    /// </summary>
+    private void CycleSelection(int delta)
+    {
+        if (spawnedSlots.Count == 0) return;
+
+        int currentIndex = 0;
+        EncyclopediaGridSlot currentSlot = FindSlotFor(currentEntry);
+        if (currentSlot != null) currentIndex = spawnedSlots.IndexOf(currentSlot);
+
+        int nextIndex = ((currentIndex + delta) % spawnedSlots.Count + spawnedSlots.Count) % spawnedSlots.Count;
+        EncyclopediaGridSlot nextSlot = spawnedSlots[nextIndex];
+        if (nextSlot != null) OnSlotClicked(nextSlot.myEntry, nextSlot);
     }
 
     private bool ShouldBeLive()
@@ -150,23 +172,9 @@ public class EncyclopediaUIController : MonoBehaviour
         if (selectedSlot != null) selectedSlot.Select();
         currentEntry = entry;
 
-        bool showDetails = entry.hasCaught > 0;
-#if UNITY_EDITOR
-        showDetails = debugIgnoreCaughtRequirement || showDetails;
-#endif
-        if (showDetails)
-        {
-            if (detailsUI != null) detailsUI.Populate(entry);
-            // fish3DPreview stays as-is; ModelViewer.ShowModel inside Populate populates the RT.
-        }
-        else
-        {
-            // No SetActive(false) on the panels — they're children of Canvas_UI and follow its
-            // active state via hierarchy. For an uncaught fish we just hide the model camera
-            // and leave the panel showing whatever it last showed. If you want a true "mystery
-            // mode" placeholder, extend FishEntryUI.Populate to accept a null/uncaught entry
-            // and render "???" placeholders — that's a UI concern, not a lifecycle concern.
-            if (ModelViewer.Instance != null) ModelViewer.Instance.HideViewer();
-        }
+        // Uncaught fish render as mystery entries — "???" name/preferences and a black
+        // silhouette model — so every slot populates; FishEntryUI decides what to reveal.
+        if (detailsUI != null) detailsUI.Populate(entry);
+        // fish3DPreview stays as-is; ModelViewer.ShowModel inside Populate populates the RT.
     }
 }

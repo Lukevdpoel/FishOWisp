@@ -1,15 +1,44 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
 public class FishRipple : MonoBehaviour
 {
-    public enum FishState { Wandering, Attracted, Scared, Nibbling }
+    public enum FishState { Wandering, Attracted, Scared, Nibbling, Striking, Grabbing, Despawning }
 
     [Header("Movement")]
     public float swimSpeed = 1.5f;
     public float attractSpeed = 1.2f;
     public float scareSpeed = 5f;
     public float wanderRadius = 3f;
+    [Tooltip("Slow forward drift (m/s) used instead of a dead stop whenever the fish 'pauses' — wander rests, post-scare recovery, approach hesitations. Fish never stand fully still.")]
+    public float pauseDriftSpeed = 0.2f;
+
+    [Header("Turning")]
+    [Tooltip("Fish always swim along their own facing, so heading turn rate (deg/sec) sets the arc they carve. Lower = wider, lazier wandering curves.")]
+    public float wanderTurnRate = 70f;
+    [Tooltip("Heading turn rate (deg/sec) while approaching the bobber — agile enough to weave but still curved.")]
+    public float attractTurnRate = 160f;
+    [Tooltip("Heading turn rate (deg/sec) during a committed lure strike. High = near-straight charge.")]
+    public float strikeTurnRate = 400f;
+    [Tooltip("Heading turn rate (deg/sec) while fleeing. Very high = sharp panic darts.")]
+    public float scareTurnRate = 720f;
+
+    [Header("Body Chain")]
+    [Tooltip("How quickly the trailing body relaxes straight behind the head, per second. Lower = the body holds its curves longer and follows the head more lazily (floppier); higher = stiffer fish. Tunable live in play mode.")]
+    public float bodyStraightenRate = 2.5f;
+
+    [Header("Wander Weave")]
+    [Tooltip("How far wandering fish bow side to side while cruising, in meters — lazy S-curves instead of straight beelines. 0 disables it.")]
+    public float wanderWeaveAmplitude = 0.6f;
+    [Tooltip("Weave cycles per second. Keep low (0.2–0.5) for natural meandering.")]
+    public float wanderWeaveFrequency = 0.35f;
+
+    [Header("Schooling")]
+    [Tooltip("Personal space radius in meters: wandering fish steer away from schoolmates closer than this instead of phasing through them.")]
+    public float separationRadius = 0.8f;
+    [Tooltip("How strongly the wander path bends away from nearby fish.")]
+    public float separationStrength = 1.2f;
 
     [Header("Natural Curiosity")]
     [Tooltip("How strongly the fish drifts toward the bobber while wandering (0 = none, 1 = strong).")]
@@ -45,6 +74,18 @@ public class FishRipple : MonoBehaviour
     [Header("Wake")]
     [Tooltip("Wake/trail prefab that follows the fish on the water surface.")]
     public GameObject wakePrefab;
+    [Tooltip("Spawn the wake/trail. Off for now — the swimming silhouette makes it redundant; flip back on any time without losing the prefab reference.")]
+    public bool spawnWake = false;
+
+    [Header("Underwater Model")]
+    [Tooltip("Clearance between the water line and the HIGHEST point of the species model. The model is auto-sunk from its renderer bounds, so no fish can poke above the surface regardless of prefab pivot or size.")]
+    public float modelDepth = 0.35f;
+    [Tooltip("Uniform scale applied to the spawned species model.")]
+    public float modelScale = 1f;
+    [Tooltip("Local rotation offset (euler) for the spawned model, for prefabs whose forward axis isn't +Z. The fish FBXs face -Z, hence the 180 default.")]
+    public Vector3 modelRotationOffset = new Vector3(0f, 180f, 0f);
+    [Tooltip("Material that blacks out the swimming model — fish in the water are always obscured. Use an UNLIT shader so lighting can't shade the silhouette. Leave empty for a runtime black URP/Unlit material.")]
+    public Material silhouetteMaterial;
 
     [Header("Obstacle Avoidance")]
     [Tooltip("Layers that count as obstacles fish cannot swim through.")]
@@ -63,8 +104,30 @@ public class FishRipple : MonoBehaviour
     public float followerHoverDistance = 1.4f;
 
     [Header("Awareness (Passive)")]
-    [Tooltip("This fish notices the bobber and auto-attracts (as a follower) whenever the bobber sits within this radius. Drifts back to wandering once the bobber leaves the radius.")]
+    [Tooltip("Fallback awareness radius — used only when the species preset's awarenessRadius is 0. The fish notices the bobber and auto-attracts (as a follower) whenever the bobber sits within the radius; drifts back to wandering once it leaves.")]
     public float actionRadius = 8f;
+
+    [Header("Lure Strike (TP Dash & Grab)")]
+    [Tooltip("Swim speed during a lure strike — the committed dash after the bite roll succeeds. TP charges at roughly double the approach speed.")]
+    public float strikeSpeed = 3.5f;
+    [Tooltip("3D distance from the lure (snout to lure) at which the dash connects and the fish clamps onto it (the grab). Stays small so the fish has to actually reach the lure.")]
+    public float strikeLeapRange = 0.9f;
+    [Tooltip("Horizontal distance from the lure at which the fish starts arcing UP toward it, so the head rises to meet the lure instead of staying at swim depth. The body trails the arc as a rope.")]
+    public float strikeRiseDistance = 1.6f;
+    [Tooltip("How fast (m/s) the head rises/sinks toward the lure's height during the dash and grab. High enough to complete the arc before contact.")]
+    public float strikeRiseSpeed = 4f;
+
+    [Header("Lure Grab (TP Bite Window)")]
+    [Tooltip("Base seconds the fish keeps the lure in its mouth, swimming on in its dash direction, before it spits it — the player's reaction window. Scaled per species by size (bigger fish spit faster).")]
+    public float grabHoldDuration = 0.6f;
+    [Tooltip("Speed (m/s) the fish swims while carrying the lure during the grab. The lure is towed along to its mouth.")]
+    public float grabForwardSpeed = 2.2f;
+    [Tooltip("How much further below the grab height the fish drags the lure over the hold (TP fish pull the lure DOWN). 0 keeps it level.")]
+    public float grabPullDownDepth = 0.25f;
+    [Tooltip("After spitting the lure on a missed bite, the fish coasts this far along its dash heading — 'finishing the dash' — before normal wandering resumes.")]
+    public float grabReleaseFollowThrough = 2.5f;
+    [Tooltip("Seconds a fish ignores the lure after spitting it, so a missed bite doesn't instantly wheel back into another grab.")]
+    public float grabReleaseAvoidTime = 2.5f;
 
     [Header("Aim Glimpse Indicator")]
     [Tooltip("Maximum distance from the camera at which the fish glimpse can appear while aiming. Set 0 to disable the distance check.")]
@@ -83,16 +146,32 @@ public class FishRipple : MonoBehaviour
     public float glimpseFadeOut = 0.6f;
     [Tooltip("Debug: keep the bait indicator fully visible at all times, ignoring aim-mode gating and the glimpse fade cycle.")]
     public bool alwaysShowIndicator = false;
+    [Tooltip("Master switch for the bait-preference image above the fish. Off for now; flip on to bring the aim glimpses back (alwaysShowIndicator still works on top of it).")]
+    public bool enableBaitIndicator = false;
 
     [Header("Timing")]
     public float scareCooldown = 5f;
     public float wanderPauseMin = 0.5f;
     public float wanderPauseMax = 2f;
 
+    [Header("Lifetime")]
+    [Tooltip("Seconds this fish hangs around before it moves on: it swims off, dives and fades " +
+             "out (the same getaway an escaped catch plays) and the zone spawns a replacement. " +
+             "The clock pauses entirely while a bobber/lure is in this pool's water — fish " +
+             "never leave during any stage of fishing — and expiry only fires from calm " +
+             "wandering, never mid-flee. Set 0 to disable.")]
+    public float lifetimeSeconds = 45f;
+
     [HideInInspector] public FishPreset preset;
+
+    // Fired once when the lifetime expires and the swim-off begins. The zone uses it to drop
+    // this fish from its roster (it's no longer catchable) and spawn the replacement.
+    public event System.Action<FishRipple> OnDespawnStarted;
 
     public FishState CurrentState => currentState;
     public bool IsFollower => isFollower;
+    // Seconds left in the current lure grab (the reaction window), 0 when not gripping.
+    public float GrabHoldRemaining => currentState == FishState.Grabbing ? Mathf.Max(0f, grabTimer) : 0f;
 
     private FishState currentState = FishState.Wandering;
     private bool isFollower;
@@ -104,6 +183,7 @@ public class FishRipple : MonoBehaviour
     private Vector3 wanderTarget;
     private bool hasWanderTarget;
     private float wanderPauseTimer;
+    private float weavePhase;
 
     // Attracted weaving
     private Vector3 weaveOffset;
@@ -114,58 +194,90 @@ public class FishRipple : MonoBehaviour
     private Vector3 scareDirection;
     private float scareTimer;
 
+    // Lifetime despawn — mirrors HookedFishController's escape swim-off: burst away from the
+    // player, diving and fading out, then despawn for good.
+    private const float DespawnDuration = 1.8f;
+    private const float DespawnSpeed = 2.6f;
+    private const float DespawnDiveDepth = 0.35f;
+    private float ageTimer;
+    private float despawnTimer;
+    private Vector3 despawnDirection;
+
     // Bobber avoidance
     private bool shouldAvoidBobber;
+
+    // Lure brain: scales the passive awareness radius (1 = normal). The brain raises it while
+    // the lure is twitching so movement draws fish from farther away, TP-style.
+    private float awarenessScale = 1f;
+
+    // TP dash & grab. The dash (Striking) charges the lure with a 3D thrash; on contact the fish
+    // clamps onto the lure (Grabbing) and holds it for grabTimer seconds — the reaction window.
+    // onGrabStart opens that window (zone → rod); onGrabReleased closes it if the hold lapses.
+    // The zone calls ConfirmGrab() when the player reacts in time. No HookFish happens until then,
+    // so a missed bite just releases the real fish — it never disappears or fades.
+    private System.Action<FishRipple> onGrabStartCallback;
+    private System.Action<FishRipple> onGrabReleasedCallback;
+    private Vector3 dashDirection = Vector3.forward;
+    private float grabTimer;
+    // The head's height during a strike/grab is integrated separately (SteerToward re-pins y to
+    // the surface each frame), so the fish can arc up to the lure and dip while gripping.
+    private float strikeHeadY;
+    private float grabStartHeadY;
+    // Cached BobberController for the lure being tracked, so a grabbing fish can tow it.
+    private BobberController bobberCtrl;
+    // After spitting the lure, the fish ignores it for this long so the missed bite coasts through
+    // its follow-through instead of instantly wheeling back. Only gates re-attraction, not steering,
+    // so the coast actually carries past the lure rather than veering away from it.
+    private float reengageCooldown;
 
     // Wake
     private GameObject activeWakeInstance;
 
-    // UI indicator
-    private GameObject indicatorInstance;
-    private Canvas indicatorCanvas;
-    private CanvasGroup indicatorCanvasGroup;
-    private bool isAimingActive;
-    private float glimpseTimer;
-    private float glimpseAlpha;
-    private enum GlimpsePhase { Hidden, FadingIn, Holding, FadingOut }
-    private GlimpsePhase glimpsePhase = GlimpsePhase.Hidden;
+    // Anti-stuck rescue: wandering fish that make no progress for a while (spawned against
+    // or nudged into level geometry the obstacle mask can't see) get relocated.
+    private Vector3 stuckAnchor;
+    private float stuckTimer;
+
+    // Shared reference to the zone's live fish list, for separation steering.
+    private List<FishRipple> school;
+
+    public void SetSchool(List<FishRipple> school)
+    {
+        this.school = school;
+    }
+
+    private readonly FishGlimpseIndicator glimpse = new FishGlimpseIndicator();
+    private FishNibbleBehavior nibble;
+    private FishModelVisual modelVisual;
 
     public void Initialize(Collider bounds, float surfaceY, GameObject aimIndicatorPrefab)
     {
         zoneBounds = bounds;
         waterSurfaceY = surfaceY;
 
+        // The ripple prefab root is pitched -90° so its surface quad lies flat, but the fish
+        // host must be level: the model spawn, sink-below-water measurement and the yaw-based
+        // steering/body-bend all assume a yaw-only transform. Random yaw for spawn variety.
+        transform.rotation = Quaternion.Euler(0f, Random.Range(0f, 360f), 0f);
+        weavePhase = Random.Range(0f, Mathf.PI * 2f);
+
+        if (nibble == null) nibble = new FishNibbleBehavior(transform);
+
         // Place at a random point within the zone
-        Vector3 startPos = GetRandomPointInBounds();
+        Vector3 startPos = FishMovementHelpers.GetRandomPointInBounds(zoneBounds, transform.position, waterSurfaceY, obstacleLayers, obstacleRayHeight);
         startPos.y = waterSurfaceY;
         transform.position = startPos;
+        stuckAnchor = startPos;
+        stuckTimer = 0f;
 
-        // Create aim indicator
-        if (aimIndicatorPrefab != null)
-        {
-            indicatorInstance = Instantiate(aimIndicatorPrefab, transform);
-            indicatorInstance.transform.localPosition = Vector3.zero;
+        glimpse.Initialize(aimIndicatorPrefab, transform, preset);
 
-            indicatorCanvas = indicatorInstance.GetComponentInChildren<Canvas>();
-            if (indicatorCanvas != null)
-            {
-                indicatorCanvas.overrideSorting = true;
-                indicatorCanvas.sortingOrder = 1000;
-            }
-
-            indicatorCanvasGroup = indicatorInstance.GetComponentInChildren<CanvasGroup>();
-            if (indicatorCanvasGroup == null && indicatorCanvas != null)
-                indicatorCanvasGroup = indicatorCanvas.gameObject.AddComponent<CanvasGroup>();
-
-            FishAimIndicator aimIndicator = indicatorInstance.GetComponentInChildren<FishAimIndicator>(true);
-            if (aimIndicator != null) aimIndicator.ApplyPreset(preset);
-
-            if (indicatorCanvasGroup != null) indicatorCanvasGroup.alpha = 0f;
-            indicatorInstance.SetActive(false);
-        }
+        // Spawn the species model under the ripple so the fish has a visible body.
+        if (modelVisual == null) modelVisual = new FishModelVisual(transform);
+        modelVisual.Spawn(preset, modelDepth, modelScale, modelRotationOffset, silhouetteMaterial);
 
         // Spawn wake
-        if (wakePrefab != null)
+        if (spawnWake && wakePrefab != null)
         {
             Vector3 wakePos = new Vector3(startPos.x, waterSurfaceY, startPos.z);
             activeWakeInstance = Instantiate(wakePrefab, wakePos, wakePrefab.transform.rotation);
@@ -177,6 +289,7 @@ public class FishRipple : MonoBehaviour
     public void SetWaterSurfaceY(float y)
     {
         waterSurfaceY = y;
+        nibble?.SetWaterSurfaceY(y);
     }
 
     public void SetAvoidBobber(bool avoid)
@@ -187,11 +300,13 @@ public class FishRipple : MonoBehaviour
     public void SetBobberTransform(Transform bobber)
     {
         bobberTransform = bobber;
+        bobberCtrl = bobber != null ? bobber.GetComponent<BobberController>() : null;
     }
 
     public void ClearBobberTransform()
     {
         bobberTransform = null;
+        bobberCtrl = null;
         isFollower = false;
         if (currentState == FishState.Attracted)
         {
@@ -202,7 +317,8 @@ public class FishRipple : MonoBehaviour
 
     public void AttractToBobber()
     {
-        if (currentState == FishState.Scared || currentState == FishState.Nibbling) return;
+        if (currentState == FishState.Scared || currentState == FishState.Nibbling
+            || currentState == FishState.Despawning) return;
         if (bobberTransform == null) return;
 
         float dist = GetHorizontalDistance(transform.position, bobberTransform.position);
@@ -222,6 +338,93 @@ public class FishRipple : MonoBehaviour
     public void SetFollower(bool follower)
     {
         isFollower = follower;
+    }
+
+    public void SetAwarenessScale(float scale)
+    {
+        awarenessScale = Mathf.Max(0.01f, scale);
+    }
+
+    // Species-specific sight range wins; the prefab's actionRadius is the fallback. The lure
+    // brain scales the result up while the lure is moving.
+    private float BaseAwarenessRadius =>
+        preset != null && preset.awarenessRadius > 0f ? preset.awarenessRadius : actionRadius;
+    private float EffectiveActionRadius => BaseAwarenessRadius * awarenessScale;
+
+    // Lure-brain strike: the fish has won its bite roll and commits — a fast 3D dash at the lure,
+    // no weaving. onGrabStart fires when the dash connects and the fish clamps onto the lure (the
+    // reaction window opens); onGrabReleased fires if the grip lapses with no player response (the
+    // fish spits the lure and swims off). No bite is committed until the zone calls ConfirmGrab().
+    public void StartLureStrike(System.Action<FishRipple> onGrabStart, System.Action<FishRipple> onGrabReleased)
+    {
+        if (currentState == FishState.Scared || currentState == FishState.Nibbling
+            || currentState == FishState.Despawning) return;
+        if (bobberTransform == null) return;
+
+        onGrabStartCallback = onGrabStart;
+        onGrabReleasedCallback = onGrabReleased;
+        isFollower = false;
+        dashDirection = GetFlatForward();
+        strikeHeadY = transform.position.y; // start at current swim depth; the dash arcs it up
+        currentState = FishState.Striking;
+    }
+
+    // The dash connected: clamp onto the lure and start the hold/reaction window. The fish now
+    // carries the lure (tows it to its mouth) and keeps swimming on in its dash heading. The zone
+    // is told via onGrabStart so it can open the rod's window and freeze further bite rolls.
+    private void BeginGrab()
+    {
+        dashDirection = GetFlatForward();
+        grabStartHeadY = strikeHeadY;
+        SizeClass size = preset != null ? preset.sizeClass : SizeClass.Medium;
+        grabTimer = Mathf.Max(0.05f, grabHoldDuration * LureBiteBrain.ReactionWindowMultiplier(size));
+        currentState = FishState.Grabbing;
+        bobberCtrl?.BeginGrabTow();
+        onGrabStartCallback?.Invoke(this);
+    }
+
+    // The hold lapsed with no response: spit the lure (hand it back to physics) and coast on along
+    // the dash heading before normal wandering resumes — the fish "finishes its dash" instead of
+    // teleporting away.
+    private void ReleaseGrab()
+    {
+        var notify = onGrabReleasedCallback;
+        onGrabStartCallback = null;
+        onGrabReleasedCallback = null;
+        bobberCtrl?.EndGrabTow();
+
+        currentState = FishState.Wandering;
+        Vector3 ahead = GetHeadPosition() + dashDirection * grabReleaseFollowThrough;
+        ahead.y = waterSurfaceY;
+        wanderTarget = ClampToBounds(ahead);
+        hasWanderTarget = true;
+        reengageCooldown = grabReleaseAvoidTime;
+
+        notify?.Invoke(this);
+    }
+
+    // The player reacted in time. Returns true while the fish is still gripping (the zone then
+    // turns this fish into the hooked fish); false if the grab already lapsed this frame. The tow
+    // ends here so BobberController.HookFish takes the lure over cleanly.
+    public bool ConfirmGrab()
+    {
+        if (currentState != FishState.Grabbing) return false;
+        bobberCtrl?.EndGrabTow();
+        grabTimer = 0f;
+        onGrabStartCallback = null;
+        onGrabReleasedCallback = null;
+        return true;
+    }
+
+    public void CancelLureStrike()
+    {
+        if (currentState != FishState.Striking && currentState != FishState.Grabbing) return;
+        if (currentState == FishState.Grabbing) onGrabReleasedCallback?.Invoke(this);
+        onGrabStartCallback = null;
+        onGrabReleasedCallback = null;
+        bobberCtrl?.EndGrabTow();
+        currentState = FishState.Wandering;
+        PickNewWanderTarget();
     }
 
     public void StopFollowing()
@@ -260,15 +463,16 @@ public class FishRipple : MonoBehaviour
 
     public void Scare()
     {
+        // A despawning fish is already on its way out — nothing left to spook.
+        if (currentState == FishState.Despawning) return;
+
         // Cancel the bobber's nibble sequence if this fish was nibbling
         if (currentState == FishState.Nibbling && bobberTransform != null)
         {
             BobberController bobber = bobberTransform.GetComponent<BobberController>();
             if (bobber != null) bobber.CancelNibbleSequence();
             FishingEvents.OnFishBite -= OnFishBiteHide;
-            FishingEvents.OnFishNibble -= OnNibbleJab;
-            FishingEvents.OnBiteImminent -= OnBiteImminent;
-            isBiteJabbing = false;
+            nibble?.Stop();
         }
 
         Vector3 awayDir;
@@ -288,6 +492,12 @@ public class FishRipple : MonoBehaviour
         scareTimer = scareCooldown;
         scareJinkTimer = 0f;
         isFollower = false;
+        // Spooked mid-grab: hand the lure back and close the reaction window before fleeing so
+        // the zone/rod don't hang.
+        if (currentState == FishState.Grabbing) onGrabReleasedCallback?.Invoke(this);
+        onGrabStartCallback = null;
+        onGrabReleasedCallback = null;
+        bobberCtrl?.EndGrabTow();
         currentState = FishState.Scared;
         FishingEvents.OnFishScared?.Invoke();
     }
@@ -303,155 +513,39 @@ public class FishRipple : MonoBehaviour
         FishingEvents.OnStartAiming -= ShowIndicator;
         FishingEvents.OnStopAiming -= HideIndicator;
         FishingEvents.OnFishBite -= OnFishBiteHide;
-        FishingEvents.OnFishNibble -= OnNibbleJab;
-        FishingEvents.OnBiteImminent -= OnBiteImminent;
+        nibble?.UnsubscribeAll();
     }
 
     private void ShowIndicator()
     {
-        isAimingActive = true;
-        EnterHidden(Random.Range(glimpseIntervalMin, glimpseIntervalMax));
+        if (enableBaitIndicator) glimpse.ShowOnAim(GetGlimpseSettings());
     }
+    private void HideIndicator() => glimpse.HideOnAim();
 
-    private void HideIndicator()
+    private FishGlimpseIndicator.Settings GetGlimpseSettings()
     {
-        isAimingActive = false;
-        EnterHidden(0f);
-    }
-
-    private void EnterHidden(float waitSeconds)
-    {
-        glimpsePhase = GlimpsePhase.Hidden;
-        glimpseTimer = waitSeconds;
-        glimpseAlpha = 0f;
-        ApplyGlimpseAlpha();
-    }
-
-    private void ApplyGlimpseAlpha()
-    {
-        if (indicatorInstance == null) return;
-        if (indicatorCanvasGroup != null) indicatorCanvasGroup.alpha = glimpseAlpha;
-        bool shouldBeActive = glimpseAlpha > 0.001f;
-        if (indicatorInstance.activeSelf != shouldBeActive)
-            indicatorInstance.SetActive(shouldBeActive);
-    }
-
-    private bool IsWithinRevealRange()
-    {
-        if (aimRevealRange <= 0f) return true;
-        Camera cam = Camera.main;
-        if (cam == null) return true;
-        float sqr = (transform.position - cam.transform.position).sqrMagnitude;
-        return sqr <= aimRevealRange * aimRevealRange;
-    }
-
-    private void UpdateGlimpse()
-    {
-        if (indicatorInstance == null) return;
-
-        if (alwaysShowIndicator)
+        return new FishGlimpseIndicator.Settings
         {
-            if (glimpseAlpha != 1f) { glimpseAlpha = 1f; }
-            glimpsePhase = GlimpsePhase.Holding;
-            ApplyGlimpseAlpha();
-            Camera cam = Camera.main;
-            if (cam != null)
-            {
-                indicatorInstance.transform.rotation = Quaternion.LookRotation(
-                    indicatorInstance.transform.position - cam.transform.position
-                );
-            }
-            return;
-        }
-
-        if (!isAimingActive)
-        {
-            if (glimpseAlpha != 0f) { glimpseAlpha = 0f; ApplyGlimpseAlpha(); }
-            return;
-        }
-
-        bool inRange = IsWithinRevealRange();
-        if (!inRange)
-        {
-            // Out of range — fade out if currently visible, then idle hidden until back in range.
-            if (glimpsePhase == GlimpsePhase.FadingIn || glimpsePhase == GlimpsePhase.Holding)
-            {
-                glimpsePhase = GlimpsePhase.FadingOut;
-            }
-            else if (glimpsePhase == GlimpsePhase.Hidden)
-            {
-                glimpseTimer = Random.Range(glimpseIntervalMin, glimpseIntervalMax);
-            }
-        }
-
-        glimpseTimer -= Time.deltaTime;
-
-        switch (glimpsePhase)
-        {
-            case GlimpsePhase.Hidden:
-                if (inRange && glimpseTimer <= 0f)
-                {
-                    glimpsePhase = GlimpsePhase.FadingIn;
-                    glimpseTimer = Mathf.Max(0.0001f, glimpseFadeIn);
-                }
-                break;
-
-            case GlimpsePhase.FadingIn:
-            {
-                float dur = Mathf.Max(0.0001f, glimpseFadeIn);
-                float t = 1f - Mathf.Clamp01(glimpseTimer / dur);
-                glimpseAlpha = Mathf.SmoothStep(0f, 1f, t);
-                if (glimpseTimer <= 0f)
-                {
-                    glimpseAlpha = 1f;
-                    glimpsePhase = GlimpsePhase.Holding;
-                    glimpseTimer = Random.Range(glimpseDurationMin, glimpseDurationMax);
-                }
-                break;
-            }
-
-            case GlimpsePhase.Holding:
-                glimpseAlpha = 1f;
-                if (glimpseTimer <= 0f)
-                {
-                    glimpsePhase = GlimpsePhase.FadingOut;
-                    glimpseTimer = Mathf.Max(0.0001f, glimpseFadeOut);
-                }
-                break;
-
-            case GlimpsePhase.FadingOut:
-            {
-                float dur = Mathf.Max(0.0001f, glimpseFadeOut);
-                float t = Mathf.Clamp01(glimpseTimer / dur);
-                glimpseAlpha = Mathf.SmoothStep(0f, 1f, t);
-                if (glimpseTimer <= 0f)
-                {
-                    EnterHidden(Random.Range(glimpseIntervalMin, glimpseIntervalMax));
-                    return;
-                }
-                break;
-            }
-        }
-
-        ApplyGlimpseAlpha();
-
-        if (glimpseAlpha > 0.001f)
-        {
-            Camera cam = Camera.main;
-            if (cam != null)
-            {
-                indicatorInstance.transform.rotation = Quaternion.LookRotation(
-                    indicatorInstance.transform.position - cam.transform.position
-                );
-            }
-        }
+            alwaysShowIndicator = alwaysShowIndicator,
+            aimRevealRange = aimRevealRange,
+            glimpseIntervalMin = glimpseIntervalMin,
+            glimpseIntervalMax = glimpseIntervalMax,
+            glimpseDurationMin = glimpseDurationMin,
+            glimpseDurationMax = glimpseDurationMax,
+            glimpseFadeIn = glimpseFadeIn,
+            glimpseFadeOut = glimpseFadeOut,
+        };
     }
 
     void Update()
     {
-        // Keep on water surface
+        // Keep on water surface — unless dashing, gripping the lure or despawning, where the
+        // strike thrash / grab dip / dive-away own the height.
         Vector3 pos = transform.position;
-        pos.y = waterSurfaceY;
+        bool ownsHeight = currentState == FishState.Striking
+                          || currentState == FishState.Grabbing
+                          || currentState == FishState.Despawning;
+        if (!ownsHeight) pos.y = waterSurfaceY;
 
         // Keep wake following the fish
         if (activeWakeInstance != null)
@@ -460,7 +554,23 @@ public class FishRipple : MonoBehaviour
         }
         transform.position = pos;
 
-        UpdateGlimpse();
+        if (enableBaitIndicator) glimpse.Tick(transform.position, GetGlimpseSettings());
+
+        // Lifetime: the clock only runs while the player ISN'T fishing this pool. The moment
+        // a bobber/lure is in the water here (bobberTransform is set on every fish in the
+        // zone), aging pauses — so no fish slips away mid-cast, mid-attract, mid-nibble or
+        // mid-fight, and there's no mass exodus of over-aged fish when the bobber leaves.
+        // Expiry itself additionally only fires from calm wandering, never mid-flee.
+        if (lifetimeSeconds > 0f && currentState != FishState.Despawning && bobberTransform == null)
+        {
+            ageTimer += Time.deltaTime;
+            if (ageTimer >= lifetimeSeconds && currentState == FishState.Wandering)
+                BeginDespawn();
+        }
+
+        // Cool-down after spitting a lure on a missed bite: ignore the lure briefly so the fish
+        // coasts through its follow-through instead of immediately wheeling into another grab.
+        if (reengageCooldown > 0f) reengageCooldown -= Time.deltaTime;
 
         switch (currentState)
         {
@@ -474,9 +584,164 @@ public class FishRipple : MonoBehaviour
                 UpdateScared();
                 break;
             case FishState.Nibbling:
-                UpdateNibbling();
+                nibble?.Tick(scareSpeed);
+                break;
+            case FishState.Striking:
+                UpdateStriking();
+                break;
+            case FishState.Grabbing:
+                UpdateGrabbing();
+                break;
+            case FishState.Despawning:
+                UpdateDespawning();
                 break;
         }
+
+        UpdateStuckRescue();
+
+        // Drive the procedural sway: agitated states beat the tail faster, which doubles as
+        // a readable telegraph (a striking fish visibly thrashes toward the lure). The body is a
+        // true 3D rope, so it trails the head's arc on its own when the fish rises to the lure.
+        modelVisual?.Tick(Time.deltaTime, GetSwayIntensity(), bodyStraightenRate);
+    }
+
+    // Wandering fish that haven't moved meaningfully for several seconds are wedged in
+    // geometry (spawned inside a rock, or terrain that isn't on the obstacle mask): swimming
+    // can't free them because every heading is blocked, so relocate to a fresh valid point.
+    // The window comfortably exceeds the longest legitimate wander pause.
+    private void UpdateStuckRescue()
+    {
+        if (currentState != FishState.Wandering)
+        {
+            stuckTimer = 0f;
+            stuckAnchor = transform.position;
+            return;
+        }
+
+        if (FishMovementHelpers.GetHorizontalDistance(transform.position, stuckAnchor) > 0.15f)
+        {
+            stuckTimer = 0f;
+            stuckAnchor = transform.position;
+            return;
+        }
+
+        stuckTimer += Time.deltaTime;
+        if (stuckTimer < 4f) return;
+        stuckTimer = 0f;
+
+        // Only a fish that's genuinely wedged (no clear water around it) gets relocated.
+        // A merely indecisive fish picks a fresh target instead of popping across the pond.
+        if (FishMovementHelpers.HasClearanceAt(transform.position, 0.4f, obstacleLayers, waterSurfaceY, obstacleRayHeight))
+        {
+            PickNewWanderTarget();
+            return;
+        }
+
+        Vector3 fresh = FishMovementHelpers.GetRandomPointInBounds(zoneBounds, transform.position, waterSurfaceY, obstacleLayers, obstacleRayHeight);
+        fresh.y = waterSurfaceY;
+        transform.position = fresh;
+        stuckAnchor = fresh;
+        PickNewWanderTarget();
+    }
+
+    private float GetSwayIntensity()
+    {
+        switch (currentState)
+        {
+            case FishState.Attracted:  return 1.5f;
+            case FishState.Nibbling:   return 0.6f;
+            case FishState.Scared:     return 2.5f;
+            case FishState.Striking:   return 2.8f;
+            case FishState.Grabbing:   return 3f;   // hardest thrash — the fish is wrestling the lure
+            case FishState.Despawning: return 2.6f; // same urgent tail-beat as the escape swim-off
+            default:                   return 1f;
+        }
+    }
+
+    // The dash: a fast, committed charge at the lure. As it closes it arcs UP toward the lure's
+    // real height so the head rises to meet it (the body trails the arc as a 3D rope). On contact
+    // (snout within reach of the lure) the fish clamps on and the grab begins.
+    private void UpdateStriking()
+    {
+        if (bobberTransform == null)
+        {
+            CancelLureStrike();
+            return;
+        }
+
+        Vector3 lure = bobberTransform.position;            // real 3D lure position
+        Vector3 lureFlat = new Vector3(lure.x, waterSurfaceY, lure.z);
+
+        // Contact is measured snout-to-lure in full 3D: the fish must actually rise to the lure,
+        // not just be horizontally under it.
+        Vector3 snout = modelVisual != null ? modelVisual.MouthWorldPosition : GetHeadPosition();
+        if (Vector3.Distance(snout, lure) < Mathf.Max(strikeLeapRange, nibbleRange))
+        {
+            BeginGrab();
+            return;
+        }
+
+        // Horizontal chase toward the lure.
+        SteerToward(lureFlat, strikeSpeed, strikeTurnRate);
+        dashDirection = GetFlatForward();
+
+        // Vertical arc: once within strikeRiseDistance, climb toward the height that places the
+        // snout on the lure; beyond that, stay at swim depth. The closer it gets, the higher it
+        // rises — a smooth upward arc into the lure.
+        float horiz = GetHorizontalDistance(GetHeadPosition(), lureFlat);
+        float targetY = horiz <= strikeRiseDistance ? HostYToPlaceSnoutAt(lure.y) : waterSurfaceY;
+        strikeHeadY = Mathf.MoveTowards(strikeHeadY, targetY, strikeRiseSpeed * Time.deltaTime);
+        ApplyStrikeHeadY();
+    }
+
+    // The grab: the fish has the lure in its mouth and keeps swimming on in its dash heading,
+    // towing the lure along (and dragging it a little deeper over the hold). When the hold lapses
+    // it spits the lure and coasts away; ConfirmGrab() (player reacted) ends it as a real bite.
+    private void UpdateGrabbing()
+    {
+        if (bobberTransform == null)
+        {
+            ReleaseGrab();
+            return;
+        }
+
+        grabTimer -= Time.deltaTime;
+
+        // Keep swimming forward along the dash heading, carrying the lure.
+        Vector3 step = dashDirection * (grabForwardSpeed * Time.deltaTime);
+        Vector3 newPos = ClampToBounds(transform.position + step);
+        transform.position = newPos;
+        transform.rotation = Quaternion.Euler(0f, Mathf.Atan2(dashDirection.x, dashDirection.z) * Mathf.Rad2Deg, 0f);
+
+        // Drag the lure down a touch as the hold runs out (TP fish pull the lure under).
+        float held = grabHoldDuration > 0.001f ? 1f - Mathf.Clamp01(grabTimer / grabHoldDuration) : 1f;
+        strikeHeadY = Mathf.MoveTowards(strikeHeadY, grabStartHeadY - grabPullDownDepth * held,
+                                        strikeRiseSpeed * Time.deltaTime);
+        ApplyStrikeHeadY();
+
+        // Tow the lure to the fish's mouth so it travels with the fish.
+        if (bobberCtrl != null && modelVisual != null)
+            bobberCtrl.SetGrabTowTarget(modelVisual.MouthWorldPosition);
+
+        if (grabTimer <= 0f) ReleaseGrab();
+    }
+
+    // Applies the separately-integrated strike head height (SteerToward re-pins y to the surface,
+    // so this runs last and owns the height during the dash/grab).
+    private void ApplyStrikeHeadY()
+    {
+        Vector3 p = transform.position;
+        p.y = strikeHeadY;
+        transform.position = p;
+    }
+
+    // The host Y that places the rendered snout at worldY. The model is sunk below the host, so
+    // we read the live host→snout vertical gap and offset by it (adapts to any species/depth).
+    private float HostYToPlaceSnoutAt(float worldY)
+    {
+        float snoutY = modelVisual != null ? modelVisual.MouthWorldPosition.y : transform.position.y;
+        float hostAboveSnout = transform.position.y - snoutY;
+        return worldY + hostAboveSnout;
     }
 
     private void UpdateWandering()
@@ -485,10 +750,13 @@ public class FishRipple : MonoBehaviour
         // (and we're not being told to give the lead fish space), wake up and approach as a follower.
         // Bait mismatch is *not* gated here — wrong-species fish still gather visually so the pond
         // doesn't look empty. Only the bite/lead promotion in FishingZone is gated by bait.
-        if (bobberTransform != null && !shouldAvoidBobber && actionRadius > 0f)
+        // Tackle mismatch IS gated: a lure-only species ignores a bait bobber entirely (and vice
+        // versa) — it neither schools around it nor gets recruited by the lure brain.
+        if (bobberTransform != null && !shouldAvoidBobber && reengageCooldown <= 0f && BaseAwarenessRadius > 0f
+            && BobberInventory.PresetRespondsToEquippedTackle(preset))
         {
             float bobberDist = GetHorizontalDistance(transform.position, bobberTransform.position);
-            if (bobberDist <= actionRadius)
+            if (bobberDist <= EffectiveActionRadius)
             {
                 AttractToBobber();
                 if (currentState == FishState.Attracted)
@@ -502,6 +770,11 @@ public class FishRipple : MonoBehaviour
         if (wanderPauseTimer > 0f)
         {
             wanderPauseTimer -= Time.deltaTime;
+            // Resting fish drift slowly instead of dead-stopping — always alive, never a
+            // statue — and crowded resters gently spread apart.
+            Vector3 driftTarget = GetHeadPosition() + GetFlatForward() * 2f
+                                  + ComputeSeparation() * separationStrength;
+            SteerToward(driftTarget, pauseDriftSpeed, wanderTurnRate * 0.5f);
             return;
         }
 
@@ -510,12 +783,29 @@ public class FishRipple : MonoBehaviour
             PickNewWanderTarget();
         }
 
-        float dist = GetHorizontalDistance(transform.position, wanderTarget);
+        // Arrival and reachability are judged from the HEAD — the steered agent. Judging
+        // from the centre while the head seeks the point lets a big fish circle its target
+        // with the head on it and the centre forever outside the arrive radius.
+        Vector3 headPos = GetHeadPosition();
+        float dist = GetHorizontalDistance(headPos, wanderTarget);
 
-        if (dist < 0.3f)
+        if (dist < 0.45f)
         {
             hasWanderTarget = false;
             wanderPauseTimer = Random.Range(wanderPauseMin, wanderPauseMax);
+            return;
+        }
+
+        // A target inside the turning radius at a bad angle can only be circled — drop it
+        // for a fresh one. Reads as the fish changing its mind rather than looping.
+        Vector3 toWanderTarget = wanderTarget - headPos;
+        toWanderTarget.y = 0f;
+        Vector3 flatForward = transform.forward;
+        flatForward.y = 0f;
+        float turnRadius = swimSpeed / Mathf.Max(wanderTurnRate * Mathf.Deg2Rad, 0.01f);
+        if (dist < turnRadius && Vector3.Angle(flatForward, toWanderTarget) > 45f)
+        {
+            hasWanderTarget = false;
             return;
         }
 
@@ -528,22 +818,17 @@ public class FishRipple : MonoBehaviour
                 Vector3 awayFromBobber = (transform.position - bobberTransform.position);
                 awayFromBobber.y = 0;
                 awayFromBobber.Normalize();
-                Vector3 avoidTarget = transform.position + awayFromBobber * swimSpeed * Time.deltaTime;
-                avoidTarget.y = waterSurfaceY;
-                avoidTarget = ClampToBounds(avoidTarget);
-                if (!IsObstacleAt(avoidTarget))
-                {
-                    transform.position = avoidTarget;
-                }
-                FaceMovementDirection(avoidTarget);
+                SteerToward(transform.position + awayFromBobber * 2f, swimSpeed, attractTurnRate);
                 hasWanderTarget = false;
                 return;
             }
         }
 
-        // Blend wander target toward bobber if nearby (natural curiosity)
+        // Blend wander target toward bobber if nearby (natural curiosity) — skipped for fish
+        // that don't respond to the equipped tackle; they shouldn't creep toward it either.
         Vector3 moveTarget = wanderTarget;
-        if (!shouldAvoidBobber && bobberTransform != null && naturalAttraction > 0f)
+        if (!shouldAvoidBobber && bobberTransform != null && naturalAttraction > 0f
+            && BobberInventory.PresetRespondsToEquippedTackle(preset))
         {
             float bobberDist = GetHorizontalDistance(transform.position, bobberTransform.position);
             if (bobberDist > naturalAttractionMinDist)
@@ -554,8 +839,28 @@ public class FishRipple : MonoBehaviour
             }
         }
 
-        MoveToward(moveTarget, swimSpeed);
-        FaceMovementDirection(moveTarget);
+        // Personal space: bend the path away from nearby schoolmates so fish don't phase
+        // through each other while milling around.
+        moveTarget += ComputeSeparation() * separationStrength;
+
+        // Lazy S-curves: bow the path sideways with a slow per-fish sine so cruising reads
+        // as weaving rather than a beeline. Fades out near the target so arrival stays clean.
+        if (wanderWeaveAmplitude > 0f)
+        {
+            Vector3 toMove = moveTarget - headPos;
+            toMove.y = 0f;
+            if (toMove.sqrMagnitude > 0.01f)
+            {
+                Vector3 perp = Vector3.Cross(Vector3.up, toMove.normalized);
+                float fade = Mathf.Clamp01(dist / 1.5f);
+                float weave = Mathf.Sin(Time.time * wanderWeaveFrequency * Mathf.PI * 2f + weavePhase);
+                moveTarget += perp * (weave * wanderWeaveAmplitude * fade);
+            }
+        }
+
+        // Glide into the stop instead of swimming full tilt until the arrival check trips.
+        float arriveGlide = Mathf.Lerp(0.35f, 1f, Mathf.Clamp01(dist / 0.8f));
+        SteerToward(moveTarget, swimSpeed * arriveGlide, wanderTurnRate);
     }
 
     private void UpdateAttracted()
@@ -573,13 +878,16 @@ public class FishRipple : MonoBehaviour
         float dist = GetHorizontalDistance(transform.position, bobberPos);
 
         // Self-attracted followers drift back to wandering once the bobber leaves the awareness radius.
-        if (actionRadius > 0f && isFollower && dist > actionRadius)
+        if (BaseAwarenessRadius > 0f && isFollower && dist > EffectiveActionRadius)
         {
             StopFollowing();
             return;
         }
 
-        if (!isFollower && dist < nibbleRange)
+        // Head-based: the steering converges the head onto the bobber, so the bite trigger
+        // must measure from there too — the centre trails half a body behind and may never
+        // come within nibbleRange on bigger fish.
+        if (!isFollower && GetHorizontalDistance(GetHeadPosition(), bobberPos) < nibbleRange)
         {
             StartNibbling();
             return;
@@ -597,6 +905,8 @@ public class FishRipple : MonoBehaviour
         if (attractPauseTimer > 0f)
         {
             attractPauseTimer -= Time.deltaTime;
+            // Hesitating fish hover with a slow drift rather than freezing mid-water.
+            SteerToward(GetHeadPosition() + GetFlatForward() * 2f, pauseDriftSpeed * 0.5f, attractTurnRate * 0.25f);
             return;
         }
 
@@ -635,8 +945,7 @@ public class FishRipple : MonoBehaviour
         Vector3 targetPos = approachCenter + weaveOffset;
         targetPos.y = waterSurfaceY;
 
-        MoveToward(targetPos, effectiveSpeed);
-        FaceMovementDirection(targetPos);
+        SteerToward(targetPos, effectiveSpeed, attractTurnRate);
     }
 
     private float scareJinkTimer;
@@ -661,11 +970,11 @@ public class FishRipple : MonoBehaviour
 
             // Vary speed each frame for a panicked feel
             float burstSpeed = scareSpeed * Random.Range(0.6f, 1.3f);
-            Vector3 targetPos = transform.position + scareDirection * burstSpeed * Time.deltaTime;
-            targetPos.y = waterSurfaceY;
-            targetPos = ClampToBounds(targetPos);
+            Vector3 probe = transform.position + scareDirection * (burstSpeed * Time.deltaTime);
+            probe.y = waterSurfaceY;
+            probe = ClampToBounds(probe);
 
-            if (IsObstacleAt(targetPos))
+            if (IsObstacleAt(probe))
             {
                 scareDirection = Vector3.Cross(scareDirection, Vector3.up).normalized;
                 if (scareDirection.sqrMagnitude < 0.01f)
@@ -674,10 +983,13 @@ public class FishRipple : MonoBehaviour
             }
             else
             {
-                transform.position = targetPos;
+                SteerToward(transform.position + scareDirection * 2f, burstSpeed, scareTurnRate);
             }
-
-            FaceMovementDirection(transform.position + scareDirection);
+        }
+        else if (scareTimer > 0f)
+        {
+            // Recovery tail: catch breath with a slow drift instead of freezing in place.
+            SteerToward(GetHeadPosition() + GetFlatForward() * 2f, pauseDriftSpeed, wanderTurnRate);
         }
 
         if (scareTimer <= 0f)
@@ -687,97 +999,82 @@ public class FishRipple : MonoBehaviour
         }
     }
 
-    private void UpdateNibbling()
+    // Lifetime's up: this fish moves on. It simply keeps swimming the way it was already headed —
+    // diving into the murk and fading out — rather than wheeling around to flee the player, which
+    // read as unnatural for a calm wandering fish. The zone is told immediately so the replacement
+    // spawns while the fade plays.
+    private void BeginDespawn()
     {
-        if (bobberTransform == null) return;
+        currentState = FishState.Despawning;
+        despawnTimer = 0f;
+        isFollower = false;
+        onGrabStartCallback = null;
+        onGrabReleasedCallback = null;
 
-        Vector3 bobberPos = bobberTransform.position;
-        bobberPos.y = waterSurfaceY;
-
-        if (isJabbing)
+        // Continue along the current heading, but prefer one with clear water: probe the mid-point
+        // of the swim-off and yaw around until one fits. A blocked heading just means the fade
+        // plays against the shore — acceptable worst case, so the heading stands if nothing better.
+        Vector3 heading = GetFlatForward();
+        despawnDirection = heading;
+        float probeDistance = DespawnSpeed * DespawnDuration * 0.5f;
+        float[] yawOffsets = { 0f, 30f, -30f, 60f, -60f, 90f, -90f, 135f, -135f, 180f };
+        for (int i = 0; i < yawOffsets.Length; i++)
         {
-            // Dart quickly toward the bobber
-            transform.position = Vector3.MoveTowards(transform.position, bobberPos, scareSpeed * Time.deltaTime);
-            FaceMovementDirection(bobberPos);
-
-            jabTimer -= Time.deltaTime;
-            if (jabTimer <= 0f)
+            Vector3 candidate = Quaternion.Euler(0f, yawOffsets[i], 0f) * heading;
+            if (!IsObstacleAt(transform.position + candidate * probeDistance))
             {
-                isJabbing = false;
+                despawnDirection = candidate;
+                break;
             }
         }
-        else if (!isBiteJabbing)
+
+        // Only the diving body remains: the surface ripple, glimpse indicator and wake all
+        // read as "fish here, catchable" and this one no longer is.
+        var particles = GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < particles.Length; i++)
+            particles[i].Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        glimpse.ForceHide();
+        if (activeWakeInstance != null)
         {
-            // Drift back to hover position (but not if the bite is imminent)
-            nibbleHoverPos.y = waterSurfaceY;
-            transform.position = Vector3.MoveTowards(transform.position, nibbleHoverPos, jabReturnSpeed * Time.deltaTime);
-            FaceMovementDirection(bobberPos);
+            Destroy(activeWakeInstance);
+            activeWakeInstance = null;
         }
+
+        OnDespawnStarted?.Invoke(this);
     }
 
-    private float nibbleHoverDist;
-    private Vector3 nibbleHoverPos;
-    private bool isJabbing;
-    private float jabTimer;
-    private float jabDuration = 0.15f;
-    private float jabReturnSpeed = 6f;
+    private void UpdateDespawning()
+    {
+        despawnTimer += Time.deltaTime;
+        float t = despawnTimer / DespawnDuration;
+        if (t >= 1f)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        transform.rotation = Quaternion.Euler(0f, Mathf.Atan2(despawnDirection.x, despawnDirection.z) * Mathf.Rad2Deg, 0f);
+        Vector3 pos = transform.position + despawnDirection * (DespawnSpeed * Time.deltaTime);
+        pos.y = waterSurfaceY - DespawnDiveDepth * t;
+        transform.position = pos;
+
+        modelVisual?.SetFadeAlpha(1f - t);
+    }
 
     private void StartNibbling()
     {
         currentState = FishState.Nibbling;
 
-        // Hover from wherever the fish currently is
-        nibbleHoverPos = transform.position;
-        nibbleHoverPos.y = waterSurfaceY;
-        isJabbing = false;
+        if (nibble == null) nibble = new FishNibbleBehavior(transform);
+        nibble.Begin(bobberTransform, waterSurfaceY, preset);
 
-        BobberController bobber = bobberTransform != null ? bobberTransform.GetComponent<BobberController>() : null;
-        if (bobber != null)
-        {
-            bobber.StartNibbleSequence(preset);
-        }
-
+        // FishRipple also wants to hide visuals once the bite resolves. Subscribed here
+        // (not in FishNibbleBehavior) because HideVisuals is a FishRipple concern.
         FishingEvents.OnFishBite += OnFishBiteHide;
-        FishingEvents.OnFishNibble += OnNibbleJab;
-        FishingEvents.OnBiteImminent += OnBiteImminent;
     }
 
-    private void OnBiteImminent(BobberController bobber)
-    {
-        if (bobberTransform != null && bobber.transform == bobberTransform)
-        {
-            MarkBiteImminent();
-            FishingEvents.OnBiteImminent -= OnBiteImminent;
-        }
-    }
-
-    private void PickNibbleHoverPos()
-    {
-        if (bobberTransform == null) return;
-
-        // Pick a random angle around the bobber to hover at
-        float angle = Random.Range(0f, 360f) * Mathf.Deg2Rad;
-        Vector3 offset = new Vector3(Mathf.Cos(angle) * nibbleHoverDist, 0f, Mathf.Sin(angle) * nibbleHoverDist);
-        nibbleHoverPos = bobberTransform.position + offset;
-        nibbleHoverPos.y = waterSurfaceY;
-    }
-
-    private void OnNibbleJab(BobberController bobber)
-    {
-        if (currentState != FishState.Nibbling) return;
-        if (bobberTransform == null || bobber.transform != bobberTransform) return;
-
-        isJabbing = true;
-        jabTimer = jabDuration;
-    }
-
-    private bool isBiteJabbing;
-
-    public void MarkBiteImminent()
-    {
-        // Called right before the final nibble — prevents pull-back
-        isBiteJabbing = true;
-    }
+    // Called externally (e.g. FishingZone) just before the final nibble — prevents pull-back.
+    public void MarkBiteImminent() => nibble?.MarkBiteImminent();
 
     private void OnFishBiteHide(BobberController bobber)
     {
@@ -785,7 +1082,7 @@ public class FishRipple : MonoBehaviour
         {
             HideVisuals();
             FishingEvents.OnFishBite -= OnFishBiteHide;
-            FishingEvents.OnFishNibble -= OnNibbleJab;
+            nibble?.Stop();
         }
     }
 
@@ -805,9 +1102,7 @@ public class FishRipple : MonoBehaviour
             renderers[i].enabled = false;
         }
 
-        // Hide indicator
-        if (indicatorInstance != null)
-            indicatorInstance.SetActive(false);
+        glimpse.ForceHide();
 
         // Destroy wake
         if (activeWakeInstance != null)
@@ -817,97 +1112,192 @@ public class FishRipple : MonoBehaviour
         }
     }
 
-    private void MoveToward(Vector3 target, float speed)
+    // Fish swim head-first: the HEAD is the steered agent — it turns toward the target at a
+    // capped rate and only ever advances along its own heading — and the body centre is
+    // placed a fixed distance behind it, trailer-style. Steering the head rather than the
+    // centre matters: pivoting around the head swings the centre sideways, so steering by
+    // the centre's bearing feeds that swing back into the next turn, which reads as jitter
+    // and endless orbiting. The head can't move sideways, so the loop can't form.
+    //
+    // The final centre position is validated against bounds/obstacles BEFORE anything is
+    // applied — a turn can never push the body into a rock. Rotation stays yaw-only and the
+    // result is pinned to the water surface: strictly horizontal swimming.
+    private void SteerToward(Vector3 target, float speed, float turnDegPerSec)
     {
-        Vector3 current = transform.position;
-        target.y = waterSurfaceY;
-        current.y = waterSurfaceY;
+        Vector3 flatForward = transform.forward;
+        flatForward.y = 0f;
+        if (flatForward.sqrMagnitude < 0.0001f) flatForward = Vector3.forward;
+        flatForward.Normalize();
 
-        Vector3 newPos = Vector3.MoveTowards(current, target, speed * Time.deltaTime);
-        newPos = ClampToBounds(newPos);
+        float headOffset = modelVisual != null ? modelVisual.HeadForwardOffset : 0f;
+        Vector3 head = transform.position + flatForward * headOffset;
+
+        // Pre-emptive avoidance: look ahead of the head, and if that water is blocked,
+        // steer for the open side BEFORE contact — the fish arcs away from shores and rocks
+        // instead of stalling nose-first against them.
+        float lookahead = Mathf.Max(speed * 0.75f, 0.3f);
+        if (FishMovementHelpers.IsObstacleAt(head + flatForward * lookahead, obstacleLayers, waterSurfaceY, obstacleRayHeight))
+        {
+            Vector3 leftDir = Quaternion.Euler(0f, -50f, 0f) * flatForward;
+            Vector3 rightDir = Quaternion.Euler(0f, 50f, 0f) * flatForward;
+            bool leftFree = !FishMovementHelpers.IsObstacleAt(head + leftDir * lookahead, obstacleLayers, waterSurfaceY, obstacleRayHeight);
+            bool rightFree = !FishMovementHelpers.IsObstacleAt(head + rightDir * lookahead, obstacleLayers, waterSurfaceY, obstacleRayHeight);
+
+            Vector3 toGoal = target - head;
+            toGoal.y = 0f;
+            Vector3 avoidDir;
+            if (leftFree && rightFree)
+                avoidDir = Vector3.SignedAngle(flatForward, toGoal, Vector3.up) < 0f ? leftDir : rightDir;
+            else if (leftFree) avoidDir = leftDir;
+            else if (rightFree) avoidDir = rightDir;
+            else avoidDir = -flatForward; // pocket dead ahead: turn around
+
+            target = head + avoidDir * 2f;
+            turnDegPerSec *= 2f;
+        }
+
+        float deltaYaw = 0f;
+        Vector3 toTarget = target - head;
+        toTarget.y = 0f;
+        if (toTarget.sqrMagnitude > 0.0001f)
+        {
+            // A target closer than the turning diameter can never be reached at this turn
+            // rate — the fish orbits it forever at a steady ~90° bearing. Real fish simply
+            // pivot harder when the goal is right beside them: raise the effective turn
+            // rate until the turning circle fits the distance (capped so it can't snap).
+            float turnRadius = speed / Mathf.Max(turnDegPerSec * Mathf.Deg2Rad, 0.01f);
+            float targetDist = toTarget.magnitude;
+            if (targetDist < 2f * turnRadius)
+                turnDegPerSec *= Mathf.Min(2f * turnRadius / Mathf.Max(targetDist, 0.05f), 8f);
+
+            float signedAngle = Vector3.SignedAngle(flatForward, toTarget, Vector3.up);
+            float maxStep = turnDegPerSec * Time.deltaTime;
+            deltaYaw = Mathf.Clamp(signedAngle, -maxStep, maxStep);
+        }
+
+        // Rebuild a level, yaw-only rotation every frame (never rotate incrementally): the
+        // host can then never accumulate pitch or roll, no matter what orientation the
+        // prefab spawned with.
+        float yawDeg = Mathf.Atan2(flatForward.x, flatForward.z) * Mathf.Rad2Deg;
+        Quaternion newRotation = Quaternion.Euler(0f, yawDeg + deltaYaw, 0f);
+        Vector3 newForward = newRotation * Vector3.forward;
+
+        Vector3 newHead = head + newForward * (speed * Time.deltaTime);
+        Vector3 newPos = newHead - newForward * headOffset;
+        newPos = FishMovementHelpers.ClampToBounds(newPos, zoneBounds);
         newPos.y = waterSurfaceY;
 
-        if (IsObstacleAt(newPos))
+        // Check the centre AND the head — the head pokes half a body ahead, and it's the
+        // part that ends up visibly buried in rocks if only the centre is validated.
+        Vector3 newHeadPos = newPos + newForward * headOffset;
+        if (!FishMovementHelpers.IsObstacleAt(newPos, obstacleLayers, waterSurfaceY, obstacleRayHeight)
+            && !FishMovementHelpers.IsObstacleAt(newHeadPos, obstacleLayers, waterSurfaceY, obstacleRayHeight))
         {
-            // Can't go there — pick a new wander target if wandering
-            if (currentState == FishState.Wandering)
-            {
-                hasWanderTarget = false;
-            }
+            transform.rotation = newRotation;
+            transform.position = newPos;
             return;
         }
 
-        transform.position = newPos;
-    }
+        // Blocked this frame: keep turning, and keep MOVING — slide along the nearest open
+        // direction at half speed rather than freezing. Only a fish boxed in on every side
+        // stays put, and the stuck rescue eventually relocates those.
+        transform.rotation = newRotation;
+        if (currentState == FishState.Wandering) hasWanderTarget = false;
 
-    private void FaceMovementDirection(Vector3 target)
-    {
-        Vector3 dir = target - transform.position;
-        dir.y = 0;
-        if (dir.sqrMagnitude > 0.001f)
+        float slideDistance = speed * 0.5f * Time.deltaTime;
+        float preferredSide = deltaYaw >= 0f ? 1f : -1f;
+        for (int step = 1; step <= 4; step++)
         {
-            transform.rotation = Quaternion.Slerp(
-                transform.rotation,
-                Quaternion.LookRotation(dir),
-                Time.deltaTime * 5f
-            );
+            for (int s = 0; s < 2; s++)
+            {
+                float sign = s == 0 ? preferredSide : -preferredSide;
+                Vector3 slideDir = Quaternion.Euler(0f, 45f * step * sign, 0f) * newForward;
+                Vector3 slidePos = transform.position + slideDir * slideDistance;
+                slidePos = FishMovementHelpers.ClampToBounds(slidePos, zoneBounds);
+                slidePos.y = waterSurfaceY;
+                Vector3 slideHead = slidePos + newForward * headOffset;
+                if (!FishMovementHelpers.IsObstacleAt(slidePos, obstacleLayers, waterSurfaceY, obstacleRayHeight)
+                    && !FishMovementHelpers.IsObstacleAt(slideHead, obstacleLayers, waterSurfaceY, obstacleRayHeight))
+                {
+                    transform.position = slidePos;
+                    return;
+                }
+            }
         }
     }
 
     private void PickNewWanderTarget()
     {
-        wanderTarget = GetRandomPointInBounds();
+        wanderTarget = FishMovementHelpers.GetRandomPointInBounds(zoneBounds, transform.position, waterSurfaceY, obstacleLayers, obstacleRayHeight);
         wanderTarget.y = waterSurfaceY;
         hasWanderTarget = true;
     }
 
-    private Vector3 GetRandomPointInBounds()
+    private Vector3 GetFlatForward()
     {
-        if (zoneBounds == null) return transform.position;
+        Vector3 forward = transform.forward;
+        forward.y = 0f;
+        return forward.sqrMagnitude < 0.0001f ? Vector3.forward : forward.normalized;
+    }
 
-        Bounds b = zoneBounds.bounds;
-        for (int i = 0; i < 30; i++)
+    // Personal-space steering: a push away from schoolmates within separationRadius,
+    // stronger the closer they are. Wandering-only — attracted fish crowd the bobber on
+    // purpose. O(n²) over a zone's handful of fish is negligible.
+    private Vector3 ComputeSeparation()
+    {
+        if (school == null || separationStrength <= 0f) return Vector3.zero;
+
+        Vector3 push = Vector3.zero;
+        for (int i = 0; i < school.Count; i++)
         {
-            Vector3 point = new Vector3(
-                Random.Range(b.min.x, b.max.x),
-                waterSurfaceY,
-                Random.Range(b.min.z, b.max.z)
-            );
-
-            // Verify the point is actually inside the collider (handles non-box shapes)
-            Vector3 closest = zoneBounds.ClosestPoint(point);
-            if (GetHorizontalDistance(point, closest) < 0.1f && !IsObstacleAt(point))
-                return point;
+            FishRipple other = school[i];
+            if (other == null || other == this) continue;
+            Vector3 away = transform.position - other.transform.position;
+            away.y = 0f;
+            float dist = away.magnitude;
+            if (dist >= separationRadius || dist < 0.0001f) continue;
+            push += away / dist * (1f - dist / separationRadius);
         }
-
-        // Fallback to center
-        return new Vector3(b.center.x, waterSurfaceY, b.center.z);
+        return push;
     }
 
-    private bool IsObstacleAt(Vector3 pos)
+    // The steered head point — where the fish is actually going. Movement targets should be
+    // judged from here, not the transform centre, which trails half a body length behind.
+    private Vector3 GetHeadPosition()
     {
-        if (obstacleLayers == 0) return false;
-        Vector3 rayOrigin = new Vector3(pos.x, waterSurfaceY + obstacleRayHeight, pos.z);
-        return Physics.Raycast(rayOrigin, Vector3.down, obstacleRayHeight + 1f, obstacleLayers);
+        float headOffset = modelVisual != null ? modelVisual.HeadForwardOffset : 0f;
+        return transform.position + GetFlatForward() * headOffset;
     }
 
-    private Vector3 ClampToBounds(Vector3 pos)
-    {
-        if (zoneBounds == null) return pos;
-        Vector3 closest = zoneBounds.ClosestPoint(pos);
-        closest.y = pos.y;
-        return closest;
-    }
-
-    private float GetHorizontalDistance(Vector3 a, Vector3 b)
-    {
-        float dx = a.x - b.x;
-        float dz = a.z - b.z;
-        return Mathf.Sqrt(dx * dx + dz * dz);
-    }
+    // Local wrappers so the state-machine bodies (UpdateWandering, UpdateScared) read the same
+    // as before. They forward to FishMovementHelpers but capture this fish's bounds and surface.
+    private Vector3 ClampToBounds(Vector3 pos) => FishMovementHelpers.ClampToBounds(pos, zoneBounds);
+    private bool IsObstacleAt(Vector3 pos) => FishMovementHelpers.IsObstacleAt(pos, obstacleLayers, waterSurfaceY, obstacleRayHeight);
+    private float GetHorizontalDistance(Vector3 a, Vector3 b) => FishMovementHelpers.GetHorizontalDistance(a, b);
 
     void OnDestroy()
     {
         if (activeWakeInstance != null) Destroy(activeWakeInstance);
+    }
+
+    // Scene-view tuning aid: cyan = the radius at which this fish sees a bobber/lure
+    // (species awarenessRadius, or the prefab fallback). Yellow appears at runtime when the
+    // lure brain has boosted awareness (lure recently moved). Red = scare range.
+    private void OnDrawGizmosSelected()
+    {
+        float baseRadius = BaseAwarenessRadius;
+        if (baseRadius <= 0f) return;
+
+        Gizmos.color = new Color(0f, 1f, 1f, 0.6f);
+        Gizmos.DrawWireSphere(transform.position, baseRadius);
+
+        if (Application.isPlaying && awarenessScale > 1.001f)
+        {
+            Gizmos.color = new Color(1f, 0.9f, 0.2f, 0.6f);
+            Gizmos.DrawWireSphere(transform.position, EffectiveActionRadius);
+        }
+
+        Gizmos.color = new Color(1f, 0.3f, 0.2f, 0.6f);
+        Gizmos.DrawWireSphere(transform.position, scareRange);
     }
 }

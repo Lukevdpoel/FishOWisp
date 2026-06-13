@@ -10,6 +10,10 @@ public class PlayerPositionToShader : MonoBehaviour
 
     private Material vineMaterial;
 
+    private const float MoveEpsilonSqr = 0.000001f;
+    private Vector3 lastWrittenPos;
+    private bool hasWritten;
+
     void Start()
     {
         // Get the material from the Renderer on this GameObject
@@ -23,10 +27,13 @@ public class PlayerPositionToShader : MonoBehaviour
 
     void Update()
     {
-        if (vineMaterial != null && playerTransform != null)
-        {
-            // Send the player's world position to the shader
-            vineMaterial.SetVector(PlayerPosID, playerTransform.position);
-        }
+        if (vineMaterial == null || playerTransform == null) return;
+
+        Vector3 pos = playerTransform.position;
+        if (hasWritten && (pos - lastWrittenPos).sqrMagnitude < MoveEpsilonSqr) return;
+
+        vineMaterial.SetVector(PlayerPosID, pos);
+        lastWrittenPos = pos;
+        hasWritten = true;
     }
 }

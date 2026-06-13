@@ -84,6 +84,20 @@ public class InventoryTooltip : MonoBehaviour
         UpdateText(fish);
     }
 
+    // Generic gear mode (bait, bobbers, lures): name + description, no value line.
+    // Called by ItemHoverTooltip on the bait bar, bobber bar and shop cells.
+    public void ShowItemTooltip(string header, string body, RectTransform slotRect)
+    {
+        currentTargetSlot = slotRect;
+        gameObject.SetActive(true);
+        transform.SetAsLastSibling(); // Render on top
+
+        if (headerText != null) headerText.text = header;
+        if (bodyText != null)
+            bodyText.text = string.IsNullOrEmpty(body) ? "" : $"<size=80%><color=#CCCCCC>{body}</color></size>";
+        if (valueText != null) valueText.text = "";
+    }
+
     private void UpdateText(CaughtFish fish)
     {
         gameObject.SetActive(true);

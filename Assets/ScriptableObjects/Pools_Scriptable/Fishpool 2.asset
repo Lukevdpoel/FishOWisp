@@ -15,10 +15,12 @@ MonoBehaviour:
   poolName: Fishpool 2
   description: 
   availableFish:
+  - {fileID: 11400000, guid: 44d32b653b9f0d84296037208a93cfd8, type: 2}
+  - {fileID: 11400000, guid: 51adb0e7344610843baee0e4ed41ab9c, type: 2}
   - {fileID: 11400000, guid: 599c32615c33e93438130c3b94c4393e, type: 2}
   - {fileID: 11400000, guid: 8a7be413503e5e34e863a04c64ffffa9, type: 2}
-  - {fileID: 11400000, guid: 51adb0e7344610843baee0e4ed41ab9c, type: 2}
-  - {fileID: 11400000, guid: 44d32b653b9f0d84296037208a93cfd8, type: 2}
   - {fileID: 11400000, guid: fc5d74fd564d7834cbbdd9edd02fd2f3, type: 2}
-  - {fileID: 11400000, guid: a0fe0e5a1de96e9468293bb94c31a23e, type: 2}
   - {fileID: 11400000, guid: c6b7cc6730100944c84da1c444c8306a, type: 2}
+  - {fileID: 11400000, guid: a0fe0e5a1de96e9468293bb94c31a23e, type: 2}
+  minCatchTime: 2
+  maxCatchTime: 5

@@ -102,8 +102,9 @@ public class ShopDoorController : MonoBehaviour
         bool canEnter = state == State.Outside && playerInOutsideZone;
         bool canExit = state == State.Inside && (insideExitTrigger == null ? playerInOutsideZone : playerInInsideZone);
 
-        if (canEnter && Input.GetKeyDown(interactKey)) StartCoroutine(EnterSequence());
-        else if (canExit && Input.GetKeyDown(interactKey)) StartCoroutine(ExitSequence());
+        bool interactPressed = Input.GetKeyDown(interactKey) || GamepadInput.InteractPressed;
+        if (canEnter && interactPressed) StartCoroutine(EnterSequence());
+        else if (canExit && interactPressed) StartCoroutine(ExitSequence());
     }
 
     private void OnTriggerEnter(Collider other)

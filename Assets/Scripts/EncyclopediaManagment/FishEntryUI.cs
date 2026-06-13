@@ -24,10 +24,23 @@ public class FishEntryUI : MonoBehaviour
             return;
         }
         var preset = entry.preset;
-        ModelViewer.Instance.ShowModel(preset);
+
+        // Uncaught fish stay a mystery: black silhouette model, "???" for the name and the
+        // bait/weather preferences. Everything reveals on the first catch.
+        bool revealed = entry.hasCaught > 0;
+
+        // Null-guard: FishEncyclopediaManager calls Populate from its Awake/OnEnable during
+        // scene load, and Awake order isn't guaranteed — ModelViewer's Awake may not have
+        // registered the singleton yet. Skipping the 3D preview here is harmless: the
+        // encyclopedia re-populates via OnSlotClicked when the notebook actually opens,
+        // by which point the viewer exists.
+        if (ModelViewer.Instance != null)
+        {
+            ModelViewer.Instance.ShowModel(preset, revealed);
+        }
 
         //fishImage.sprite = preset.fishImage;
-        fishNameText.text = preset.fishName;
+        fishNameText.text = revealed ? preset.fishName : "???";
         if(sizeClassText != null )
             sizeClassText.text = preset.sizeClass.ToString();
         if( caughtText != null )
@@ -57,25 +70,42 @@ public class FishEntryUI : MonoBehaviour
 
         if (baitText != null)
         {
-            if (preset.preferredBaits == null || preset.preferredBaits.Count == 0)
+            if (!revealed)
             {
-                baitText.text = "None";
+                baitText.text = "???";
             }
             else
             {
+                // What actually draws this species to the hook: its bait list (bobber path),
+                // the lure, or both. attractedTo gates the bait list — lure-only species
+                // ignore bait entirely, so their leftover preferredBaits data must not leak
+                // into the notebook. An empty bait list on a bobber-responsive fish means it
+                // takes any bait (see BaitInventory.PresetAcceptsSelectedBait), not none.
                 System.Text.StringBuilder sb = new System.Text.StringBuilder();
-                for (int i = 0; i < preset.preferredBaits.Count; i++)
+                if (preset.RespondsToBobber)
                 {
-                    BaitItem b = preset.preferredBaits[i];
-                    if (b == null) continue;
-                    if (sb.Length > 0) sb.Append(", ");
-                    sb.Append(string.IsNullOrEmpty(b.displayName) ? b.name : b.displayName);
+                    if (preset.preferredBaits != null)
+                    {
+                        for (int i = 0; i < preset.preferredBaits.Count; i++)
+                        {
+                            BaitItem b = preset.preferredBaits[i];
+                            if (b == null) continue;
+                            if (sb.Length > 0) sb.Append(", ");
+                            sb.Append(string.IsNullOrEmpty(b.displayName) ? b.name : b.displayName);
+                        }
+                    }
+                    if (sb.Length == 0) sb.Append("Any bait");
                 }
-                baitText.text = sb.Length > 0 ? sb.ToString() : "None";
+                if (preset.RespondsToLure)
+                {
+                    if (sb.Length > 0) sb.Append(", ");
+                    sb.Append("Lure");
+                }
+                baitText.text = sb.ToString();
             }
         }
 
         if (weatherText != null)
-            weatherText.text = preset.preferredWeather.ToString();
+            weatherText.text = revealed ? preset.preferredWeather.ToString() : "???";
     }
 }

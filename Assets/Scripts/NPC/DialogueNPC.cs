@@ -17,8 +17,8 @@ public class DialogueNPC : MonoBehaviour
 
     void Update()
     {
-        // 1. Check if Player is close AND presses E
-        if (playerInZone && Input.GetKeyDown(KeyCode.E))
+        // 1. Check if Player is close AND presses E (or X on a gamepad)
+        if (playerInZone && (Input.GetKeyDown(KeyCode.E) || GamepadInput.InteractPressed))
         {
             // 2. Check if we are already talking
             if (DialogueManager.Instance != null && !DialogueManager.Instance.IsDialogueActive())

@@ -100,6 +100,21 @@ public class InventorySlotUI : MonoBehaviour, IPointerEnterHandler, IPointerExit
         isPressed = false;
     }
 
+    // Gamepad D-pad navigation drives the same hover path as the mouse: highlight on,
+    // tooltip up. No drag handling — that stays mouse-only.
+    public void HighlightFromGamepad()
+    {
+        if (CurrentFish == null) return;
+        onHoverEnter?.Invoke(CurrentFish, GetComponent<RectTransform>());
+        Select();
+    }
+
+    public void UnhighlightFromGamepad()
+    {
+        onHoverExit?.Invoke();
+        Deselect();
+    }
+
     private void Select()
     {
         if (selectionHighlight != null) selectionHighlight.SetActive(true);

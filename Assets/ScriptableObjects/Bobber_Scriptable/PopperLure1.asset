@@ -1,0 +1,20 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 58be025659510044f9e6220f64cc4c67, type: 3}
+  m_Name: PopperLure1
+  m_EditorClassIdentifier: Assembly-CSharp::BobberItem
+  id: PopperLure1
+  displayName: PopperLure1
+  icon: {fileID: 0}
+  description: used to attract fish that prefer bigger, livelier prey.
+  kind: 1
+  bobberPrefab: {fileID: 2032432550669248663, guid: b39d435451716d44bba356b04d3217fc, type: 3}

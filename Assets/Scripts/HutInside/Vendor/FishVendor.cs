@@ -33,6 +33,8 @@ public class FishVendor : MonoBehaviour
     public static FishVendor CurrentShoppingVendor { get; private set; }
 
     private Transform playerTransform;
+    private InventoryUI cachedInventoryUI;
+    private bool playerResolveAttempted;
 
     [Serializable]
     public class BaitOffer
@@ -56,11 +58,12 @@ public class FishVendor : MonoBehaviour
     private void Start()
     {
         ResolvePlayerTransform();
+        cachedInventoryUI = FindFirstObjectByType<InventoryUI>();
     }
 
     private void Update()
     {
-        if (Input.GetKeyDown(interactKey))
+        if (Input.GetKeyDown(interactKey) || GamepadInput.InteractPressed)
         {
             if (CurrentShoppingVendor == this)
             {
@@ -78,6 +81,8 @@ public class FishVendor : MonoBehaviour
         // PlayerController owns the CharacterController and is what actually moves around. Its
         // transform.root often points at a static rig parent ("Dev") that stays at world origin,
         // so we deliberately use the PlayerController's own transform here.
+        playerResolveAttempted = true;
+
         PlayerController pc = FindFirstObjectByType<PlayerController>();
         if (pc != null)
         {
@@ -91,7 +96,10 @@ public class FishVendor : MonoBehaviour
 
     private bool IsPlayerInRange()
     {
-        if (playerTransform == null) ResolvePlayerTransform();
+        // Resolve at most once per scene from a hot path. The original code retried
+        // FindFirstObjectByType every frame the player ref was null, which is a hidden
+        // per-frame scene scan.
+        if (playerTransform == null && !playerResolveAttempted) ResolvePlayerTransform();
         if (playerTransform == null) return false;
         return (playerTransform.position - transform.position).sqrMagnitude
                <= interactionRadius * interactionRadius;
@@ -102,7 +110,7 @@ public class FishVendor : MonoBehaviour
         CurrentShoppingVendor = this;
         OnCurrentShoppingVendorChanged?.Invoke();
 
-        InventoryUI inv = FindFirstObjectByType<InventoryUI>();
+        InventoryUI inv = GetInventoryUI();
         if (inv != null && !InventoryUI.IsInventoryOpen) inv.OpenInventory();
     }
 
@@ -112,8 +120,16 @@ public class FishVendor : MonoBehaviour
         CurrentShoppingVendor = null;
         OnCurrentShoppingVendorChanged?.Invoke();
 
-        InventoryUI inv = FindFirstObjectByType<InventoryUI>();
+        InventoryUI inv = GetInventoryUI();
         if (inv != null && InventoryUI.IsInventoryOpen) inv.CloseInventory();
+    }
+
+    private InventoryUI GetInventoryUI()
+    {
+        // Re-resolve only if the cached ref was destroyed (e.g. scene reload). Avoids
+        // a fresh FindFirstObjectByType on every shop open/close.
+        if (cachedInventoryUI == null) cachedInventoryUI = FindFirstObjectByType<InventoryUI>();
+        return cachedInventoryUI;
     }
 
     public void SellFishToVendor(CaughtFish fish)

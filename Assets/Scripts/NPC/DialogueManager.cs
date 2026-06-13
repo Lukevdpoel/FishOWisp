@@ -74,6 +74,8 @@ public class DialogueManager : GenericSingleton<DialogueManager>
     private CanvasGroup arrowCanvasGroup;
     private Vector3 arrowBaseScale = Vector3.one;
 
+    private Coroutine typeTextRoutine;
+
     protected override void Awake()
     {
         base.Awake();
@@ -124,7 +126,10 @@ public class DialogueManager : GenericSingleton<DialogueManager>
         // Input
         if (isDialogueActive)
         {
-            if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetMouseButtonDown(0))
+            // A advances/confirms; B also skips through dialogue (it doubles as the cancel/close
+            // verb everywhere else, but here it just keeps the lines moving).
+            if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetMouseButtonDown(0)
+                || GamepadInput.InteractPressed || GamepadInput.ConfirmPressed || GamepadInput.CancelPressed)
             {
                 if (isTyping) { skipTyping = true; return; }
                 if (!isTyping) StartCoroutine(PulseAndContinue());
@@ -193,8 +198,8 @@ public class DialogueManager : GenericSingleton<DialogueManager>
         if (nameText) nameText.text = line.characterName;
         string textToType = (currentLineIndex == 0) ? line.text : "\n" + line.text;
 
-        StopCoroutine("TypeText");
-        StartCoroutine(TypeText(textToType));
+        if (typeTextRoutine != null) StopCoroutine(typeTextRoutine);
+        typeTextRoutine = StartCoroutine(TypeText(textToType));
     }
 
     // TYPEWRITER: Pre-loads text and reveals it, playing one sound at the start
@@ -344,8 +349,10 @@ public class DialogueManager : GenericSingleton<DialogueManager>
 
     private void HandleChoiceInput()
     {
-        if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow)) { selectedOption = 1 - selectedOption; UpdateArrowPosition(); }
-        if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Return)) { CloseDialogue(); if (selectedOption == 0 && specialUI) specialUI.SetActive(true); }
+        if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow)
+            || GamepadInput.DpadUpPressed || GamepadInput.DpadDownPressed) { selectedOption = 1 - selectedOption; UpdateArrowPosition(); }
+        if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Return)
+            || GamepadInput.InteractPressed || GamepadInput.ConfirmPressed) { CloseDialogue(); if (selectedOption == 0 && specialUI) specialUI.SetActive(true); }
     }
 
     private void UpdateArrowPosition() { if (arrow && yesOption && noOption) arrow.position = selectedOption == 0 ? yesOption.position : noOption.position; }

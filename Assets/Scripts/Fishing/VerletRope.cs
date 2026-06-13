@@ -1,6 +1,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+// Run after PlayerController.LateUpdate (squash/stretch, airborne tumble) and FishingRodBend.LateUpdate
+// finish writing to the rod-tip transform chain. If we sampled rodTip.position before those wrote their
+// LateUpdate changes, point 0 of the rope would lag a frame behind the rendered rod tip — visible as a
+// disconnect during charge-squash and bounce impacts.
+[DefaultExecutionOrder(1000)]
 [RequireComponent(typeof(LineRenderer))]
 public class VerletRope : MonoBehaviour
 {
@@ -31,6 +36,28 @@ public class VerletRope : MonoBehaviour
     [Tooltip("Seconds for a nibble's tighten pulse to decay back to baseline.")]
     public float nibbleTightenDecay = 0.4f;
 
+    [Header("Tug Tighten Pulse")]
+    [Tooltip("How much the line straightens on each lure tug / yank (0 = no change, 1 = fully straight).")]
+    [Range(0f, 1f)] public float tugTightenAmount = 0.85f;
+    [Tooltip("Seconds for a tug's straighten pulse to slacken back to baseline.")]
+    public float tugTightenDecay = 0.35f;
+
+    [Header("Lure Reel Tension")]
+    [Tooltip("How taut the line is held while the player cranks the reel on a lure (0 = no change, 1 = fully straight).")]
+    [Range(0f, 1f)] public float reelTightenAmount = 0.9f;
+    [Tooltip("Seconds for the line to pull taut once cranking starts.")]
+    public float reelTightenAttack = 0.12f;
+    [Tooltip("Seconds for the line to slacken back once cranking stops.")]
+    public float reelTightenRelease = 0.4f;
+
+    [Header("Fight Jump Slack")]
+    [Tooltip("How slack the taut fight line goes while the hooked fish is airborne (0 = stays dead straight, 1 = fully simulated rope).")]
+    [Range(0f, 1f)] public float jumpSlackAmount = 0.85f;
+    [Tooltip("Seconds for the line to go slack when the fish leaves the water.")]
+    public float jumpSlackAttack = 0.08f;
+    [Tooltip("Seconds for the line to pull straight again after the fish lands.")]
+    public float jumpSlackRelease = 0.6f;
+
     private LineRenderer lineRenderer;
     private List<RopePoint> ropePoints = new List<RopePoint>();
     private float segmentLength;
@@ -38,6 +65,11 @@ public class VerletRope : MonoBehaviour
     private bool isLineTight = false;
     private bool hasLanded = false;
     private float nibbleTightness = 0f;
+    private float tugTightness = 0f;
+    private float reelTightness = 0f;
+    private bool isLureReelHeld = false;
+    private bool isFishAirborne = false;
+    private float fightSlack = 0f;
     private Vector3[] positionsCache;
 
     void Awake()
@@ -52,6 +84,9 @@ public class VerletRope : MonoBehaviour
         FishingEvents.OnFishBite += HandleFishBite;
         FishingEvents.OnFishFightBegin += HandleFishFightBegin;
         FishingEvents.OnFishFightEnd += HandleFishFightEnd;
+        FishingEvents.OnLureTugged += HandleLureTugged;
+        FishingEvents.OnLureReelChanged += HandleLureReelChanged;
+        FishingEvents.OnHookedFishJumpChanged += HandleHookedFishJumpChanged;
     }
 
     private void OnDisable()
@@ -61,11 +96,29 @@ public class VerletRope : MonoBehaviour
         FishingEvents.OnFishBite -= HandleFishBite;
         FishingEvents.OnFishFightBegin -= HandleFishFightBegin;
         FishingEvents.OnFishFightEnd -= HandleFishFightEnd;
+        FishingEvents.OnLureTugged -= HandleLureTugged;
+        FishingEvents.OnLureReelChanged -= HandleLureReelChanged;
+        FishingEvents.OnHookedFishJumpChanged -= HandleHookedFishJumpChanged;
+    }
+
+    private void HandleHookedFishJumpChanged(bool airborne)
+    {
+        isFishAirborne = airborne;
     }
 
     private void HandleFishNibble(BobberController b)
     {
         nibbleTightness = nibbleTightenAmount;
+    }
+
+    private void HandleLureTugged()
+    {
+        tugTightness = tugTightenAmount;
+    }
+
+    private void HandleLureReelChanged(bool held)
+    {
+        isLureReelHeld = held;
     }
 
     private void HandleFishBite(BobberController b)
@@ -88,6 +141,7 @@ public class VerletRope : MonoBehaviour
     private void HandleFishFightEnd(bool success)
     {
         isLineTight = false;
+        isFishAirborne = false;
     }
 
     public void SetupRope(Transform rodTip, Transform bobber)
@@ -110,6 +164,17 @@ public class VerletRope : MonoBehaviour
         positionsCache = new Vector3[ropePoints.Count];
         isInitialized = true;
         hasLanded = false;
+
+        // A re-setup is a fresh line (new cast or the bobber parked back on the rod) — clear
+        // all transient tension state. Without this, a fight that ends by parking the bobber
+        // (lost fight, missed hook) leaves isLineTight stuck on and the dangling rope renders
+        // as a dead-straight 2-point line.
+        isLineTight = false;
+        nibbleTightness = 0f;
+        tugTightness = 0f;
+        reelTightness = 0f;
+        isFishAirborne = false;
+        fightSlack = 0f;
     }
 
     public void DeactivateRope()
@@ -118,6 +183,11 @@ public class VerletRope : MonoBehaviour
         isLineTight = false;
         hasLanded = false;
         nibbleTightness = 0f;
+        tugTightness = 0f;
+        reelTightness = 0f;
+        isLureReelHeld = false;
+        isFishAirborne = false;
+        fightSlack = 0f;
         if (lineRenderer != null)
             lineRenderer.positionCount = 0;
     }
@@ -139,15 +209,37 @@ public class VerletRope : MonoBehaviour
         {
             nibbleTightness = Mathf.Max(0f, nibbleTightness - Time.deltaTime / Mathf.Max(0.001f, nibbleTightenDecay));
         }
+        if (tugTightness > 0f)
+        {
+            tugTightness = Mathf.Max(0f, tugTightness - Time.deltaTime / Mathf.Max(0.001f, tugTightenDecay));
+        }
+
+        // Sustained tension while cranking: ramp up fast on attack, ease off on release.
+        float reelTarget = isLureReelHeld ? reelTightenAmount : 0f;
+        float reelRampTime = reelTarget > reelTightness ? reelTightenAttack : reelTightenRelease;
+        reelTightness = Mathf.MoveTowards(
+            reelTightness, reelTarget, Time.deltaTime / Mathf.Max(0.001f, reelRampTime));
+
+        // Fight-jump slack: snaps in when the hooked fish leaves the water, eases back out
+        // after the splash-down so the line smoothly pulls straight again.
+        float slackTarget = isFishAirborne ? jumpSlackAmount : 0f;
+        float slackRampTime = slackTarget > fightSlack ? jumpSlackAttack : jumpSlackRelease;
+        fightSlack = Mathf.MoveTowards(
+            fightSlack, slackTarget, Time.deltaTime / Mathf.Max(0.001f, slackRampTime));
+
+        // Simulate every frame — even while the fight line renders straight — so the rope
+        // points keep tracking the endpoints. When jump slack kicks in mid-fight the simulated
+        // rope is current instead of frozen at its pre-fight pose.
+        Simulate();
 
         if (isLineTight)
         {
-            DrawTightLine();
+            if (fightSlack <= 0f) DrawTightLine();
+            else DrawSimulatedRope(1f - fightSlack);
         }
         else
         {
-            Simulate();
-            DrawSimulatedRope();
+            DrawSimulatedRope(0f);
         }
     }
 
@@ -210,14 +302,18 @@ public class VerletRope : MonoBehaviour
         }
     }
 
-    private void DrawSimulatedRope()
+    // minTightness floors the straight-line blend — the fight line during a jump passes
+    // (1 - fightSlack) here so the rope stays partially taut and re-tightens smoothly.
+    private void DrawSimulatedRope(float minTightness)
     {
         int count = ropePoints.Count;
         lineRenderer.positionCount = count;
         int last = count - 1;
 
         float baseline = hasLanded ? landedTightenAmount : 0f;
-        float effectiveTightness = Mathf.Max(baseline, nibbleTightness);
+        float effectiveTightness = Mathf.Max(
+            Mathf.Max(Mathf.Max(baseline, reelTightness), minTightness),
+            Mathf.Max(nibbleTightness, tugTightness));
         bool blend = effectiveTightness > 0f && last > 0;
 
         for (int i = 0; i < count; i++)

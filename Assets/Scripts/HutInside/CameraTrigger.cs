@@ -32,7 +32,7 @@ public class CameraTrigger : MonoBehaviour
     {
         if (playerInZone)
         {
-            if (Input.GetKeyDown(interactKey))
+            if (Input.GetKeyDown(interactKey) || GamepadInput.InteractPressed)
             {
                 ToggleCamera();
             }

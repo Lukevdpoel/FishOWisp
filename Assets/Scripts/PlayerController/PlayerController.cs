@@ -15,6 +15,10 @@ public class PlayerController : MonoBehaviour
     [Header("Movement Settings")]
     [SerializeField] private float walkSpeed = 6f;
     [SerializeField] private float sprintSpeed = 12f;
+    [Tooltip("Gamepad sprint latch threshold: one left-stick click latches sprint on, and it " +
+             "stays on while the stick stays deflected past this fraction. Ease off below it " +
+             "(or stop) and the latch drops. Keyboard sprint (Shift) is still hold-to-sprint.")]
+    [SerializeField, Range(0.1f, 1f)] private float sprintMaintainThreshold = 0.5f;
     [SerializeField] private float acceleration = 25f;
     [SerializeField] private float deceleration = 35f;
     [SerializeField] private float tapKickSpeed = 3f;
@@ -79,6 +83,12 @@ public class PlayerController : MonoBehaviour
     private float idleTimer;
     private bool allowSitdown = true;
     private bool isSprinting = false;
+    // Gamepad sprint session: a left-stick click "arms" sprintLatched; it becomes sprintEngaged
+    // once the stick actually pushes past the maintain threshold, and the session ends (latch
+    // cleared) the moment an engaged sprint slows below that threshold — so it survives clicking
+    // L3 a hair before/after pushing the stick, but still needs a fresh click after you stop.
+    private bool sprintLatched = false;
+    private bool sprintEngaged = false;
     private bool hadMovementInputLast;
     private Quaternion targetModelRotation;
     private bool isLockedOnFish;
@@ -90,20 +100,9 @@ public class PlayerController : MonoBehaviour
     private int hashBallIn;
     private int hashBallOut;
 
-    private enum JumpPhase { None, Charging, Launched, Bounced }
-    private JumpPhase jumpPhase = JumpPhase.None;
-    private float chargeTimer;
-    private float launchHorizontalSpeed;
-    private float launchUpwardSpeed;
-    private Vector3 launchDirection = Vector3.forward;
-    private bool airborneSinceLaunch;
-    private Vector3 originalModelScale = Vector3.one;
-    private Vector3 originalModelLocalPosition;
-    private Vector3 originalNormalMeshScale = Vector3.one;
-    private Quaternion originalNormalMeshLocalRotation = Quaternion.identity;
-    private Vector3 ballSpinAxis = Vector3.right;
-    private float ballSpinSpeedDeg;
-    private float bounceImpactTimer = -1f; // -1 = inactive
+    private readonly PlayerAirborneTumble airborneTumble = new PlayerAirborneTumble();
+    private readonly PlayerSquashStretch squashStretch = new PlayerSquashStretch();
+    private readonly ChargeJumpController chargeJump = new ChargeJumpController();
 
     private Vector3 staticCameraOffset;
     private bool staticCameraOffsetCaptured;
@@ -117,17 +116,12 @@ public class PlayerController : MonoBehaviour
         hashBallOut = Animator.StringToHash(ballTransitionOutTrigger);
 
         characterController = GetComponent<CharacterController>();
-        if (playerModel)
-        {
-            targetModelRotation = playerModel.rotation;
-            originalModelScale = playerModel.localScale;
-            originalModelLocalPosition = playerModel.localPosition;
-        }
-        if (normalMeshRoot)
-        {
-            originalNormalMeshScale = normalMeshRoot.transform.localScale;
-            originalNormalMeshLocalRotation = normalMeshRoot.transform.localRotation;
-        }
+        if (playerModel) targetModelRotation = playerModel.rotation;
+
+        airborneTumble.Init(normalMeshRoot);
+        squashStretch.Init(playerModel, normalMeshRoot);
+        chargeJump.Init(characterController, animator, hashBallIn, hashBallOut,
+                        airborneTumble, squashStretch, NotifyOfAction);
 
         if (cameraController != null) cameraController.Initialize(playerModel);
     }
@@ -144,7 +138,7 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        HandleChargeJump();
+        TickChargeJump();
         HandleMovement();
         HandleRotation();
         HandleGravity();
@@ -160,8 +154,16 @@ public class PlayerController : MonoBehaviour
         if (Time.timeScale == 0f || Time.deltaTime <= 0.0001f) return;
 
         // Run after Animator has evaluated so our scale/rotation writes aren't overwritten by clip curves.
-        HandleSquashStretch();
-        HandleAirborneTumble();
+        squashStretch.Tick(
+            chargeJump.Phase == ChargeJumpController.JumpPhase.Charging,
+            chargeJump.ChargeNormalized(maxChargeTime),
+            chargeMaxSquash, scaleLerpSpeed,
+            bounceImpactCurve, bounceImpactDuration);
+
+        bool isAirborneJump = chargeJump.Phase == ChargeJumpController.JumpPhase.Launched
+                           || chargeJump.Phase == ChargeJumpController.JumpPhase.Bounced;
+        airborneTumble.Tick(isAirborneJump, characterController != null && characterController.isGrounded);
+
         HandleStaticCameraFollow();
 
         if (cameraController != null)
@@ -353,7 +355,8 @@ public class PlayerController : MonoBehaviour
     {
         float yVelocity = targetVelocity.y;
 
-        if (jumpPhase == JumpPhase.Charging)
+        var jumpPhase = chargeJump.Phase;
+        if (jumpPhase == ChargeJumpController.JumpPhase.Charging)
         {
             Vector3 horiz = new Vector3(targetVelocity.x, 0f, targetVelocity.z);
             horiz = Vector3.MoveTowards(horiz, Vector3.zero, deceleration * Time.deltaTime);
@@ -361,21 +364,47 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        if (jumpPhase == JumpPhase.Launched || jumpPhase == JumpPhase.Bounced)
+        if (jumpPhase == ChargeJumpController.JumpPhase.Launched || jumpPhase == ChargeJumpController.JumpPhase.Bounced)
         {
             // Trajectory locked once launched — gravity still applies via HandleGravity.
             return;
         }
 
-        bool inputDisabled = InventoryUI.IsInventoryOpen || areControlsLocked || isLockedOnFish;
+        bool inputDisabled = InventoryUI.IsInventoryOpen || NoteMenu.IsNotebookOpen || areControlsLocked || isLockedOnFish;
 
         float h = inputDisabled ? 0f : Input.GetAxisRaw("Horizontal");
         float v = inputDisabled ? 0f : Input.GetAxisRaw("Vertical");
 
-        bool hasMovementInput = new Vector2(h, v).magnitude > 0.1f;
-        isSprinting = hasMovementInput && Input.GetKey(KeyCode.LeftShift) && !inputDisabled;
+        // Keyboard wins when both devices are active; otherwise the left stick drives, and
+        // its deflection scales the target speed so small tilts walk slower than full tilt.
+        Vector2 moveInput = Vector2.ClampMagnitude(new Vector2(h, v), 1f);
+        if (!inputDisabled && moveInput.sqrMagnitude < 0.01f) moveInput = GamepadInput.Move;
 
-        float currentSpeed = isSprinting ? sprintSpeed : walkSpeed;
+        bool hasMovementInput = moveInput.magnitude > 0.1f;
+
+        // Gamepad sprint is a latch: one left-stick click arms it, the stick crossing the
+        // maintain threshold engages the run, and slowing back below the threshold ends the
+        // session (needs another click to sprint again). No hold-to-sprint on the pad; keyboard
+        // Shift stays a plain hold.
+        if (inputDisabled)
+        {
+            sprintLatched = false;
+            sprintEngaged = false;
+        }
+        else
+        {
+            if (GamepadInput.SprintTogglePressed) { sprintLatched = true; sprintEngaged = false; }
+            if (sprintLatched)
+            {
+                if (moveInput.magnitude >= sprintMaintainThreshold) sprintEngaged = true;
+                else if (sprintEngaged) { sprintLatched = false; sprintEngaged = false; }
+            }
+        }
+
+        isSprinting = hasMovementInput && !inputDisabled
+                      && (Input.GetKey(KeyCode.LeftShift) || (sprintLatched && sprintEngaged));
+
+        float currentSpeed = (isSprinting ? sprintSpeed : walkSpeed) * Mathf.Clamp01(moveInput.magnitude);
 
         Transform camTransform;
         if (useStaticCamera && staticCameraTarget != null)
@@ -390,7 +419,7 @@ public class PlayerController : MonoBehaviour
         camForward.Normalize();
         camRight.Normalize();
 
-        Vector3 moveDirection = (camForward * v + camRight * h).normalized;
+        Vector3 moveDirection = (camForward * moveInput.y + camRight * moveInput.x).normalized;
         Vector3 desiredHorizontal = moveDirection * currentSpeed;
 
         Vector3 currentHorizontal = new Vector3(targetVelocity.x, 0f, targetVelocity.z);
@@ -421,7 +450,7 @@ public class PlayerController : MonoBehaviour
     {
         if (areControlsLocked) return;
 
-        if (jumpPhase != JumpPhase.None)
+        if (chargeJump.Phase != ChargeJumpController.JumpPhase.None)
         {
             playerModel.rotation = Quaternion.Slerp(playerModel.rotation, targetModelRotation, rotationSpeed * Time.deltaTime);
             return;
@@ -464,7 +493,7 @@ public class PlayerController : MonoBehaviour
         {
             float horizontalSpeed = new Vector3(targetVelocity.x, 0, targetVelocity.z).magnitude;
 
-            if (areControlsLocked || InventoryUI.IsInventoryOpen || isLockedOnFish)
+            if (areControlsLocked || InventoryUI.IsInventoryOpen || NoteMenu.IsNotebookOpen || isLockedOnFish)
             {
                 horizontalSpeed = 0f;
             }
@@ -476,9 +505,11 @@ public class PlayerController : MonoBehaviour
     private void HandleIdleAnimation()
     {
         bool isMoving = !areControlsLocked && !InventoryUI.IsInventoryOpen &&
-                        (new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f);
-        bool isRotatingCamera = !areControlsLocked && !InventoryUI.IsInventoryOpen && Input.GetMouseButton(1);
-        if (InventoryUI.IsInventoryOpen) { isMoving = false; isRotatingCamera = false; }
+                        (new Vector3(Input.GetAxisRaw("Horizontal"), 0f, Input.GetAxisRaw("Vertical")).magnitude > 0.1f
+                         || GamepadInput.Move.magnitude > 0.1f);
+        bool isRotatingCamera = !areControlsLocked && !InventoryUI.IsInventoryOpen
+                                && (Input.GetMouseButton(1) || GamepadInput.Look.magnitude > 0.1f);
+        if (InventoryUI.IsInventoryOpen || NoteMenu.IsNotebookOpen) { isMoving = false; isRotatingCamera = false; }
 
         if (isMoving || isRotatingCamera || isLockedOnFish) NotifyOfAction();
         else idleTimer += Time.deltaTime;
@@ -490,182 +521,49 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    private void HandleChargeJump()
+    private void TickChargeJump()
     {
-        bool inputDisabled = InventoryUI.IsInventoryOpen || areControlsLocked || isLockedOnFish;
+        bool inputDisabled = InventoryUI.IsInventoryOpen || NoteMenu.IsNotebookOpen || areControlsLocked || isLockedOnFish;
+        Vector3 modelForward = playerModel ? playerModel.forward : transform.forward;
 
-        if (inputDisabled && jumpPhase == JumpPhase.Charging)
+        var cfg = new ChargeJumpController.JumpConfig
         {
-            jumpPhase = JumpPhase.None;
-            chargeTimer = 0f;
-            return;
-        }
+            chargeJumpKey = chargeJumpKey,
+            maxChargeTime = maxChargeTime,
+            minLaunchCharge = minLaunchCharge,
+            forwardByCharge = forwardByCharge,
+            upwardByCharge = upwardByCharge,
+            bounceForwardMultiplier = bounceForwardMultiplier,
+            bounceUpwardMultiplier = bounceUpwardMultiplier,
+            tumbleDegPerUnitSpeed = ballSpinDegPerUnitSpeed,
+            tumbleAxisJitter = ballSpinAxisJitter,
+            tumbleSpeedJitter = ballSpinSpeedJitter,
+        };
 
-        switch (jumpPhase)
-        {
-            case JumpPhase.None:
-                if (!inputDisabled && characterController.isGrounded && Input.GetKeyDown(chargeJumpKey))
-                {
-                    jumpPhase = JumpPhase.Charging;
-                    chargeTimer = 0f;
-                    ResetTumbleRotation();
-                    if (animator) animator.SetTrigger(hashBallIn);
-                    NotifyOfAction();
-                }
-                break;
-
-            case JumpPhase.Charging:
-                chargeTimer = Mathf.Min(chargeTimer + Time.deltaTime, maxChargeTime);
-                if (Input.GetKeyUp(chargeJumpKey) || !Input.GetKey(chargeJumpKey))
-                {
-                    LaunchJump(chargeTimer / maxChargeTime);
-                }
-                break;
-
-            case JumpPhase.Launched:
-                if (!characterController.isGrounded) airborneSinceLaunch = true;
-                else if (airborneSinceLaunch) BounceOnLand();
-                break;
-
-            case JumpPhase.Bounced:
-                if (!characterController.isGrounded)
-                {
-                    airborneSinceLaunch = true;
-                }
-                else if (airborneSinceLaunch)
-                {
-                    jumpPhase = JumpPhase.None;
-                    airborneSinceLaunch = false;
-                    ResetTumbleRotation();
-                    if (animator) animator.SetTrigger(hashBallOut);
-                }
-                break;
-        }
-    }
-
-    private void LaunchJump(float chargeNorm)
-    {
-        chargeNorm = Mathf.Clamp01(Mathf.Max(chargeNorm, minLaunchCharge));
-        launchHorizontalSpeed = forwardByCharge.Evaluate(chargeNorm);
-        launchUpwardSpeed = upwardByCharge.Evaluate(chargeNorm);
-
-        Vector3 fwd = playerModel ? playerModel.forward : transform.forward;
-        fwd.y = 0f;
-        if (fwd.sqrMagnitude < 0.001f) fwd = transform.forward;
-        launchDirection = fwd.normalized;
-
-        Vector3 horiz = launchDirection * launchHorizontalSpeed;
-        targetVelocity = new Vector3(horiz.x, launchUpwardSpeed, horiz.z);
-
-        jumpPhase = JumpPhase.Launched;
-        airborneSinceLaunch = false;
-        SeedAirborneTumble();
-        NotifyOfAction();
-    }
-
-    private void BounceOnLand()
-    {
-        Vector3 horiz = launchDirection * launchHorizontalSpeed * bounceForwardMultiplier;
-        targetVelocity = new Vector3(horiz.x, launchUpwardSpeed * bounceUpwardMultiplier, horiz.z);
-        jumpPhase = JumpPhase.Bounced;
-        airborneSinceLaunch = false;
-        ballSpinSpeedDeg *= bounceForwardMultiplier;
-        bounceImpactTimer = 0f;
-    }
-
-    private void SeedAirborneTumble()
-    {
-        // Forward tumble around local X, with a small random tilt so it doesn't look mechanical.
-        Vector3 jitter = new Vector3(
-            0f,
-            Random.Range(-ballSpinAxisJitter, ballSpinAxisJitter),
-            Random.Range(-ballSpinAxisJitter, ballSpinAxisJitter));
-        ballSpinAxis = (Vector3.right + jitter).normalized;
-
-        float rate = launchHorizontalSpeed * ballSpinDegPerUnitSpeed;
-        ballSpinSpeedDeg = rate * (1f + Random.Range(-ballSpinSpeedJitter, ballSpinSpeedJitter));
-
-        ResetTumbleRotation();
-    }
-
-    private void ResetTumbleRotation()
-    {
-        if (!normalMeshRoot) return;
-        normalMeshRoot.transform.localRotation = originalNormalMeshLocalRotation;
-    }
-
-    private void HandleAirborneTumble()
-    {
-        if (!normalMeshRoot) return;
-        if (jumpPhase != JumpPhase.Launched && jumpPhase != JumpPhase.Bounced) return;
-        if (characterController.isGrounded) return;
-
-        normalMeshRoot.transform.Rotate(ballSpinAxis, ballSpinSpeedDeg * Time.deltaTime, Space.Self);
-    }
-
-    private void HandleSquashStretch()
-    {
-        if (!playerModel) return;
-
-        Vector3 scaleMul = Vector3.one;
-        Vector3 targetPos = originalModelLocalPosition;
-        bool driveDirectly = false;
-
-        // One-shot bounce-impact curve: drives Y-scale through squash → stretch → neutral over
-        // bounceImpactDuration after BounceOnLand fires. Set directly (no lerp) so the curve plays
-        // exactly as authored — fast snaps land hard, that's the whole point.
-        if (bounceImpactTimer >= 0f)
-        {
-            bounceImpactTimer += Time.deltaTime;
-            if (bounceImpactTimer >= bounceImpactDuration)
-            {
-                bounceImpactTimer = -1f;
-            }
-            else
-            {
-                float bt = bounceImpactTimer / Mathf.Max(0.01f, bounceImpactDuration);
-                float yScale = bounceImpactCurve.Evaluate(bt);
-                float xz = VolumePreserveXZ(yScale);
-                scaleMul = new Vector3(xz, yScale, xz);
-                driveDirectly = true;
-            }
-        }
-
-        // Charge squash takes priority if both overlap (e.g. user charges again immediately).
-        if (jumpPhase == JumpPhase.Charging)
-        {
-            float t = Mathf.Clamp01(chargeTimer / maxChargeTime);
-            float y = Mathf.Lerp(1f, chargeMaxSquash, t);
-            float xz = VolumePreserveXZ(y);
-            scaleMul = new Vector3(xz, y, xz);
-            driveDirectly = false;
-        }
-
-        // playerModel's local axes align with player facing, so X/Y/Z scale = right/up/forward.
-        Vector3 targetScale = Vector3.Scale(originalModelScale, scaleMul);
-        if (driveDirectly)
-            playerModel.localScale = targetScale;
-        else
-            playerModel.localScale = Vector3.Lerp(playerModel.localScale, targetScale, scaleLerpSpeed * Time.deltaTime);
-        playerModel.localPosition = Vector3.Lerp(playerModel.localPosition, targetPos, scaleLerpSpeed * Time.deltaTime);
-
-        // Belt-and-suspenders: keep the mesh-root scale at its captured original so stale scaling from a
-        // previous code path can never compound with playerModel's scale.
-        if (normalMeshRoot && normalMeshRoot.transform.localScale != originalNormalMeshScale)
-            normalMeshRoot.transform.localScale = originalNormalMeshScale;
-    }
-
-    private static float VolumePreserveXZ(float yScale)
-    {
-        return 1f / Mathf.Sqrt(Mathf.Max(0.01f, yScale));
+        chargeJump.Tick(ref targetVelocity, modelForward, transform.forward, inputDisabled, in cfg);
     }
 
     private void HandleCursorLocking()
     {
-        if (areControlsLocked) { Cursor.lockState = CursorLockMode.None; Cursor.visible = true; return; }
+        // Mouse-driven UIs own the cursor while open — they unlock it themselves, and
+        // re-locking here every frame would make their buttons unclickable.
+        if (InventoryUI.IsInventoryOpen || NoteMenu.IsNotebookOpen) return;
+
+        if (areControlsLocked)
+        {
+            // Fishing locks controls too, but while the bobber/lure sits in the water the
+            // mouse is orbiting the camera — keep the cursor locked and hidden there. Every
+            // other locked context (dialogue, shop, inspection) shows the cursor as before.
+            bool bobberCameraOwnsView = cameraController != null && cameraController.IsBobberCameraActive;
+            if (!bobberCameraOwnsView)
+            {
+                Cursor.lockState = CursorLockMode.None;
+                Cursor.visible = true;
+                return;
+            }
+        }
 
         bool isFighting = fishingAnimHandler != null && fishingAnimHandler.IsFightingFish;
-        if (InventoryUI.IsInventoryOpen) return;
         if (isFighting)
         {
             // Keep cursor locked during fight — mouse controls rod direction

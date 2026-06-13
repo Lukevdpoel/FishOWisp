@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 [RequireComponent(typeof(Rigidbody))]
 [RequireComponent(typeof(AudioSource))]
@@ -70,6 +71,14 @@ public class BobberController : MonoBehaviour
     public float waterAngularDamping = 2f;
     public float waterRotationSpeed = 2f;
 
+    [Header("Water Impact Absorption")]
+    [Tooltip("Fraction of the bobber's downward velocity that survives the moment it touches water. " +
+             "The buoyancy spring is intentionally light, so without absorption the cast's plunge " +
+             "rebounds violently. 0 = no plunge at all, 1 = no absorption (original bouncy behavior). " +
+             "0.15 = the bobber briefly dips ~15cm and settles. Only the downward Y is dampened; " +
+             "horizontal drift is preserved so the bobber still glides slightly after a long cast.")]
+    [Range(0f, 1f)] public float waterImpactVelocityRetention = 0.15f;
+
     [Header("Nibble Settings")]
     public int minNibbles = 2;
     public int maxNibbles = 5;
@@ -92,6 +101,28 @@ public class BobberController : MonoBehaviour
     [Range(0f, 1f)] public float repeatSideChance = 0.25f;
     [Tooltip("Random multiplier applied to struggleForce per burst. Lets weak tugs and hard jabs mix.")]
     public Vector2 forceMultiplierRange = new Vector2(0.5f, 1.6f);
+    [Tooltip("How hard the struggling fish pulls the line straight away from the player (acceleration). Makes struggles visibly take line.")]
+    public float strugglePullAwayForce = 2.5f;
+    [Tooltip("Max distance the fish can drag its tether anchor away from the bite point. Caps how much line a struggle can take; reeling wins it back, tug-of-war style.")]
+    public float maxPullAwayDistance = 3f;
+    [Tooltip("Speed (m/s) the tether anchor itself drifts away from the player during a struggle, so gained line sticks instead of springing back to the bite point.")]
+    public float pullAwayAnchorSpeed = 0.5f;
+
+    [Header("Fight Jump")]
+    [Tooltip("Chance per struggle burst that the hooked fish leaps out of the water. 0 disables jumps.")]
+    [Range(0f, 1f)] public float fightJumpChance = 0.15f;
+    [Tooltip("Vertical launch speed (m/s) of the leap. The leap is purely ballistic (buoyancy is " +
+             "kept out of it), so breach height ≈ jumpUpSpeed²/(2·9.81) minus the submerge depth. " +
+             "At the default 1.5 m depth, ~5.6 pokes the fish ~0.1 m clear of the surface for a " +
+             "brief writhe — raise for a bigger leap, lower for a flopping head-poke (below ~5.45 " +
+             "it stays under the surface).")]
+    public float jumpUpSpeed = 5.6f;
+    [Tooltip("Horizontal speed (m/s) carried along the current struggle direction so the leap arcs sideways instead of straight up.")]
+    public float jumpForwardSpeed = 1.2f;
+    [Tooltip("Minimum seconds between leaps.")]
+    public float jumpCooldown = 5f;
+    [Tooltip("Safety net: if the fish hasn't splashed back down after this many seconds (e.g. the leap never broke the surface), fight state is restored anyway.")]
+    public float maxJumpDuration = 2.5f;
 
     [Header("Struggle Tether")]
     [Tooltip("Radius of the AOE circle around the hook point that the fish prefers to stay within.")]
@@ -109,6 +140,8 @@ public class BobberController : MonoBehaviour
 
     [Header("Visuals")]
     public GameObject bobberVisuals;
+    [Tooltip("Silhouette material for the hooked fish that replaces the bobber/lure at the bite. Assign the Fish Silhouette Sway material; when left empty it's found by shader name at runtime.")]
+    public Material hookedFishSilhouetteMaterial;
 
     [Header("Camera")]
     [Tooltip("Child Transform that defines the camera pose used while the bobber is in the water. Parent it under the bobber and position/rotate it however the in-water camera should sit. Leave null to fall back to the formula in PlayerCameraController.")]
@@ -119,6 +152,11 @@ public class BobberController : MonoBehaviour
     [Tooltip("Child Transform where the fishing line connects to this bobber. Leave null to attach at the bobber's root.")]
     [SerializeField] private Transform lineAttachPoint;
     public Transform LineAttachPoint => lineAttachPoint != null ? lineAttachPoint : transform;
+
+    // Raw attach transform for the hooked-fish visual: while a fish is on the line it parks
+    // this on the fish's mouth every frame (and restores it on release), so the rope visibly
+    // runs to the snout instead of the hidden bobber.
+    public Transform LineAttachTransform => lineAttachPoint;
 
     // Internal State
     private Rigidbody rb;
@@ -132,8 +170,15 @@ public class BobberController : MonoBehaviour
     private float initialAngularDamping;
     private float waterSurfaceY;
 
+    // Adjacent fishing zones can have overlapping water trigger volumes at their seam. Water
+    // state must therefore be reference-counted: the bobber is only "out of the water" once it
+    // has left ALL volumes, otherwise exiting one volume while floating in the other kills
+    // buoyancy and the bobber sinks through the seam.
+    private readonly HashSet<Collider> waterVolumes = new HashSet<Collider>();
+
     private CaughtFish hookedFish;
     private GameObject activeFishModel;
+    private static Material sharedHookedSilhouette;
 
     // Track the active wake instance
     private GameObject activeWakeInstance;
@@ -147,16 +192,56 @@ public class BobberController : MonoBehaviour
     private int currentStruggleSide = 1; // 1 or -1
     private float currentStruggleForceMultiplier = 1f;
     private Vector3 struggleAnchor;
+    private Vector3 initialStruggleAnchor;
     private bool hasStruggleAnchor = false;
     private Transform playerTransform;
 
+    private bool jumpActive = false;
+    private float jumpStartTime;
+    private float nextJumpAllowedTime;
+
     public CaughtFish HookedFish => hookedFish;
     public GameObject ActiveFishModel => activeFishModel;
+    public Transform PlayerTransform => playerTransform;
+    public bool IsStruggling => isStruggling;
     public Vector3 StruggleDirection => struggleDirection;
     public bool IsInWater => isInWater;
     public float WaterSurfaceY => waterSurfaceY;
+    // True while a hooked fish is mid-leap (airborne). HookedFishController reads this to free
+    // its body chain's vertical lock so the tail trails the head's arc, then re-locks on landing.
+    public bool IsHookedFishJumping => jumpActive;
+
+    // Set externally (LureReelHandler) to drive the "speedboat" visual: positive pitch raises
+    // the LineAttachPoint side, bob offset bobs the buoyancy target up/down. Both are read by
+    // ApplyBuoyancy each FixedUpdate. Reset to 0 in ResetForCast so a parked bobber sits level.
+    [System.NonSerialized] public float lureVisualPitchDeg = 0f;
+    [System.NonSerialized] public float lureBobOffset = 0f;
+
+    [Header("Grab Tow")]
+    [Tooltip("Max speed (m/s) the lure is dragged to follow a fish that has grabbed it during a " +
+             "TP bite. Keep above the fish's grab swim speed so the lure stays at its mouth. While " +
+             "towed, buoyancy/struggle are suspended and the fish drives the lure; normal physics " +
+             "resume the instant it lets go or the bite is set. The reel handler is never touched.")]
+    public float grabTowMaxSpeed = 6f;
+
+    // True while a grabbing fish is towing the lure to its mouth (set via BeginGrabTow/EndGrabTow).
+    [System.NonSerialized] private bool isGrabTowed;
+    [System.NonSerialized] private Vector3 grabTowTarget;
+
+    [Header("Lure Inertia Override")]
+    [Tooltip("If > 0, overrides Unity's auto-computed inertia tensor with this uniform value " +
+             "when the bobber enters water. Lures need this — Unity's default for a small " +
+             "sphere is tiny (~0.03), which makes AddForceAtPosition at the LineAttachPoint " +
+             "spin the lure ~16× too fast. 0.2-0.4 gives a controlled response. Leave 0 on " +
+             "regular bobbers to keep their hand-tuned nibble/struggle behavior unchanged.")]
+    public float waterInertiaTensorOverride = 0f;
 
     public void SetPlayerTransform(Transform player) { playerTransform = player; }
+
+    // ----- TP grab tow: a fish that clamped onto the lure drags it along until it lets go -----
+    public void BeginGrabTow() { isGrabTowed = true; grabTowTarget = transform.position; }
+    public void SetGrabTowTarget(Vector3 worldPos) { grabTowTarget = worldPos; }
+    public void EndGrabTow() { isGrabTowed = false; }
 
     /// <summary>
     /// Slide the struggle tether anchor by a world-space delta. Called by the rod while the
@@ -201,6 +286,37 @@ public class BobberController : MonoBehaviour
 
     void FixedUpdate()
     {
+        // A fish that grabbed the lure drives it to its mouth: drag the rigidbody along the
+        // fish's path and suspend buoyancy/struggle for the hold. Released the instant the fish
+        // spits it or the bite is set, where normal physics resume.
+        if (isGrabTowed)
+        {
+            if (rb != null && !rb.isKinematic)
+                rb.MovePosition(Vector3.MoveTowards(rb.position, grabTowTarget, grabTowMaxSpeed * Time.fixedDeltaTime));
+            return;
+        }
+
+        // End the leap on the bobber's own descent rather than waiting on the water trigger:
+        // a low writhe may never fully clear the trigger volume, so EnterWater wouldn't fire.
+        // Once the fish is past its apex (falling) and back under the surface — or the timeout
+        // trips — restore the submerged fight state. EnterWater's splash path also calls
+        // EndFightJump for full breaches; whichever happens first wins, the other no-ops.
+        if (jumpActive)
+        {
+            bool timedOut = Time.time - jumpStartTime > maxJumpDuration;
+            bool fallenBack = rb != null && rb.linearVelocity.y <= 0f
+                              && transform.position.y <= waterSurfaceY;
+            if (timedOut || fallenBack)
+            {
+                if (isInWater && hookedFish != null)
+                {
+                    isSubmerged = true;
+                    if (rb != null) rb.linearDamping = waterDrag;
+                }
+                EndFightJump();
+            }
+        }
+
         if (isInWater)
         {
             ApplyBuoyancy();
@@ -226,10 +342,14 @@ public class BobberController : MonoBehaviour
     // ------------------------------------------------------------------------
     void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag(waterTag) && !isInWater)
+        if (other.CompareTag(waterTag))
         {
-            waterSurfaceY = other.bounds.max.y;
-            EnterWater();
+            waterVolumes.Add(other);
+            waterSurfaceY = HighestWaterSurfaceY();
+            if (!isInWater)
+            {
+                EnterWater();
+            }
         }
     }
 
@@ -237,31 +357,73 @@ public class BobberController : MonoBehaviour
     {
         if (other.CompareTag(waterTag) && isInWater)
         {
-            waterSurfaceY = other.bounds.max.y;
+            // Adding here too heals any Enter event missed while crossing a zone seam.
+            waterVolumes.Add(other);
+            waterSurfaceY = HighestWaterSurfaceY();
         }
     }
 
     void OnTriggerExit(Collider other)
     {
-        if (other.CompareTag(waterTag) && isInWater)
+        if (!other.CompareTag(waterTag)) return;
+
+        waterVolumes.Remove(other);
+        if (!isInWater) return;
+
+        // Enter/Exit ordering at the seam between two overlapping water volumes is not
+        // guaranteed, so when the bookkeeping says we left the last volume, physically probe
+        // before sinking — the bobber may still be inside a neighboring volume.
+        waterVolumes.RemoveWhere(c => c == null || !c.enabled || !c.gameObject.activeInHierarchy);
+        if (waterVolumes.Count == 0) ProbeForWaterVolumes();
+        if (waterVolumes.Count > 0)
         {
-            isInWater = false;
-            isSubmerged = false;
-            SetStruggleActive(false);
-            hasStruggleAnchor = false;
+            waterSurfaceY = HighestWaterSurfaceY();
+            return;
+        }
 
-            // UNITY 6 FIX: Reset Damping
-            if (rb != null)
-            {
-                rb.linearDamping = initialLinearDamping;
-            }
+        isInWater = false;
+        isSubmerged = false;
+        SetStruggleActive(false);
+        // Keep the tether anchor while a fish is on the line: a fight jump exits the water for
+        // a moment, and losing the anchor here would permanently disable the tether/pull-away
+        // tug-of-war for the rest of the fight. (The fight loop re-enables struggling each
+        // frame; the anchor is the only state that wouldn't come back on its own.)
+        if (hookedFish == null) hasStruggleAnchor = false;
 
-            // Destroy Wake when leaving water
-            if (activeWakeInstance != null)
-            {
-                Destroy(activeWakeInstance);
-                activeWakeInstance = null;
-            }
+        // UNITY 6 FIX: Reset Damping
+        if (rb != null)
+        {
+            rb.linearDamping = initialLinearDamping;
+        }
+
+        // Destroy Wake when leaving water
+        if (activeWakeInstance != null)
+        {
+            Destroy(activeWakeInstance);
+            activeWakeInstance = null;
+        }
+    }
+
+    private float HighestWaterSurfaceY()
+    {
+        // Overlapping volumes can sit at slightly different heights; the bobber floats on the
+        // highest surface it is currently touching.
+        float top = float.MinValue;
+        foreach (Collider c in waterVolumes)
+        {
+            if (c == null) continue;
+            top = Mathf.Max(top, c.bounds.max.y);
+        }
+        return top > float.MinValue ? top : waterSurfaceY;
+    }
+
+    private void ProbeForWaterVolumes()
+    {
+        Collider[] hits = Physics.OverlapSphere(transform.position, 0.1f, ~0, QueryTriggerInteraction.Collide);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            if (hits[i].CompareTag(waterTag))
+                waterVolumes.Add(hits[i]);
         }
     }
 
@@ -282,6 +444,9 @@ public class BobberController : MonoBehaviour
 
     private void EnterWater()
     {
+        // solve in cleaner issue should not be allowed to enter water while reeling after canceling fishing.
+        if (FindFirstObjectByType<FishingRodController>().currentState == FishingRodController.FishingState.Reeling)
+            return;
         isInWater = true;
         isInFlight = false;
 
@@ -290,6 +455,22 @@ public class BobberController : MonoBehaviour
         {
             rb.linearDamping = waterDrag;
             rb.angularDamping = waterAngularDamping;
+
+            // Absorb the cast's plunge so the lightly-damped buoyancy spring doesn't catapult
+            // the bobber back up. Only the downward component is killed; preserve any upward
+            // motion (unlikely on entry but harmless) and horizontal glide.
+            Vector3 v = rb.linearVelocity;
+            if (v.y < 0f) v.y *= Mathf.Clamp01(waterImpactVelocityRetention);
+            rb.linearVelocity = v;
+            // Also dump residual spin from the air tumble so the bobber doesn't roll on landing.
+            rb.angularVelocity *= 0.25f;
+
+            // Lure-only: override the auto-computed inertia tensor so off-center pulls at the
+            // LineAttachPoint produce a controlled rotation rather than spinning the lure wildly.
+            if (waterInertiaTensorOverride > 0f)
+            {
+                rb.inertiaTensor = Vector3.one * waterInertiaTensorOverride;
+            }
         }
 
         // 1. TRIGGER IMPACT SPLASH
@@ -306,6 +487,23 @@ public class BobberController : MonoBehaviour
             activeWakeInstance = Instantiate(wakePrefab, wakePos, wakePrefab.transform.rotation);
         }
 
+        if (hookedFish != null)
+        {
+            // Splash-down from a fight jump: dive back to the fight depth with its own splash
+            // and sound, but do NOT re-announce the landing — FishingZone's bite brain would
+            // start a second bite cycle on a bobber that already has a fish on the line.
+            isSubmerged = true;
+            SpawnEffect(impactPrefab, impactLifetime);
+            if (audioSource != null && waterEntrySound != null)
+            {
+                audioSource.PlayOneShot(waterEntrySound, waterEntryVolumeScale);
+            }
+            EndFightJump();
+            return;
+        }
+
+        Debug.LogWarning("dobber landed in water calling event");
+
         FishingEvents.OnBobberLandedInWater?.Invoke(this);
 
         if (audioSource != null && waterEntrySound != null && !hasPlayedSplashSound)
@@ -320,7 +518,10 @@ public class BobberController : MonoBehaviour
     // ------------------------------------------------------------------------
     private void ApplyBuoyancy()
     {
-        float effectiveFloatHeight = isSubmerged ? biteSubmergeDepth : floatHeight;
+        // Bob offset added to the rest float height drives the visual bounce while a lure is
+        // being nudged — buoyancy follows the moving target naturally.
+        float restFloatHeight = floatHeight + (isSubmerged ? 0f : lureBobOffset);
+        float effectiveFloatHeight = isSubmerged ? biteSubmergeDepth : restFloatHeight;
         float targetY = waterSurfaceY - effectiveFloatHeight;
         float depth = targetY - transform.position.y;
 
@@ -331,7 +532,9 @@ public class BobberController : MonoBehaviour
             rb.AddForce(force, ForceMode.Acceleration);
         }
 
-        Quaternion targetRotation = Quaternion.Euler(0, rb.rotation.eulerAngles.y, 0);
+        // Pitch X is driven by lureVisualPitchDeg (0 = level, positive = LineAttachPoint side
+        // rises). Heading Y is preserved; roll Z is held at 0.
+        Quaternion targetRotation = Quaternion.Euler(lureVisualPitchDeg, rb.rotation.eulerAngles.y, 0);
         Quaternion newRotation = Quaternion.Slerp(rb.rotation, targetRotation, waterRotationSpeed * Time.fixedDeltaTime);
         rb.MoveRotation(newRotation);
     }
@@ -359,6 +562,7 @@ public class BobberController : MonoBehaviour
                 currentStruggleSide = -currentStruggleSide;
             }
             StartNewStruggleBurst(perpendicular);
+            TryFightJump();
         }
 
         // Check for obstacles ahead — flip side and pick a fresh burst if blocked
@@ -375,6 +579,28 @@ public class BobberController : MonoBehaviour
         if (rb != null && !rb.isKinematic)
         {
             rb.AddForce(struggleDirection * struggleForce * currentStruggleForceMultiplier, ForceMode.Acceleration);
+
+            // The fish takes line: a steady pull straight away from the player, with the
+            // tether anchor dragged along so the gained distance sticks instead of
+            // springing back to the bite point. The pull is capped by how far the anchor
+            // has progressed away from the original bite spot (measured along the current
+            // away direction, so line the player reels back can be taken again — a real
+            // tug-of-war), and stops against obstacles and the fishing line's own tether.
+            float pulledAway = Vector3.Dot(struggleAnchor - initialStruggleAnchor, toBobber);
+            if (strugglePullAwayForce > 0f && pulledAway < maxPullAwayDistance)
+            {
+                rb.AddForce(toBobber * strugglePullAwayForce, ForceMode.Acceleration);
+
+                if (hasStruggleAnchor && pullAwayAnchorSpeed > 0f)
+                {
+                    bool blocked = obstacleCheckLayers != 0
+                        && Physics.Raycast(transform.position + Vector3.up * 0.5f, toBobber,
+                                           obstacleCheckDistance, obstacleCheckLayers);
+                    if (!blocked)
+                        struggleAnchor += toBobber * (pullAwayAnchorSpeed * Time.fixedDeltaTime);
+                }
+            }
+
             ApplyTetherPullBack();
         }
     }
@@ -404,6 +630,39 @@ public class BobberController : MonoBehaviour
         Vector3 returnDir = -offset / dist;
         float overshoot = dist - tetherRadius;
         rb.AddForce(returnDir * tetherReturnForce * overshoot, ForceMode.Acceleration);
+    }
+
+    // Rolled once per struggle burst: occasionally the hooked fish leaps clean out of the
+    // water. Only the heavy in-water damping comes off so the launch velocity carries up
+    // cleanly — buoyancy is deliberately left targeting the bite depth (NOT the surface), so
+    // it adds no upward boost and the breach height is governed solely by jumpUpSpeed. (Aiming
+    // buoyancy at the surface here was what sent the fish way too high.) The trigger exit/enter
+    // pair handles the splash, and OnHookedFishJumpChanged lets the rope go slack mid-air.
+    private void TryFightJump()
+    {
+        if (jumpActive || fightJumpChance <= 0f || hookedFish == null) return;
+        if (rb == null || rb.isKinematic) return;
+        if (Time.time < nextJumpAllowedTime) return;
+        if (Random.value > fightJumpChance) return;
+
+        jumpActive = true;
+        jumpStartTime = Time.time;
+        nextJumpAllowedTime = Time.time + jumpCooldown;
+
+        rb.linearDamping = initialLinearDamping;
+
+        Vector3 horizontal = struggleDirection * jumpForwardSpeed;
+        rb.linearVelocity = new Vector3(horizontal.x, jumpUpSpeed, horizontal.z);
+
+        SpawnEffect(strugglePrefab, struggleLifetime);
+        FishingEvents.OnHookedFishJumpChanged?.Invoke(true);
+    }
+
+    private void EndFightJump()
+    {
+        if (!jumpActive) return;
+        jumpActive = false;
+        FishingEvents.OnHookedFishJumpChanged?.Invoke(false);
     }
 
     private void StartNewStruggleBurst(Vector3 perpendicular)
@@ -452,9 +711,15 @@ public class BobberController : MonoBehaviour
 
         hookedFish = new CaughtFish(fishPreset);
         Debug.Log($"{hookedFish.GetDisplayName()} is on the line!");
+
+        // From the bite onward the line holds a fish, not a float: the bobber/lure stops
+        // rendering and the hooked silhouette (chain + sway) thrashes at the hook point.
+        AttachHookedFishVisual();
+
         FishingEvents.OnFishBite?.Invoke(this);
 
         struggleAnchor = transform.position;
+        initialStruggleAnchor = struggleAnchor;
         hasStruggleAnchor = true;
 
         SpawnEffect(bitePrefab, biteLifetime);
@@ -485,18 +750,48 @@ public class BobberController : MonoBehaviour
 
     public void SwapBobberForFishModel()
     {
-        if (hookedFish != null && activeFishModel == null)
-        {
-            if (bobberVisuals != null) bobberVisuals.SetActive(false);
+        if (hookedFish == null) return;
 
-            if (hookedFish.preset.fishPrefab != null)
+        // The hooked visual normally attaches at the bite (HookFish); this is a safety net
+        // for any path that reaches the reel-in without it, and keeps the OnFishHooked
+        // event timing unchanged for listeners.
+        AttachHookedFishVisual();
+        FishingEvents.OnFishHooked?.Invoke(hookedFish);
+    }
+
+    // The fish got away (missed hook window or lost fight): hand the hooked visual its
+    // freedom so it swims off and fades instead of vanishing with the destroyed bobber.
+    public void ReleaseHookedFishToEscape()
+    {
+        if (activeFishModel == null) return;
+        HookedFishController hooked = activeFishModel.GetComponent<HookedFishController>();
+        if (hooked != null) hooked.BeginEscape();
+        activeFishModel = null;
+        if (bobberVisuals != null) bobberVisuals.SetActive(true);
+    }
+
+    // Hides the bobber/lure visuals and spawns the chain+sway hooked fish with its mouth
+    // pinned to the hook point. Registered as activeFishModel so the existing reset path
+    // (restore visuals, destroy model) cleans it up on catch, escape and cancel alike.
+    private void AttachHookedFishVisual()
+    {
+        if (activeFishModel != null || hookedFish == null) return;
+
+        if (bobberVisuals != null) bobberVisuals.SetActive(false);
+
+        Material mat = hookedFishSilhouetteMaterial;
+        if (mat == null)
+        {
+            if (sharedHookedSilhouette == null)
             {
-                activeFishModel = Instantiate(hookedFish.preset.fishPrefab, this.transform);
-                activeFishModel.transform.localPosition = Vector3.zero;
-                activeFishModel.transform.localRotation = Quaternion.identity;
+                Shader swayShader = Shader.Find("FishOWisp/Fish Silhouette Sway");
+                if (swayShader != null)
+                    sharedHookedSilhouette = new Material(swayShader) { name = "HookedFishSilhouette (runtime)" };
             }
-            FishingEvents.OnFishHooked?.Invoke(hookedFish);
+            mat = sharedHookedSilhouette;
         }
+
+        activeFishModel = HookedFishController.Attach(this, hookedFish.preset, mat).gameObject;
     }
 
     // ------------------------------------------------------------------------
@@ -557,7 +852,11 @@ public class BobberController : MonoBehaviour
         CancelNibbleSequence();
         StopAllCoroutines();
 
+        // If the fight ended mid-leap, tell the rope the fish is down so it doesn't stay slack.
+        EndFightJump();
+
         isInWater = false;
+        waterVolumes.Clear();
         isInFlight = false;
         isSubmerged = false;
         hasSplashed = false;
@@ -566,6 +865,9 @@ public class BobberController : MonoBehaviour
         isStruggling = false;
         hasStruggleAnchor = false;
         hookedFish = null;
+        isGrabTowed = false;
+        lureVisualPitchDeg = 0f;
+        lureBobOffset = 0f;
 
         if (activeFishModel != null)
         {

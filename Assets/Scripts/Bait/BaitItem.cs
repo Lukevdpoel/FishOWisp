@@ -16,4 +16,7 @@ public class BaitItem : ScriptableObject
 
     [Tooltip("If true, this bait is treated as infinite: it can never be bought, dropped, or consumed, and is always equipped at full stock.")]
     public bool isAlwaysAvailable;
+
+    [Tooltip("Master switch: untick to shelve this bait for now — vendors stop selling it and it disappears from the bait bar.")]
+    public bool isAvailable = true;
 }

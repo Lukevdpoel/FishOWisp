@@ -15,6 +15,16 @@ public class BaitInventory : GenericSingleton<BaitInventory>
     [Tooltip("The bait currently equipped on the hook. Null = no bait selected.")]
     [SerializeField] private BaitItem selectedBait;
 
+    [Tooltip("Bait granted automatically on a fresh save (no bait.json yet) so a new player starts stocked.")]
+    [SerializeField] private List<StartingBait> startingBaits = new List<StartingBait>();
+
+    [Serializable]
+    public class StartingBait
+    {
+        public BaitItem bait;
+        [Min(1)] public int count = 5;
+    }
+
     public BaitItem SelectedBait => selectedBait;
 
     public event Action OnBaitChanged;
@@ -45,8 +55,22 @@ public class BaitInventory : GenericSingleton<BaitInventory>
 
     private void Start()
     {
-        LoadBait();
+        if (!LoadBait()) GrantStartingBaits();
         OnBaitChanged?.Invoke();
+    }
+
+    // Fresh save: stock the configured starting bait so the player can fish right away.
+    private void GrantStartingBaits()
+    {
+        bool granted = false;
+        foreach (StartingBait grant in startingBaits)
+        {
+            if (grant == null || grant.bait == null || grant.count <= 0) continue;
+            if (grant.bait.isAlwaysAvailable || string.IsNullOrEmpty(grant.bait.id)) continue;
+            counts[grant.bait.id] = grant.count;
+            granted = true;
+        }
+        if (granted) SaveBait();
     }
 
     public int GetCount(BaitItem bait)
@@ -127,15 +151,17 @@ public class BaitInventory : GenericSingleton<BaitInventory>
         File.WriteAllText(SavePath, JsonUtility.ToJson(data, true));
     }
 
-    private void LoadBait()
+    // Returns true when a save file existed (even an empty/corrupt one — the player has
+    // history, so the fresh-save starting grant must not re-stock them).
+    private bool LoadBait()
     {
         counts.Clear();
-        if (!File.Exists(SavePath)) return;
+        if (!File.Exists(SavePath)) return false;
 
         try
         {
             BaitSaveData data = JsonUtility.FromJson<BaitSaveData>(File.ReadAllText(SavePath));
-            if (data?.entries == null) return;
+            if (data?.entries == null) return true;
             foreach (BaitSaveEntry e in data.entries)
             {
                 if (!string.IsNullOrEmpty(e.id) && e.count > 0)
@@ -146,6 +172,7 @@ public class BaitInventory : GenericSingleton<BaitInventory>
         {
             Debug.LogWarning($"[BaitInventory] Failed to load: {e.Message}");
         }
+        return true;
     }
 
     [Serializable]

@@ -266,7 +266,7 @@ public class BaitShopUI : MonoBehaviour
             for (int i = 0; i < activeVendor.baitOffers.Count; i++)
             {
                 FishVendor.BaitOffer o = activeVendor.baitOffers[i];
-                if (o != null && o.bait != null && !o.bait.isAlwaysAvailable) sellableCount++;
+                if (o != null && o.bait != null && !o.bait.isAlwaysAvailable && o.bait.isAvailable) sellableCount++;
             }
         }
         if (sellableCount > 0)
@@ -412,6 +412,7 @@ public class BaitShopUI : MonoBehaviour
             FishVendor.BaitOffer offer = activeVendor.baitOffers[i];
             if (offer == null || offer.bait == null) continue;
             if (offer.bait.isAlwaysAvailable) continue; // Always-available bait is never sold.
+            if (!offer.bait.isAvailable) continue;      // Shelved bait stays off the shelf.
             BaitCellUI cell = CreateBaitCell(stripRect, offer, activeVendor.baitStackSize, displayIndex);
             baitCells.Add(cell);
             displayIndex++;
@@ -490,6 +491,8 @@ public class BaitShopUI : MonoBehaviour
         buyLabel.alignment = TextAlignmentOptions.Center;
         buyLabel.color = Color.white;
         buyLabel.raycastTarget = false;
+
+        ItemHoverTooltip.Attach(cellObj, baitName, offer.bait.description);
 
         BaitCellUI cell = new BaitCellUI
         {

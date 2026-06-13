@@ -86,6 +86,11 @@ public class NotebookPageFlipper : MonoBehaviour
     void Awake()
     {
         mpb = new MaterialPropertyBlock();
+
+        // Flips only happen while the notebook is open, and the open notebook sets
+        // Time.timeScale to 0 — the flip animation must run on unscaled time or the
+        // page mesh freezes mid-air while the realtime waits below keep counting.
+        if (flipAnimator != null) flipAnimator.updateMode = AnimatorUpdateMode.UnscaledTime;
     }
 
     void Start()
@@ -96,14 +101,22 @@ public class NotebookPageFlipper : MonoBehaviour
 
     void Update()
     {
-        if (!useKeyboard) return;
         if (noteMenu == null || !noteMenu.IsNoteOpen) return;
-        if (Keyboard.current == null) return;
 
-        bool next = Keyboard.current.rightArrowKey.wasPressedThisFrame
-                 || Keyboard.current.eKey.wasPressedThisFrame;
-        bool prev = Keyboard.current.leftArrowKey.wasPressedThisFrame
-                 || Keyboard.current.qKey.wasPressedThisFrame;
+        bool next = false;
+        bool prev = false;
+
+        if (useKeyboard && Keyboard.current != null)
+        {
+            next = Keyboard.current.rightArrowKey.wasPressedThisFrame
+                || Keyboard.current.eKey.wasPressedThisFrame;
+            prev = Keyboard.current.leftArrowKey.wasPressedThisFrame
+                || Keyboard.current.qKey.wasPressedThisFrame;
+        }
+
+        // RB flips forward, LB flips backward while the notebook is open.
+        next |= GamepadInput.PageNextPressed;
+        prev |= GamepadInput.PagePrevPressed;
 
         if (next) FlipNext();
         else if (prev) FlipPrev();

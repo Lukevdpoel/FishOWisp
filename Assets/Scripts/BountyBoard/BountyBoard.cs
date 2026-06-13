@@ -54,14 +54,15 @@ public class BountyBoard : MonoBehaviour
         }
         // ----------------------------------------------
 
-        if (playerInZone && !isViewingBoard && Input.GetKeyDown(KeyCode.E))
+        if (playerInZone && !isViewingBoard && (Input.GetKeyDown(KeyCode.E) || GamepadInput.InteractPressed))
         {
             OpenBoard();
         }
         else if (isViewingBoard)
         {
-            // Exit on E, Escape, or Right Click
-            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.E) || Input.GetMouseButtonDown(1))
+            // Exit on E, Escape, Right Click, or gamepad A/B
+            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.E) || Input.GetMouseButtonDown(1)
+                || GamepadInput.InteractPressed || GamepadInput.CancelPressed)
             {
                 CloseBoard();
             }

@@ -46,6 +46,7 @@ public class FishingLine : MonoBehaviour
 
     private VerletRope verletRope;
     private BobberController activeBobber;
+    private Rigidbody activeBobberRb;
     private Rigidbody anchorRigidbody;
     private Transform anchorTransform;
     private ConfigurableJoint activeJoint;
@@ -149,6 +150,7 @@ public class FishingLine : MonoBehaviour
         {
             Destroy(activeBobber.gameObject);
             activeBobber = null;
+            activeBobberRb = null;
             activeJoint = null;
         }
 
@@ -180,6 +182,7 @@ public class FishingLine : MonoBehaviour
             activeBobber = null;
             return;
         }
+        activeBobberRb = rb;
 
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
@@ -211,7 +214,7 @@ public class FishingLine : MonoBehaviour
         if (!isDangling || activeBobber == null || anchorRigidbody == null) return;
         if (dangleOrientStrength <= 0f) return;
 
-        Rigidbody bobberRb = activeBobber.GetComponent<Rigidbody>();
+        Rigidbody bobberRb = activeBobberRb;
         if (bobberRb == null || bobberRb.isKinematic) return;
 
         Transform attach = activeBobber.LineAttachPoint;
@@ -300,7 +303,7 @@ public class FishingLine : MonoBehaviour
             return;
         }
 
-        Rigidbody rb = activeBobber.GetComponent<Rigidbody>();
+        Rigidbody rb = activeBobberRb;
         if (rb == null) return;
 
         Transform spawnOrigin = stableThrowOrigin != null ? stableThrowOrigin : rodTip;
@@ -337,16 +340,16 @@ public class FishingLine : MonoBehaviour
 
         ApplyLinearLimit(dangleLength);
 
-        Rigidbody rb = activeBobber.GetComponent<Rigidbody>();
+        Rigidbody rb = activeBobberRb;
         if (rb != null)
         {
             // Kinematic-teleport-untoggle so the position move is clean and the joint solver picks
             // up the new state on the next FixedUpdate without fighting a stale dynamic position.
+            // Velocities are zeroed only after going dynamic again — Unity 6 warns when you set
+            // angularVelocity on a kinematic body.
             rb.isKinematic = true;
             rb.position = anchorTransform.position;
             rb.rotation = Quaternion.identity;
-            rb.linearVelocity = Vector3.zero;
-            rb.angularVelocity = Vector3.zero;
             Physics.SyncTransforms();
             rb.isKinematic = false;
             rb.linearVelocity = Vector3.zero;

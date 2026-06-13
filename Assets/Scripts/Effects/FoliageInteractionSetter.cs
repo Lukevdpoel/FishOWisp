@@ -21,12 +21,39 @@ public class FoliageInteractionSetter : MonoBehaviour
     private static readonly int BendStrengthID = Shader.PropertyToID("_PlayerBendStrength");
     private static readonly int FlattenStrengthID = Shader.PropertyToID("_FlattenStrength");
 
+    // Squared distance threshold below which the player is considered "not moved enough"
+    // to bother repushing globals. 1mm² in world units.
+    private const float MoveEpsilonSqr = 0.000001f;
+
+    private Vector3 lastWrittenPos;
+    private float lastWrittenRadius;
+    private float lastWrittenBend;
+    private float lastWrittenFlatten;
+    private bool hasWritten;
+
     void Update()
     {
-        Shader.SetGlobalVector(PlayerPosID, transform.position);
+        Vector3 pos = transform.position;
+
+        if (hasWritten
+            && (pos - lastWrittenPos).sqrMagnitude < MoveEpsilonSqr
+            && lastWrittenRadius == interactionRadius
+            && lastWrittenBend == bendStrength
+            && lastWrittenFlatten == flattenStrength)
+        {
+            return;
+        }
+
+        Shader.SetGlobalVector(PlayerPosID, pos);
         Shader.SetGlobalFloat(InteractionRadiusID, interactionRadius);
         Shader.SetGlobalFloat(BendStrengthID, bendStrength);
         Shader.SetGlobalFloat(FlattenStrengthID, flattenStrength);
+
+        lastWrittenPos = pos;
+        lastWrittenRadius = interactionRadius;
+        lastWrittenBend = bendStrength;
+        lastWrittenFlatten = flattenStrength;
+        hasWritten = true;
     }
 
     void OnDrawGizmosSelected()

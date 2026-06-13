@@ -97,7 +97,7 @@ public class SimpleSmash : MonoBehaviour
         UpdatePointer();
 
         // 5. Input
-        if (Input.GetKeyDown(KeyCode.E) && currentBestPot != null)
+        if ((Input.GetKeyDown(KeyCode.E) || GamepadInput.InteractPressed) && currentBestPot != null)
         {
             potsInRange.Remove(currentBestPot);
             StartCoroutine(PerformSmashSequence(currentBestPot));

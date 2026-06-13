@@ -8,12 +8,23 @@ public class LoopAnimationWithRandomDelay : MonoBehaviour
     public float minDelay = 1f;           // Minimum delay between animations
     public float maxDelay = 5f;           // Maximum delay between animations
 
+    private Coroutine loopRoutine;
+
     void Start()
     {
         if (animator == null)
             animator = GetComponent<Animator>();
 
-        StartCoroutine(PlayAnimationLoop());
+        loopRoutine = StartCoroutine(PlayAnimationLoop());
+    }
+
+    void OnDestroy()
+    {
+        if (loopRoutine != null)
+        {
+            StopCoroutine(loopRoutine);
+            loopRoutine = null;
+        }
     }
 
     IEnumerator PlayAnimationLoop()

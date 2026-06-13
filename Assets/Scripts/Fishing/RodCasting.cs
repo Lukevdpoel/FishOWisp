@@ -30,6 +30,8 @@ public class RodCasting : MonoBehaviour
     public float aimConeAngle = 45f;
     [Tooltip("How sensitive the aiming is to horizontal mouse movement.")]
     public float aimSensitivity = 2f;
+    [Tooltip("Degrees per second the aim swings at full right-stick deflection.")]
+    public float gamepadAimSpeed = 90f;
     [Tooltip("How smoothly the aim follows the mouse.")]
     public float aimSmoothing = 10f;
     [Tooltip("How fast the player model rotates to face the aim direction.")]
@@ -39,6 +41,9 @@ public class RodCasting : MonoBehaviour
     private Vector3 throwDirection;
     private Vector3 targetAimDirection;
     private bool isCharging = false;
+    // Latched at BeginCharging so a mid-charge device switch can't change how the force builds:
+    // gamepad charges scale force by trigger pressure, keyboard charges ramp it over time.
+    private bool chargingWithGamepad;
     private Camera mainCamera;
 
     private CastingTargetController activeCastingTarget;
@@ -89,6 +94,7 @@ public class RodCasting : MonoBehaviour
     private void BeginCharging()
     {
         isCharging = true;
+        chargingWithGamepad = GamepadInput.IsGamepadActive;
         currentThrowForce = minThrowForce;
 
         targetAimDirection = mainCamera.transform.forward;
@@ -117,8 +123,21 @@ public class RodCasting : MonoBehaviour
 
     private void ChargeThrow()
     {
-        currentThrowForce += chargeRate * Time.deltaTime;
-        if (currentThrowForce > maxThrowForce) currentThrowForce = maxThrowForce;
+        if (chargingWithGamepad)
+        {
+            // Pressure-driven, live: the force tracks the trigger pull every frame — up AND down
+            // — so the player dials distance in by how hard they hold RT. Press A while still
+            // holding to cast at this value (FishingRodController); letting the trigger go fully
+            // cancels the charge. Because A commits with the trigger still down, there's no
+            // spring-back to bleed the force, so the live value is exactly what gets thrown.
+            float t = Mathf.InverseLerp(GamepadInput.TriggerPressPoint, 1f, GamepadInput.ThrowChargeAnalog);
+            currentThrowForce = Mathf.Lerp(minThrowForce, maxThrowForce, t);
+        }
+        else
+        {
+            currentThrowForce += chargeRate * Time.deltaTime;
+            if (currentThrowForce > maxThrowForce) currentThrowForce = maxThrowForce;
+        }
 
         FishingEvents.OnUpdateChargeUI?.Invoke(currentThrowForce, maxThrowForce);
 
@@ -155,8 +174,9 @@ public class RodCasting : MonoBehaviour
 
     private void UpdateAimAndRotation()
     {
-        float mouseX = Input.GetAxis("Mouse X") * aimSensitivity;
-        Quaternion rotation = Quaternion.AngleAxis(mouseX, Vector3.up);
+        float aimDelta = Input.GetAxis("Mouse X") * aimSensitivity
+                       + GamepadInput.Look.x * gamepadAimSpeed * Time.deltaTime;
+        Quaternion rotation = Quaternion.AngleAxis(aimDelta, Vector3.up);
         targetAimDirection = rotation * targetAimDirection;
 
         Vector3 coneCenter = mainCamera.transform.forward;

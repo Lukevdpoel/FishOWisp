@@ -36,6 +36,59 @@ public class BaitBarUI : MonoBehaviour
     private bool lastVisibleState = true;
     private bool isFishingActive;
 
+    // --- Gamepad focus (driven by InventoryUI's D-pad navigation) ---
+    // How strongly the focused slot's background is pushed toward white.
+    private const float GamepadFocusTint = 0.45f;
+    private int gamepadFocusIndex = -1;
+
+    public int SlotCount => slots.Count;
+
+    /// <summary>Give this bar the D-pad focus. Lands on the equipped bait if there is one.</summary>
+    public void FocusGamepad()
+    {
+        if (slots.Count == 0) return;
+        if (gamepadFocusIndex < 0 || gamepadFocusIndex >= slots.Count)
+        {
+            int equipped = IndexOfSelected();
+            gamepadFocusIndex = equipped >= 0 ? equipped : 0;
+        }
+        RefreshVisuals();
+    }
+
+    public void MoveGamepadFocus(int delta)
+    {
+        if (slots.Count == 0) return;
+        if (gamepadFocusIndex < 0) gamepadFocusIndex = delta > 0 ? 0 : slots.Count - 1;
+        else gamepadFocusIndex = ((gamepadFocusIndex + delta) % slots.Count + slots.Count) % slots.Count;
+        RefreshVisuals();
+    }
+
+    public void ClearGamepadFocus()
+    {
+        if (gamepadFocusIndex == -1) return;
+        gamepadFocusIndex = -1;
+        RefreshVisuals();
+    }
+
+    /// <summary>A-button press: same path as clicking the focused slot.</summary>
+    public void ActivateGamepadFocus()
+    {
+        if (gamepadFocusIndex < 0 || gamepadFocusIndex >= slots.Count) return;
+        HandleClick(slots[gamepadFocusIndex]);
+    }
+
+    private int IndexOfSelected()
+    {
+        if (BaitInventory.Instance == null) return -1;
+        BaitItem selected = BaitInventory.Instance.SelectedBait;
+        if (selected == null) return -1;
+        for (int i = 0; i < slots.Count; i++)
+        {
+            if (slots[i] != null && slots[i].bait == selected) return i;
+        }
+        return -1;
+    }
+
     private class Slot
     {
         public BaitItem bait;
@@ -169,15 +222,21 @@ public class BaitBarUI : MonoBehaviour
         IReadOnlyList<BaitItem> registered = BaitInventory.Instance.RegisteredBaits;
         if (registered == null || registered.Count == 0) return;
 
-        float totalWidth = registered.Count * slotSize.x + Mathf.Max(0, registered.Count - 1) * slotSpacing;
-        float startX = -totalWidth * 0.5f + slotSize.x * 0.5f;
-
+        // Shelved bait (isAvailable off) stays out of the bar entirely; filtering first keeps
+        // the remaining slots centered with no gaps.
+        List<BaitItem> shown = new List<BaitItem>();
         for (int i = 0; i < registered.Count; i++)
         {
-            BaitItem bait = registered[i];
-            if (bait == null) continue;
+            if (registered[i] != null && registered[i].isAvailable) shown.Add(registered[i]);
+        }
+        if (shown.Count == 0) return;
 
-            Slot s = CreateSlot(bait);
+        float totalWidth = shown.Count * slotSize.x + Mathf.Max(0, shown.Count - 1) * slotSpacing;
+        float startX = -totalWidth * 0.5f + slotSize.x * 0.5f;
+
+        for (int i = 0; i < shown.Count; i++)
+        {
+            Slot s = CreateSlot(shown[i]);
             float x = startX + i * (slotSize.x + slotSpacing);
             ((RectTransform)s.button.transform).anchoredPosition = new Vector2(x, 0f);
             slots.Add(s);
@@ -234,6 +293,10 @@ public class BaitBarUI : MonoBehaviour
         countText.raycastTarget = false;
         countText.text = "0";
 
+        ItemHoverTooltip.Attach(slotObj,
+            string.IsNullOrEmpty(bait.displayName) ? bait.name : bait.displayName,
+            bait.description);
+
         Slot slot = new Slot
         {
             bait = bait,
@@ -250,6 +313,7 @@ public class BaitBarUI : MonoBehaviour
     {
         if (slot == null || slot.bait == null || BaitInventory.Instance == null) return;
         if (isFishingActive) return; // No swapping bait while the bobber is in the water.
+        if (BobberInventory.IsLureEquipped) return; // Lures don't use bait — block equip to make that obvious.
 
         BaitInventory inv = BaitInventory.Instance;
         bool isAlreadySelected = inv.SelectedBait == slot.bait;
@@ -300,6 +364,11 @@ public class BaitBarUI : MonoBehaviour
             {
                 s.background.color = slotBackgroundColor;
                 s.icon.color = iconTint;
+            }
+
+            if (i == gamepadFocusIndex)
+            {
+                s.background.color = Color.Lerp(s.background.color, Color.white, GamepadFocusTint);
             }
         }
     }

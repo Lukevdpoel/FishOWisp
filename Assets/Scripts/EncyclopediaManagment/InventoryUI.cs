@@ -8,6 +8,23 @@ public class InventoryUI : MonoBehaviour
 {
     public static bool IsInventoryOpen { get; private set; }
 
+    // Self-registering static instance. Set in Awake, cleared in OnDestroy. Lets other
+    // systems (FishingRodController, PauseMenu, FishVendor, BaitShopUI) reach the
+    // inventory without ever calling FindFirstObjectByType — which was returning null
+    // intermittently for the bait-missing prompt at cast time, even with include-inactive.
+    public static InventoryUI Instance { get; private set; }
+
+    // Reset statics at the start of every play session, before any Awake fires.
+    // Required when "Reload Domain" is disabled in Enter Play Mode Settings — without
+    // this, Instance keeps pointing at a destroyed object from the previous play and
+    // IsInventoryOpen lies. Symptom: "everything works once per play session, then breaks."
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        Instance = null;
+        IsInventoryOpen = false;
+    }
+
     [Header("Keybindings")]
     public KeyCode toggleKey = KeyCode.B;
 
@@ -80,11 +97,23 @@ public class InventoryUI : MonoBehaviour
     private GameObject currentDraggedModel;
     private CaughtFish currentDraggedFishData;
 
+    // For closing the notebook when the inventory opens (mutual exclusion). Lives on the
+    // same GameObject in the PlayerMaster prefab; the scene-wide find is just a fallback.
+    private NoteMenu noteMenu;
+
     // Click-away-to-close support.
     private PointerEventData clickPointerData;
     private List<RaycastResult> clickRaycastResults;
     private BaitBarUI baitBar;
+    private BobberBarUI bobberBar;
     private int openedFrame = -1;
+
+    private void Awake()
+    {
+        // First-instance-wins. Duplicate inventories in additively-loaded scenes are kept
+        // alive but won't claim the static slot from the original.
+        if (Instance == null) Instance = this;
+    }
 
     private void Start()
     {
@@ -94,6 +123,10 @@ public class InventoryUI : MonoBehaviour
 
         clickRaycastResults = new List<RaycastResult>();
         baitBar = FindFirstObjectByType<BaitBarUI>();
+        bobberBar = FindFirstObjectByType<BobberBarUI>();
+
+        noteMenu = GetComponent<NoteMenu>();
+        if (noteMenu == null) noteMenu = FindFirstObjectByType<NoteMenu>(FindObjectsInactive.Include);
 
         if (PlayerInventory.Instance != null)
         {
@@ -116,6 +149,8 @@ public class InventoryUI : MonoBehaviour
     {
         IsInventoryOpen = false;
 
+        if (Instance == this) Instance = null;
+
         if (PlayerInventory.Instance != null)
         {
             PlayerInventory.Instance.OnInventoryChanged -= RefreshInventory;
@@ -129,9 +164,28 @@ public class InventoryUI : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(toggleKey))
+        // B / gamepad Back toggles the inventory. Pressing it over the open notebook is
+        // allowed: OpenInventory closes the notebook first (mutual exclusion).
+        if (Input.GetKeyDown(toggleKey) || GamepadInput.InventoryTogglePressed)
         {
             ToggleInventory();
+        }
+
+        // Gamepad B / Circle backs out of the inventory — and with it the vendor shop and
+        // bait bar, which only render while the inventory is open.
+        if (IsInventoryOpen && GamepadInput.CancelPressed)
+        {
+            CloseInventory();
+            return;
+        }
+
+        // Controller navigation while the inventory is open (and the notebook isn't —
+        // there the D-pad cycles encyclopedia fish instead): up/down hops between the
+        // fish row, the bobber/lure bar and the bait bar; left/right moves within a
+        // section; A selects. The bait bar is skipped while a lure is equipped.
+        if (IsInventoryOpen && !NoteMenu.IsNotebookOpen)
+        {
+            HandleGamepadNavigation();
         }
 
         // Click-away-to-close: a left click that lands outside the inventory panel
@@ -175,6 +229,9 @@ public class InventoryUI : MonoBehaviour
             if (baitBar != null && hit.IsChildOf(baitBar.transform))
                 return true;
 
+            if (bobberBar != null && hit.IsChildOf(bobberBar.transform))
+                return true;
+
             foreach (var root in additionalClickThroughRoots)
             {
                 if (root != null && hit.IsChildOf(root))
@@ -210,8 +267,9 @@ public class InventoryUI : MonoBehaviour
             Ray ray = ActiveCamera.ScreenPointToRay(Input.mousePosition);
             currentDraggedModel.transform.position = ray.GetPoint(modelDistance);
 
-            // 3. Rotation
-            currentDraggedModel.transform.Rotate(Vector3.up, 30f * Time.deltaTime);
+            // 3. Rotation — unscaled so the showcase spin keeps turning if the game
+            // is paused (e.g. dragging while the notebook holds Time.timeScale at 0).
+            currentDraggedModel.transform.Rotate(Vector3.up, 30f * Time.unscaledDeltaTime);
         }
     }
 
@@ -365,6 +423,133 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
+    // --- Controller navigation ---
+    // Sections in top-to-bottom screen order: the fish row (panel), the bobber/lure bar,
+    // and the bait bar stacked at the bottom. Up/down on the D-pad walks this order.
+    private enum PadSection { Fish, Bobber, Bait }
+    private PadSection padSection = PadSection.Fish;
+
+    // Index of the fish slot the D-pad currently has highlighted; -1 = nothing selected yet.
+    private int gamepadSelectedIndex = -1;
+
+    private void HandleGamepadNavigation()
+    {
+        if (GamepadInput.DpadRightPressed) MoveInSection(1);
+        else if (GamepadInput.DpadLeftPressed) MoveInSection(-1);
+        else if (GamepadInput.DpadDownPressed) MoveSection(1);
+        else if (GamepadInput.DpadUpPressed) MoveSection(-1);
+        else if (GamepadInput.ConfirmPressed) ActivateSection();
+    }
+
+    private bool SectionAvailable(PadSection section)
+    {
+        switch (section)
+        {
+            case PadSection.Fish: return spawnedSlots.Count > 0;
+            case PadSection.Bobber: return bobberBar != null && bobberBar.SlotCount > 0;
+            // "If I select bobber, I can select bait" — the bait bar is unreachable while
+            // a lure is equipped (lures don't take bait; BaitBarUI blocks the click too).
+            case PadSection.Bait:
+                return baitBar != null && baitBar.SlotCount > 0 && !BobberInventory.IsLureEquipped;
+        }
+        return false;
+    }
+
+    private void MoveSection(int dir)
+    {
+        PadSection target = padSection;
+        do
+        {
+            int next = (int)target + dir;
+            if (next < 0 || next > (int)PadSection.Bait) return; // no wrap — stay put at the ends
+            target = (PadSection)next;
+        } while (!SectionAvailable(target));
+
+        LeaveSection(padSection);
+        padSection = target;
+        EnterSection(target);
+    }
+
+    private void LeaveSection(PadSection section)
+    {
+        switch (section)
+        {
+            case PadSection.Fish:
+                if (gamepadSelectedIndex >= 0 && gamepadSelectedIndex < spawnedSlots.Count
+                    && spawnedSlots[gamepadSelectedIndex] != null)
+                {
+                    spawnedSlots[gamepadSelectedIndex].UnhighlightFromGamepad();
+                }
+                break;
+            case PadSection.Bobber: if (bobberBar != null) bobberBar.ClearGamepadFocus(); break;
+            case PadSection.Bait: if (baitBar != null) baitBar.ClearGamepadFocus(); break;
+        }
+    }
+
+    private void EnterSection(PadSection section)
+    {
+        switch (section)
+        {
+            case PadSection.Fish:
+                if (spawnedSlots.Count == 0) break;
+                if (gamepadSelectedIndex < 0 || gamepadSelectedIndex >= spawnedSlots.Count)
+                    gamepadSelectedIndex = 0;
+                if (spawnedSlots[gamepadSelectedIndex] != null)
+                    spawnedSlots[gamepadSelectedIndex].HighlightFromGamepad();
+                break;
+            case PadSection.Bobber: if (bobberBar != null) bobberBar.FocusGamepad(); break;
+            case PadSection.Bait: if (baitBar != null) baitBar.FocusGamepad(); break;
+        }
+    }
+
+    private void MoveInSection(int delta)
+    {
+        switch (padSection)
+        {
+            case PadSection.Fish: MoveGamepadSelection(delta); break;
+            case PadSection.Bobber: if (bobberBar != null) bobberBar.MoveGamepadFocus(delta); break;
+            case PadSection.Bait: if (baitBar != null) baitBar.MoveGamepadFocus(delta); break;
+        }
+    }
+
+    private void ActivateSection()
+    {
+        switch (padSection)
+        {
+            // Fish slots have no A-button action — fish actions are drag-and-drop (mouse).
+            case PadSection.Bobber: if (bobberBar != null) bobberBar.ActivateGamepadFocus(); break;
+            case PadSection.Bait: if (baitBar != null) baitBar.ActivateGamepadFocus(); break;
+        }
+    }
+
+    private void ResetGamepadNavigation()
+    {
+        if (bobberBar != null) bobberBar.ClearGamepadFocus();
+        if (baitBar != null) baitBar.ClearGamepadFocus();
+        padSection = PadSection.Fish;
+        gamepadSelectedIndex = -1;
+    }
+
+    private void MoveGamepadSelection(int delta)
+    {
+        if (spawnedSlots.Count == 0) return;
+
+        if (gamepadSelectedIndex >= 0 && gamepadSelectedIndex < spawnedSlots.Count
+            && spawnedSlots[gamepadSelectedIndex] != null)
+        {
+            spawnedSlots[gamepadSelectedIndex].UnhighlightFromGamepad();
+        }
+
+        // First press lands on an end of the row instead of skipping a slot.
+        if (gamepadSelectedIndex < 0)
+            gamepadSelectedIndex = delta > 0 ? 0 : spawnedSlots.Count - 1;
+        else
+            gamepadSelectedIndex = ((gamepadSelectedIndex + delta) % spawnedSlots.Count + spawnedSlots.Count) % spawnedSlots.Count;
+
+        InventorySlotUI slot = spawnedSlots[gamepadSelectedIndex];
+        if (slot != null) slot.HighlightFromGamepad();
+    }
+
     public void ToggleInventory()
     {
         if (IsInventoryOpen) CloseInventory();
@@ -373,6 +558,13 @@ public class InventoryUI : MonoBehaviour
 
     public void OpenInventory()
     {
+        // Mutually exclusive with the notebook — opening the inventory closes it through
+        // its normal close path, which restores time scale, the main camera and the cursor.
+        if (NoteMenu.IsNotebookOpen && noteMenu != null)
+        {
+            noteMenu.CloseNotebook();
+        }
+
         IsInventoryOpen = true;
         openedFrame = Time.frameCount;
         if (uiPanel != null) uiPanel.SetActive(true);
@@ -389,6 +581,7 @@ public class InventoryUI : MonoBehaviour
         IsInventoryOpen = false;
         if (uiPanel != null) uiPanel.SetActive(false);
         if (tooltip != null) tooltip.HideTooltip();
+        ResetGamepadNavigation();
 
         if (currentDraggedModel != null) Destroy(currentDraggedModel);
 
@@ -426,6 +619,8 @@ public class InventoryUI : MonoBehaviour
             if (slot != null) Destroy(slot.gameObject);
         }
         spawnedSlots.Clear();
+        // Slots were rebuilt — any D-pad selection now points at destroyed objects.
+        gamepadSelectedIndex = -1;
 
         if (PlayerInventory.Instance == null) return;
 

@@ -4774,7 +4774,7 @@ ParticleSystemRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 86703556735717939}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -4862,6 +4862,16 @@ MonoBehaviour:
   attractSpeed: 0.6
   scareSpeed: 4
   wanderRadius: 1.5
+  pauseDriftSpeed: 0.2
+  wanderTurnRate: 70
+  attractTurnRate: 160
+  strikeTurnRate: 400
+  scareTurnRate: 720
+  bodyStraightenRate: 2.5
+  wanderWeaveAmplitude: 0.82
+  wanderWeaveFrequency: 0.35
+  separationRadius: 0.8
+  separationStrength: 1.2
   naturalAttraction: 0.05
   naturalAttractionMinDist: 3.5
   weaveAmplitude: 4
@@ -4870,10 +4880,16 @@ MonoBehaviour:
   attractPauseMin: 0.2
   attractPauseMax: 0.5
   attractPauseChance: 0.3
-  loseInterestDelay: 3
-  loseInterestChancePerSec: 0.25
+  commitDistance: 3
+  commitWeaveDamping: 0.85
+  commitSpeedBoost: 0.6
   loseInterestDriftDistance: 3
   wakePrefab: {fileID: 86703556735717939, guid: f6979877153156a458266b7fffe64178, type: 3}
+  spawnWake: 0
+  modelDepth: 0.35
+  modelScale: 1
+  modelRotationOffset: {x: 0, y: 180, z: 0}
+  silhouetteMaterial: {fileID: 2100000, guid: 7e2d9c4f6b1a4358a9d0e3f5c8b7a624, type: 2}
   obstacleLayers:
     serializedVersion: 2
     m_Bits: 256
@@ -4883,6 +4899,10 @@ MonoBehaviour:
   bobberAvoidRadius: 3
   followerHoverDistance: 1.4
   actionRadius: 8
+  strikeSpeed: 3.5
+  strikeLeapRange: 0.9
+  strikeLeapHeight: 0.45
+  strikeLeapDuration: 0.4
   aimRevealRange: 20.04
   glimpseIntervalMin: 1.5
   glimpseIntervalMax: 4
@@ -4891,6 +4911,7 @@ MonoBehaviour:
   glimpseFadeIn: 0.35
   glimpseFadeOut: 0.6
   alwaysShowIndicator: 1
+  enableBaitIndicator: 0
   scareCooldown: 2
   wanderPauseMin: 0.5
   wanderPauseMax: 1

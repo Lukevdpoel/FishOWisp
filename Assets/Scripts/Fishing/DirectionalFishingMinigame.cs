@@ -9,6 +9,8 @@ public class DirectionalFishingMinigame : MonoBehaviour
     public float rodReturnSpeed = 1.5f;
     [Tooltip("Dead zone - rod direction magnitude must exceed this to count as pointing a direction.")]
     public float rodDeadZone = 0.15f;
+    [Tooltip("How fast (per second) the rod follows the left stick. The stick maps absolutely: full tilt = rod fully to that side.")]
+    public float gamepadRodFollowSpeed = 5f;
 
     [Header("Phase Settings")]
     public float struggleDuration = 5.0f;
@@ -111,7 +113,7 @@ public class DirectionalFishingMinigame : MonoBehaviour
 
         FishingEvents.OnRodDirectionUpdate?.Invoke(RodDirection);
 
-        IsReeling = Input.GetMouseButton(0);
+        IsReeling = Input.GetMouseButton(0) || GamepadInput.ReelHeld;
         if (IsReeling)
         {
             currentProgress += holdFillRate * Time.deltaTime;
@@ -142,12 +144,19 @@ public class DirectionalFishingMinigame : MonoBehaviour
     private void ProcessPlayerInput()
     {
         float mouseX = Input.GetAxis("Mouse X");
+        float stickX = GamepadInput.Move.x;
 
         // Accumulate mouse movement into rod direction
         RodDirection += mouseX * rodSensitivity;
 
-        // Drift back to center when mouse is idle
-        if (Mathf.Abs(mouseX) < 0.01f)
+        // Left stick maps absolutely — the rod chases the stick position. Movement is
+        // locked onto the fish during the fight, so the stick is free for the rod here.
+        if (Mathf.Abs(stickX) > 0.01f)
+        {
+            RodDirection = Mathf.MoveTowards(RodDirection, stickX, gamepadRodFollowSpeed * Time.deltaTime);
+        }
+        // Drift back to center when both devices are idle
+        else if (Mathf.Abs(mouseX) < 0.01f)
         {
             RodDirection = Mathf.MoveTowards(RodDirection, 0f, rodReturnSpeed * Time.deltaTime);
         }

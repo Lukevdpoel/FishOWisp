@@ -29,25 +29,96 @@ public class NoteMenu : MonoBehaviour
     private bool isNoteOpen = false;
     public bool IsNoteOpen => isNoteOpen;
 
+    // Static mirror of the open state so systems without a scene reference (PlayerController's
+    // cursor locking, FishingRodController's click handling, PlayerCameraController) can stand
+    // down while the notebook is open. The notebook also freezes Time.timeScale, but unscaled-
+    // time code (camera, input) still runs, so input must be gated explicitly, like InventoryUI.
+    public static bool IsNotebookOpen { get; private set; }
+
+    // Time.timeScale as it was when the notebook opened, restored on close. Saving instead of
+    // assuming 1 keeps us compatible with PauseMenu's 0.5 slow-mo Esc pause: opening the book
+    // over it and closing again lands back on 0.5, not full speed.
+    private float prevTimeScale = 1f;
+    private bool didPause = false;
+
+    // Reset statics before any Awake of a new play session — required with Reload Domain
+    // disabled, otherwise the flag survives into the next play (see InventoryUI.ResetStatics).
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        IsNotebookOpen = false;
+    }
+
+    private BackdropQuadFit backdropQuadFit;
+
     private string debugInfo = "NoteMenu: waiting...";
 
-    void Start()
+    void Awake()
     {
         isOpenAnimHash = Animator.StringToHash("IsOpen");
 
-        if (noteAnimator != null) noteAnimator.SetBool(isOpenAnimHash, false);
-
-        // EnterBackdrop assumes the BackdropCamera is off at rest. If a scene authored it as active
-        // (e.g. HUTBUILT did), it would render the captureRT quad over every other camera (depth 1,
-        // Depth-Only clear) and paint over things like the shop interior view. Enforce the invariant
-        // here so the rest of the codebase doesn't have to coordinate with the notebook.
-        if (backdropCamera != null)
+        if (noteAnimator != null)
         {
-            backdropCamera.enabled = false;
-            backdropCamera.gameObject.SetActive(false);
+            noteAnimator.SetBool(isOpenAnimHash, false);
+            // The book open/close animation must play while Time.timeScale is 0 —
+            // opening the notebook is what pauses the game in the first place.
+            noteAnimator.updateMode = AnimatorUpdateMode.UnscaledTime;
         }
 
-        debugInfo = "NoteMenu: Start() ran";
+        // Enforce the BackdropCamera-off invariant BEFORE the first frame renders.
+        // Doing this in Start() (which runs after the first rendering pass can begin)
+        // let the camera flash visible with stale captureRT content on some loads.
+        // Awake() runs before any rendering, eliminating the race.
+        EnforceBackdropOff();
+        ClearCaptureRT();
+
+        // Cache the quad-fit script so we can force a fit on the same frame we activate
+        // the backdrop camera — otherwise [ExecuteAlways] LateUpdate can lose the race
+        // against the very first render after activation.
+        if (backdropCamera != null)
+        {
+            backdropQuadFit = backdropCamera.GetComponentInChildren<BackdropQuadFit>(includeInactive: true);
+        }
+
+        debugInfo = "NoteMenu: Awake() ran";
+    }
+
+    void OnEnable()
+    {
+        // Defensive: scene additive loads or runtime re-enables of the notebook root
+        // shouldn't be able to leave the backdrop camera on.
+        EnforceBackdropOff();
+    }
+
+    void OnDestroy()
+    {
+        // Scene unload while open must not leave the static flag stuck, or the next scene's
+        // player would spawn with cursor/input gated forever.
+        if (isNoteOpen) IsNotebookOpen = false;
+
+        // Likewise it must not leave Time.timeScale frozen at 0 — timeScale survives
+        // scene loads, so the next scene would start completely paused.
+        if (didPause)
+        {
+            didPause = false;
+            Time.timeScale = prevTimeScale;
+        }
+    }
+
+    private void EnforceBackdropOff()
+    {
+        if (backdropCamera == null) return;
+        backdropCamera.enabled = false;
+        if (backdropCamera.gameObject.activeSelf) backdropCamera.gameObject.SetActive(false);
+    }
+
+    private void ClearCaptureRT()
+    {
+        if (captureRT == null) return;
+        RenderTexture prev = RenderTexture.active;
+        RenderTexture.active = captureRT;
+        GL.Clear(true, true, Color.clear);
+        RenderTexture.active = prev;
     }
 
     void Update()
@@ -57,7 +128,9 @@ public class NoteMenu : MonoBehaviour
         else
             debugInfo = "NoteMenu: Keyboard OK, isOpen=" + isNoteOpen + ", tab=" + Keyboard.current.tabKey.isPressed;
 
-        if (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
+        bool togglePressed = (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
+                          || GamepadInput.NotebookTogglePressed;
+        if (togglePressed)
         {
             if (isNoteOpen)
             {
@@ -67,35 +140,80 @@ public class NoteMenu : MonoBehaviour
             {
                 OpenNotebook();
             }
+            return;
+        }
+
+        // B / Circle backs out of the open notebook, matching the bounty board's cancel verb.
+        if (isNoteOpen && GamepadInput.CancelPressed)
+        {
+            CloseNotebook();
         }
     }
 
     void OpenNotebook()
     {
+        // The notebook and the inventory (with its bait bar) are mutually exclusive —
+        // opening one closes the other. Routing through CloseInventory keeps all its
+        // side effects (tooltip, dragged fish, vendor session, bait bar) consistent.
+        if (InventoryUI.IsInventoryOpen && InventoryUI.Instance != null)
+        {
+            InventoryUI.Instance.CloseInventory();
+        }
+
         isNoteOpen = true;
+        IsNotebookOpen = true;
 
-        EnterBackdrop();
-
+        // Open the UI first so the notebook always appears even if the backdrop step throws.
+        // Previously EnterBackdrop ran first and any exception (e.g. URP camera-stack hiccup,
+        // null mainCamera mid-scene-transition) would skip the animator/cursor/pause calls,
+        // making Tab "do nothing" intermittently.
         if (noteAnimator != null) noteAnimator.SetBool(isOpenAnimHash, true);
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
-        if (PauseManager.Instance != null)
-            PauseManager.Instance.SetPaused(true);
+        // Freeze the world for real. (The old PauseManager.Instance.SetPaused call silently
+        // no-opped — PauseManager exists in no scene — which is why gameplay kept advancing
+        // behind the backdrop snapshot.) Everything the notebook itself animates is unscaled:
+        // the book animator (set in Awake), the page-flip animator and its realtime waits,
+        // the Kuwahara fade, and the encyclopedia fish's FishDisplaySway — so the book and
+        // its fish stay alive while the world stops.
+        if (!didPause)
+        {
+            prevTimeScale = Time.timeScale;
+            didPause = true;
+        }
+        Time.timeScale = 0f;
+
+        try
+        {
+            EnterBackdrop();
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"NoteMenu: EnterBackdrop failed — notebook UI is still open but the world snapshot/blur is missing. {ex}");
+        }
     }
 
     public void CloseNotebook()
     {
         isNoteOpen = false;
+        IsNotebookOpen = false;
 
         if (noteAnimator != null) noteAnimator.SetBool(isOpenAnimHash, false);
 
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        // Don't steal the cursor back if another mouse-driven UI (inventory) is still open.
+        if (!InventoryUI.IsInventoryOpen)
+        {
+            Cursor.lockState = CursorLockMode.Locked;
+            Cursor.visible = false;
+        }
 
-        if (PauseManager.Instance != null)
-            PauseManager.Instance.SetPaused(false);
+        if (didPause)
+        {
+            didPause = false;
+            Time.timeScale = prevTimeScale;
+        }
 
         ExitBackdrop();
 
@@ -116,8 +234,6 @@ public class NoteMenu : MonoBehaviour
         if (backdropCamera == null) { Debug.LogWarning("NoteMenu: backdropCamera not assigned"); return; }
         if (captureRT == null)   { Debug.LogWarning("NoteMenu: captureRT not assigned"); return; }
 
-        Debug.Log($"NoteMenu: disabling main camera '{mainCamera.name}' for backdrop");
-
         // Snapshot the live frame into the RT before disabling the main camera.
         // cam.Render() is synchronous and independent of Time.timeScale.
         // Strip the UI layer AND temporarily clear the URP overlay stack so the
@@ -132,19 +248,33 @@ public class NoteMenu : MonoBehaviour
             camData.cameraStack.Clear();
         }
 
-        mainCamera.targetTexture = captureRT;
-        mainCamera.cullingMask = prevMask & ~(1 << LayerMask.NameToLayer("UI"));
-        mainCamera.Render();
-        mainCamera.cullingMask = prevMask;
-        mainCamera.targetTexture = prevTarget;
-
-        if (prevStack != null)
-            camData.cameraStack.AddRange(prevStack);
+        // Try/finally: if mainCamera.Render() throws, the targetTexture/cullingMask/cameraStack
+        // mutations below would otherwise leak and break ALL subsequent rendering until the
+        // scene reloads. The finally block guarantees we restore the main camera to a usable
+        // state even on failure.
+        try
+        {
+            mainCamera.targetTexture = captureRT;
+            mainCamera.cullingMask = prevMask & ~(1 << LayerMask.NameToLayer("UI"));
+            mainCamera.Render();
+        }
+        finally
+        {
+            mainCamera.cullingMask = prevMask;
+            mainCamera.targetTexture = prevTarget;
+            if (prevStack != null) camData.cameraStack.AddRange(prevStack);
+        }
 
         mainCamera.enabled = false;
         // Toggle the GameObject (not just the component) — the BackdropCamera is
         // disabled at the GameObject level in the scene so it costs nothing at rest.
         backdropCamera.gameObject.SetActive(true);
+
+        // Force-fit the quad NOW so the backdrop camera's first render after activation
+        // samples a correctly sized/positioned quad. The [ExecuteAlways] LateUpdate on
+        // BackdropQuadFit will keep it correct from this frame onward.
+        if (backdropQuadFit != null) backdropQuadFit.Fit();
+
         backdropCamera.enabled = true;
 
         if (backdropMaterial != null)

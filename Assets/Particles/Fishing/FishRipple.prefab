@@ -4765,7 +4765,7 @@ ParticleSystemRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1370866258836361411}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -4886,3 +4886,4 @@ MonoBehaviour:
   wanderPauseMin: 0.5
   wanderPauseMax: 1
   preset: {fileID: 0}
+  silhouetteMaterial: {fileID: 2100000, guid: 7e2d9c4f6b1a4358a9d0e3f5c8b7a624, type: 2}
