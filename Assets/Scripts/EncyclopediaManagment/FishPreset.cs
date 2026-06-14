@@ -35,6 +35,18 @@ public class FishPreset : ScriptableObject
              "Set 0 to fall back to the FishRipple prefab's actionRadius.")]
     public float awarenessRadius = 8f;
 
+    [Header("Predator")]
+    [Tooltip("Species this fish hunts. When prey of one of these species shares the water, this fish " +
+             "chases it down and scares it off. Leave empty for non-predators (most fish). " +
+             "Chase tuning (sight range, speed, etc.) lives on the FishRipple prefab.")]
+    public List<FishPreset> prey = new List<FishPreset>();
+
+    // A fish with anything in its prey list actively hunts; everyone else just wanders/schools.
+    public bool IsPredator => prey != null && prey.Count > 0;
+
+    // True when the given species is on this predator's menu.
+    public bool Hunts(FishPreset other) => other != null && prey != null && prey.Contains(other);
+
     [Header("Swim Animation")]
     [Tooltip("Tail-beat rate in beats/second while calmly swimming. Drives the procedural sway shader only — movement speed is unaffected.")]
     public float swimFrequency = 1.8f;

@@ -3,6 +3,12 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+    // Raised when ball-form visuals should hide (true — while morphing in / flying as the ball) or
+    // reappear (false — once the morph-out begins on the bounce). Lets systems that own runtime-
+    // spawned visuals (e.g. FishingLine's instantiated bobber + line) toggle themselves, since those
+    // can't be wired into hideRenderersDuringJump in the inspector.
+    // (System.Action qualified to avoid a using System that would make Random ambiguous below.)
+    public static event System.Action<bool> BallJumpVisibilityChanged;
     [Header("Object References")]
     [SerializeField] private Animator animator;
     [SerializeField] private Transform playerModel;
@@ -15,10 +21,6 @@ public class PlayerController : MonoBehaviour
     [Header("Movement Settings")]
     [SerializeField] private float walkSpeed = 6f;
     [SerializeField] private float sprintSpeed = 12f;
-    [Tooltip("Gamepad sprint latch threshold: one left-stick click latches sprint on, and it " +
-             "stays on while the stick stays deflected past this fraction. Ease off below it " +
-             "(or stop) and the latch drops. Keyboard sprint (Shift) is still hold-to-sprint.")]
-    [SerializeField, Range(0.1f, 1f)] private float sprintMaintainThreshold = 0.5f;
     [SerializeField] private float acceleration = 25f;
     [SerializeField] private float deceleration = 35f;
     [SerializeField] private float tapKickSpeed = 3f;
@@ -40,6 +42,14 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private AnimationCurve upwardByCharge = new AnimationCurve(new Keyframe(0f, 5f), new Keyframe(1f, 10f));
     [SerializeField, Range(0f, 1f)] private float bounceForwardMultiplier = 0.45f;
     [SerializeField, Range(0f, 1f)] private float bounceUpwardMultiplier = 0.5f;
+    [Tooltip("Horizontal accel (units/s²) applied toward the move input while airborne. Lets the " +
+             "player slightly curve the jump mid-flight; capped at the launch speed so it can't speed up. 0 = off.")]
+    [SerializeField] private float airSteerAccel = 6f;
+    [Tooltip("Velocity kept after ricocheting off a wall/obstacle mid-jump (1 = perfectly bouncy, 0 = dead stop).")]
+    [SerializeField, Range(0f, 1f)] private float wallBounceRestitution = 0.6f;
+    [Tooltip("A hit surface counts as a bounceable wall when its normal's Y is below this. Higher (flatter, " +
+             "floor-like) surfaces are left to the landing bounce instead. ~0.5 separates walls from ground.")]
+    [SerializeField, Range(0f, 1f)] private float wallBounceMaxSurfaceY = 0.5f;
 
     [Header("Squash & Stretch")]
     [SerializeField, Range(0.1f, 1f)] private float chargeMaxSquash = 0.55f;
@@ -57,10 +67,21 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private string ballTransitionInTrigger = "BallTransitionIn";
     [SerializeField] private string ballTransitionOutTrigger = "BallTransitionOut";
 
-    [Header("Airborne Tumble")]
-    [SerializeField] private float ballSpinDegPerUnitSpeed = 30f;
-    [SerializeField, Range(0f, 1f)] private float ballSpinAxisJitter = 0.35f;
-    [SerializeField, Range(0f, 0.5f)] private float ballSpinSpeedJitter = 0.2f;
+    [Header("Airborne Ball Tumble")]
+    // While launched in ball form the model tumbles around a random axis. We spin playerModel (the
+    // parent of normalMeshRoot, where the body Animator lives), so the rotation rides over the morph
+    // clips instead of fighting them. A fresh random axis/speed is rolled at each launch; the model
+    // rights itself back upright on the bounce + landing via HandleRotation.
+    [SerializeField] private bool enableBallTumble = true;
+    [SerializeField] private float ballTumbleMinSpeed = 220f; // deg/sec
+    [SerializeField] private float ballTumbleMaxSpeed = 540f; // deg/sec
+
+    [Header("Jump Hidden Renderers")]
+    [Tooltip("Optional persistent renderers switched off (renderer.enabled = false) while a charge " +
+             "jump is active and back on when it ends — for anything that shouldn't show in ball form. " +
+             "The runtime-spawned bobber + fishing line hide themselves via BallJumpVisibilityChanged, " +
+             "so they don't need to be listed here. GameObjects stay active; only rendering toggles.")]
+    [SerializeField] private Renderer[] hideRenderersDuringJump;
 
     [Header("Idle Animation")]
     [SerializeField] private string sitdownAnimTrigger = "Sitdown";
@@ -78,17 +99,18 @@ public class PlayerController : MonoBehaviour
 
     public bool IsSprinting => isSprinting;
 
+    // True only when the player is firmly on the ground and not in any phase of a charge jump.
+    // Actions that shouldn't begin in midair (e.g. casting the fishing rod) gate on this.
+    public bool IsGrounded =>
+        characterController != null
+        && characterController.isGrounded
+        && chargeJump.Phase == ChargeJumpController.JumpPhase.None;
+
     private CharacterController characterController;
     private Vector3 targetVelocity;
     private float idleTimer;
     private bool allowSitdown = true;
     private bool isSprinting = false;
-    // Gamepad sprint session: a left-stick click "arms" sprintLatched; it becomes sprintEngaged
-    // once the stick actually pushes past the maintain threshold, and the session ends (latch
-    // cleared) the moment an engaged sprint slows below that threshold — so it survives clicking
-    // L3 a hair before/after pushing the stick, but still needs a fresh click after you stop.
-    private bool sprintLatched = false;
-    private bool sprintEngaged = false;
     private bool hadMovementInputLast;
     private Quaternion targetModelRotation;
     private bool isLockedOnFish;
@@ -100,9 +122,19 @@ public class PlayerController : MonoBehaviour
     private int hashBallIn;
     private int hashBallOut;
 
-    private readonly PlayerAirborneTumble airborneTumble = new PlayerAirborneTumble();
     private readonly PlayerSquashStretch squashStretch = new PlayerSquashStretch();
     private readonly ChargeJumpController chargeJump = new ChargeJumpController();
+
+    // Random midair tumble state, re-seeded each launch (see TickBallTumbleReset).
+    private Vector3 ballTumbleAxis = Vector3.right;
+    private float ballTumbleSpeed;
+    private float ballTumbleAngle;
+    private bool ballTumbleSeeded;
+    private Vector3 ballRestLocalPos;
+    private Quaternion ballRestLocalRot = Quaternion.identity;
+    private Vector3 ballPivotRootLocal;   // ball-center spin pivot, stored in player-root local space
+    private Renderer[] bodyRenderers;
+    private bool jumpVisualsHidden;
 
     private Vector3 staticCameraOffset;
     private bool staticCameraOffsetCaptured;
@@ -118,10 +150,12 @@ public class PlayerController : MonoBehaviour
         characterController = GetComponent<CharacterController>();
         if (playerModel) targetModelRotation = playerModel.rotation;
 
-        airborneTumble.Init(normalMeshRoot);
         squashStretch.Init(playerModel, normalMeshRoot);
         chargeJump.Init(characterController, animator, hashBallIn, hashBallOut,
-                        airborneTumble, squashStretch, NotifyOfAction);
+                        squashStretch, NotifyOfAction);
+
+        // Cached for the in-air tumble's bounds-center pivot.
+        if (normalMeshRoot != null) bodyRenderers = normalMeshRoot.GetComponentsInChildren<Renderer>(true);
 
         if (cameraController != null) cameraController.Initialize(playerModel);
     }
@@ -139,6 +173,7 @@ public class PlayerController : MonoBehaviour
         }
 
         TickChargeJump();
+        UpdateJumpVisuals();
         HandleMovement();
         HandleRotation();
         HandleGravity();
@@ -160,9 +195,9 @@ public class PlayerController : MonoBehaviour
             chargeMaxSquash, scaleLerpSpeed,
             bounceImpactCurve, bounceImpactDuration);
 
-        bool isAirborneJump = chargeJump.Phase == ChargeJumpController.JumpPhase.Launched
-                           || chargeJump.Phase == ChargeJumpController.JumpPhase.Bounced;
-        airborneTumble.Tick(isAirborneJump, characterController != null && characterController.isGrounded);
+        // Snap the model to its rest pose (if tumbling) BEFORE the camera reads playerModel.position,
+        // so the camera follows the stable body point. The spin itself is applied after the camera.
+        bool tumbling = TickBallTumbleReset();
 
         HandleStaticCameraFollow();
 
@@ -181,6 +216,9 @@ public class PlayerController : MonoBehaviour
             };
             cameraController.UpdateCamera(input);
         }
+
+        // Apply the centered spin last — purely visual, so it never drags the camera pivot.
+        if (tumbling) ApplyBallTumbleSpin();
     }
 
     public void LockControls(bool locked)
@@ -233,6 +271,13 @@ public class PlayerController : MonoBehaviour
         staticCameraFollowsPlayer = followPlayer;
         staticCameraOffsetCaptured = false;
     }
+
+    // The transform of the camera the player controller drives — the one PlayerCameraController
+    // snaps back to after a UI panel releases the view. UI that temporarily hijacks Camera.main
+    // (e.g. the loadout framing camera) compares against this so it never grabs a fixed camera
+    // (like a shop interior view) that nothing would restore, leaving it stranded mid-zoom.
+    public Transform ActivePlayerCameraTransform =>
+        cameraController != null ? cameraController.CameraTransform : null;
 
     private bool staticCameraFollowsPlayer = true;
 
@@ -358,6 +403,9 @@ public class PlayerController : MonoBehaviour
         var jumpPhase = chargeJump.Phase;
         if (jumpPhase == ChargeJumpController.JumpPhase.Charging)
         {
+            // Locked in place while charging — bleed off any horizontal momentum. The player can
+            // still aim, though: HandleRotation steers the model from the move input, and the
+            // launch fires along the model's forward.
             Vector3 horiz = new Vector3(targetVelocity.x, 0f, targetVelocity.z);
             horiz = Vector3.MoveTowards(horiz, Vector3.zero, deceleration * Time.deltaTime);
             targetVelocity = new Vector3(horiz.x, yVelocity, horiz.z);
@@ -366,60 +414,21 @@ public class PlayerController : MonoBehaviour
 
         if (jumpPhase == ChargeJumpController.JumpPhase.Launched || jumpPhase == ChargeJumpController.JumpPhase.Bounced)
         {
-            // Trajectory locked once launched — gravity still applies via HandleGravity.
+            // Trajectory mostly locked once launched — gravity still applies via HandleGravity,
+            // and ChargeJumpController.Tick applies the slight air steering.
             return;
         }
 
-        bool inputDisabled = InventoryUI.IsInventoryOpen || NoteMenu.IsNotebookOpen || areControlsLocked || isLockedOnFish;
+        Vector3 moveDirection = GetMoveDirection(out float inputMagnitude);
+        bool hasMovementInput = inputMagnitude > 0.1f;
 
-        float h = inputDisabled ? 0f : Input.GetAxisRaw("Horizontal");
-        float v = inputDisabled ? 0f : Input.GetAxisRaw("Vertical");
+        // Sprint is hold-to-run on both devices: keep Shift (keyboard) or the bound pad
+        // control held to turn walking into running, release it to drop back to a walk.
+        // (No need to gate on inputDisabled — GetMoveDirection already zeroes input then.)
+        isSprinting = hasMovementInput
+                      && (Input.GetKey(KeyCode.LeftShift) || GamepadInput.SprintHeld);
 
-        // Keyboard wins when both devices are active; otherwise the left stick drives, and
-        // its deflection scales the target speed so small tilts walk slower than full tilt.
-        Vector2 moveInput = Vector2.ClampMagnitude(new Vector2(h, v), 1f);
-        if (!inputDisabled && moveInput.sqrMagnitude < 0.01f) moveInput = GamepadInput.Move;
-
-        bool hasMovementInput = moveInput.magnitude > 0.1f;
-
-        // Gamepad sprint is a latch: one left-stick click arms it, the stick crossing the
-        // maintain threshold engages the run, and slowing back below the threshold ends the
-        // session (needs another click to sprint again). No hold-to-sprint on the pad; keyboard
-        // Shift stays a plain hold.
-        if (inputDisabled)
-        {
-            sprintLatched = false;
-            sprintEngaged = false;
-        }
-        else
-        {
-            if (GamepadInput.SprintTogglePressed) { sprintLatched = true; sprintEngaged = false; }
-            if (sprintLatched)
-            {
-                if (moveInput.magnitude >= sprintMaintainThreshold) sprintEngaged = true;
-                else if (sprintEngaged) { sprintLatched = false; sprintEngaged = false; }
-            }
-        }
-
-        isSprinting = hasMovementInput && !inputDisabled
-                      && (Input.GetKey(KeyCode.LeftShift) || (sprintLatched && sprintEngaged));
-
-        float currentSpeed = (isSprinting ? sprintSpeed : walkSpeed) * Mathf.Clamp01(moveInput.magnitude);
-
-        Transform camTransform;
-        if (useStaticCamera && staticCameraTarget != null)
-            camTransform = staticCameraTarget;
-        else
-            camTransform = cameraController != null ? cameraController.CameraTransform : transform;
-        Vector3 camForward = camTransform.forward;
-        Vector3 camRight = camTransform.right;
-
-        camForward.y = 0f;
-        camRight.y = 0f;
-        camForward.Normalize();
-        camRight.Normalize();
-
-        Vector3 moveDirection = (camForward * moveInput.y + camRight * moveInput.x).normalized;
+        float currentSpeed = (isSprinting ? sprintSpeed : walkSpeed) * Mathf.Clamp01(inputMagnitude);
         Vector3 desiredHorizontal = moveDirection * currentSpeed;
 
         Vector3 currentHorizontal = new Vector3(targetVelocity.x, 0f, targetVelocity.z);
@@ -433,6 +442,42 @@ public class PlayerController : MonoBehaviour
         Vector3 newHorizontal = Vector3.MoveTowards(currentHorizontal, desiredHorizontal, rate * Time.deltaTime);
 
         targetVelocity = new Vector3(newHorizontal.x, yVelocity, newHorizontal.z);
+    }
+
+    // Camera-relative horizontal direction of the current move input, shared by walking, the
+    // charge-jump aim, and air steering. Returns Vector3.zero (and inputMagnitude 0) when input
+    // is disabled or there's no meaningful deflection. Keyboard wins when both devices are active;
+    // otherwise the left stick drives, and its deflection sets inputMagnitude so small tilts read
+    // as slower input than a full push.
+    private Vector3 GetMoveDirection(out float inputMagnitude)
+    {
+        inputMagnitude = 0f;
+
+        bool inputDisabled = InventoryUI.IsInventoryOpen || NoteMenu.IsNotebookOpen || areControlsLocked || isLockedOnFish;
+        if (inputDisabled) return Vector3.zero;
+
+        float h = Input.GetAxisRaw("Horizontal");
+        float v = Input.GetAxisRaw("Vertical");
+        Vector2 moveInput = Vector2.ClampMagnitude(new Vector2(h, v), 1f);
+        if (moveInput.sqrMagnitude < 0.01f) moveInput = GamepadInput.Move;
+
+        inputMagnitude = moveInput.magnitude;
+        if (inputMagnitude <= 0.1f) { inputMagnitude = 0f; return Vector3.zero; }
+
+        Transform camTransform;
+        if (useStaticCamera && staticCameraTarget != null)
+            camTransform = staticCameraTarget;
+        else
+            camTransform = cameraController != null ? cameraController.CameraTransform : transform;
+
+        Vector3 camForward = camTransform.forward;
+        Vector3 camRight = camTransform.right;
+        camForward.y = 0f;
+        camRight.y = 0f;
+        camForward.Normalize();
+        camRight.Normalize();
+
+        return (camForward * moveInput.y + camRight * moveInput.x).normalized;
     }
 
     public void SetFacing(Quaternion worldRotation)
@@ -450,11 +495,39 @@ public class PlayerController : MonoBehaviour
     {
         if (areControlsLocked) return;
 
-        if (chargeJump.Phase != ChargeJumpController.JumpPhase.None)
+        if (chargeJump.Phase == ChargeJumpController.JumpPhase.Charging)
         {
+            // While charging, the player is pinned in place but free to re-aim with the normal
+            // directional input. Face the input direction so the launch (which fires along the
+            // model's forward) goes where they point; hold the current aim when there's no input.
+            Vector3 aimDir = GetMoveDirection(out _);
+            if (aimDir.sqrMagnitude > 0.001f)
+                targetModelRotation = Quaternion.LookRotation(aimDir);
             playerModel.rotation = Quaternion.Slerp(playerModel.rotation, targetModelRotation, rotationSpeed * Time.deltaTime);
             return;
         }
+
+        if (chargeJump.Phase == ChargeJumpController.JumpPhase.Launched && enableBallTumble)
+        {
+            // Ball-form tumble is applied in LateUpdate (TickBallTumbleReset + ApplyBallTumbleSpin) —
+            // after squash/stretch and the Animator — so it spins about the mesh center without being
+            // overwritten, and around the camera read so the view stays stable.
+            return;
+        }
+
+        if (chargeJump.Phase != ChargeJumpController.JumpPhase.None)
+        {
+            // Bounced (or Launched with tumble off): ease back toward the travel heading so the
+            // un-balled character rights itself and lands on its feet rather than mid-tumble.
+            Vector3 horizVel = new Vector3(targetVelocity.x, 0f, targetVelocity.z);
+            if (horizVel.sqrMagnitude > 0.01f)
+                targetModelRotation = Quaternion.LookRotation(horizVel.normalized);
+            playerModel.rotation = Quaternion.Slerp(playerModel.rotation, targetModelRotation, rotationSpeed * Time.deltaTime);
+            return;
+        }
+
+        // Grounded / no jump: re-arm the tumble so the next launch rolls a fresh axis.
+        ballTumbleSeeded = false;
 
         if (isLockedOnFish && fishLockTarget != null)
         {
@@ -479,6 +552,79 @@ public class PlayerController : MonoBehaviour
         }
 
         playerModel.rotation = Quaternion.Slerp(playerModel.rotation, targetModelRotation, rotationSpeed * Time.deltaTime);
+    }
+
+    // Toggles the configured renderers off while a charge jump is active (ball form) and back on
+    // when it ends. Only flips on state change. GameObjects/physics stay untouched.
+    private void UpdateJumpVisuals()
+    {
+        // Hidden only while morphing into / flying as the ball (Charging + Launched). They reappear
+        // at the bounce (Bounced), where the morph-out animation plays — symmetric with the morph-in.
+        bool hide = chargeJump.Phase == ChargeJumpController.JumpPhase.Charging
+                 || chargeJump.Phase == ChargeJumpController.JumpPhase.Launched;
+        if (hide == jumpVisualsHidden) return;
+        jumpVisualsHidden = hide;
+
+        if (hideRenderersDuringJump != null)
+            foreach (var r in hideRenderersDuringJump)
+                if (r != null) r.enabled = !hide;
+
+        // Let runtime-spawned visuals (the instantiated bobber + line) hide themselves.
+        BallJumpVisibilityChanged?.Invoke(hide);
+    }
+
+    // First half of the in-air ball tumble, run BEFORE the camera in LateUpdate. Seeds a random
+    // axis/speed/pivot on the first launched frame, advances the spin angle, and snaps playerModel
+    // back to its rest pose. Resetting to rest here means the camera (which reads playerModel.position
+    // with no smoothing) follows a stable point; the actual spin is applied afterward in
+    // ApplyBallTumbleSpin. Returns true while a tumble is active this frame.
+    private bool TickBallTumbleReset()
+    {
+        if (playerModel == null) return false;
+        if (!enableBallTumble || chargeJump.Phase != ChargeJumpController.JumpPhase.Launched) return false;
+
+        if (!ballTumbleSeeded)
+        {
+            ballTumbleAxis = Random.onUnitSphere;
+            ballTumbleSpeed = Random.Range(ballTumbleMinSpeed, ballTumbleMaxSpeed);
+            ballTumbleAngle = 0f;
+            ballRestLocalPos = playerModel.localPosition;
+            ballRestLocalRot = playerModel.localRotation;
+            ballPivotRootLocal = transform.InverseTransformPoint(ComputeBallCenterWorld());
+            ballTumbleSeeded = true;
+        }
+
+        ballTumbleAngle += ballTumbleSpeed * Time.deltaTime;
+        playerModel.localPosition = ballRestLocalPos;
+        playerModel.localRotation = ballRestLocalRot;
+        return true;
+    }
+
+    // Second half, run AFTER the camera. Spins playerModel about the mesh's bounds-center pivot
+    // (which sits at the visual middle, unlike playerModel's own origin). Applying it post-camera
+    // keeps the orbit purely visual — the camera already framed the stable rest position.
+    private void ApplyBallTumbleSpin()
+    {
+        playerModel.RotateAround(transform.TransformPoint(ballPivotRootLocal), ballTumbleAxis, ballTumbleAngle);
+    }
+
+    // World-space point the ball spins about: the combined bounds center of the body mesh (its
+    // visual middle). Falls back to the model origin if no renderers were cached.
+    private Vector3 ComputeBallCenterWorld()
+    {
+        if (bodyRenderers == null || bodyRenderers.Length == 0) return playerModel.position;
+
+        bool has = false;
+        Bounds b = new Bounds();
+        foreach (var r in bodyRenderers)
+        {
+            // Skip hidden renderers (e.g. the bobber/line we just disabled this frame) so they
+            // don't drag the pivot off the visible ball.
+            if (r == null || !r.enabled || !r.gameObject.activeInHierarchy) continue;
+            if (!has) { b = r.bounds; has = true; }
+            else b.Encapsulate(r.bounds);
+        }
+        return has ? b.center : playerModel.position;
     }
 
     private void HandleGravity()
@@ -525,8 +671,14 @@ public class PlayerController : MonoBehaviour
     {
         bool inputDisabled = InventoryUI.IsInventoryOpen || NoteMenu.IsNotebookOpen || areControlsLocked || isLockedOnFish;
         Vector3 modelForward = playerModel ? playerModel.forward : transform.forward;
+        Vector3 steerDir = GetMoveDirection(out _);
+        var cfg = BuildJumpConfig();
+        chargeJump.Tick(ref targetVelocity, modelForward, transform.forward, steerDir, inputDisabled, in cfg);
+    }
 
-        var cfg = new ChargeJumpController.JumpConfig
+    private ChargeJumpController.JumpConfig BuildJumpConfig()
+    {
+        return new ChargeJumpController.JumpConfig
         {
             chargeJumpKey = chargeJumpKey,
             maxChargeTime = maxChargeTime,
@@ -535,12 +687,19 @@ public class PlayerController : MonoBehaviour
             upwardByCharge = upwardByCharge,
             bounceForwardMultiplier = bounceForwardMultiplier,
             bounceUpwardMultiplier = bounceUpwardMultiplier,
-            tumbleDegPerUnitSpeed = ballSpinDegPerUnitSpeed,
-            tumbleAxisJitter = ballSpinAxisJitter,
-            tumbleSpeedJitter = ballSpinSpeedJitter,
+            airSteerAccel = airSteerAccel,
+            wallBounceRestitution = wallBounceRestitution,
+            wallBounceMaxSurfaceY = wallBounceMaxSurfaceY,
         };
+    }
 
-        chargeJump.Tick(ref targetVelocity, modelForward, transform.forward, inputDisabled, in cfg);
+    // Unity message: fires for every CharacterController contact during Move(). While airborne in
+    // a charge jump, ChargeJumpController reflects the velocity off wall/overhang hits so the
+    // player ricochets like a ball; floor contacts are ignored here and handled by the landing bounce.
+    private void OnControllerColliderHit(ControllerColliderHit hit)
+    {
+        var cfg = BuildJumpConfig();
+        chargeJump.HandleColliderHit(hit.normal, ref targetVelocity, in cfg);
     }
 
     private void HandleCursorLocking()

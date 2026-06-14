@@ -45,6 +45,7 @@ public class FishingLine : MonoBehaviour
 
 
     private VerletRope verletRope;
+    private LineRenderer lineRenderer;
     private BobberController activeBobber;
     private Rigidbody activeBobberRb;
     private Rigidbody anchorRigidbody;
@@ -56,6 +57,7 @@ public class FishingLine : MonoBehaviour
     void Awake()
     {
         verletRope = GetComponent<VerletRope>();
+        lineRenderer = GetComponent<LineRenderer>();
         verletRope.DeactivateRope();
         EnsureAnchorRigidbody();
     }
@@ -128,6 +130,7 @@ public class FishingLine : MonoBehaviour
         FishingEvents.OnThrowBobber += LaunchBobber;
         FishingEvents.OnCancelFishing += ReturnBobberToRod;
         FishingEvents.OnReelingCompleted += ReturnBobberToRod;
+        PlayerController.BallJumpVisibilityChanged += OnBallJumpVisibilityChanged;
     }
 
     private void OnDisable()
@@ -135,6 +138,19 @@ public class FishingLine : MonoBehaviour
         FishingEvents.OnThrowBobber -= LaunchBobber;
         FishingEvents.OnCancelFishing -= ReturnBobberToRod;
         FishingEvents.OnReelingCompleted -= ReturnBobberToRod;
+        PlayerController.BallJumpVisibilityChanged -= OnBallJumpVisibilityChanged;
+    }
+
+    // Hide the line + spawned bobber while the player morphs into / flies as the ball, and show
+    // them again when the morph-out begins on the bounce (PlayerController decides the timing).
+    // Rendering is toggled; physics/joints stay live so the bobber is right back on the rod. Fishing
+    // can't begin mid-jump (needs grounded, unlocked controls), so the only bobber here is the dangling one.
+    private void OnBallJumpVisibilityChanged(bool hidden)
+    {
+        if (lineRenderer != null) lineRenderer.enabled = !hidden;
+        if (activeBobber != null)
+            foreach (var r in activeBobber.GetComponentsInChildren<Renderer>(true))
+                r.enabled = !hidden;
     }
 
     public void SetBobber(BobberItem item)
@@ -163,9 +179,21 @@ public class FishingLine : MonoBehaviour
         if (anchorTransform == null) EnsureAnchorRigidbody();
         if (anchorTransform == null) return;
 
-        // Deterministic spawn position: exactly at the anchor's world position. Combined with
-        // autoConfigureConnectedAnchor=false below, swapping bobber types never accumulates drift.
-        GameObject instance = Instantiate(item.bobberPrefab, anchorTransform.position, Quaternion.identity);
+        // Spawn at the dangle rest position (dangleLength straight below the anchor) instead of at
+        // the anchor itself, so the bobber doesn't visibly drop into place on the first frame.
+        // autoConfigureConnectedAnchor=false below pins the joint anchors explicitly, so the spawn
+        // position doesn't affect joint setup or accumulate drift when swapping bobber types.
+        // Spawn already upright (LineAttachPoint up so the lure hangs vertically, line attachment
+        // toward the rod) by computing the rest rotation from the PREFAB before instantiating. The
+        // attach-point geometry is identical on prefab and instance, so this is exact. Instantiating
+        // at the correct rotation — rather than at identity (the flat in-water pose) and rotating
+        // afterward — is what kills the one-frame flat flicker: the prefab uses RigidbodyInterpolation,
+        // so an identity spawn records the flat pose in the interpolation buffer and the first rendered
+        // frame blends out of it. Born upright, the buffer's first pose is already correct.
+        BobberController prefabBobber = item.bobberPrefab.GetComponent<BobberController>();
+        Quaternion spawnRotation = prefabBobber != null ? DangleRestRotation(prefabBobber) : Quaternion.identity;
+
+        GameObject instance = Instantiate(item.bobberPrefab, DangleRestPosition(), spawnRotation);
         activeBobber = instance.GetComponent<BobberController>();
         if (activeBobber == null)
         {
@@ -275,6 +303,58 @@ public class FishingLine : MonoBehaviour
         activeJoint.enableCollision = false;
     }
 
+    // Where the dangling bobber settles: its joint limits the centre to dangleLength from the
+    // anchor, and gravity pulls it straight down. Spawn/park here so it starts at rest instead
+    // of dropping into place. Doesn't have to be exact — the joint settles any small residual.
+    private Vector3 DangleRestPosition()
+    {
+        Vector3 anchorPos = anchorTransform != null ? anchorTransform.position : rodTip.TransformPoint(anchorLocalOffset);
+        return anchorPos + Vector3.down * dangleLength;
+    }
+
+    // The orientation a dangling bobber settles into: its LineAttachPoint axis pointing up at the
+    // anchor, plus a locked heading. Bobbers lie flat in the water but hang vertically off the rod,
+    // so spawning/parking with this avoids a visible rotate-into-place. The heading lock matters for
+    // elongated lures: aligning only the attach axis leaves the spin about the vertical line free,
+    // so the lure settled at a random facing (looked rotated on some spawns, fine on others). We
+    // pin that spin relative to the rod so it's consistent from the player's view; the per-item
+    // dangleFacingYawOffset turns which side shows. A round bobber doesn't care about the spin.
+    private Quaternion DangleRestRotation(BobberController bobber)
+    {
+        if (bobber == null) return Quaternion.identity;
+
+        Transform attach = bobber.LineAttachPoint;
+        if (attach == null || attach == bobber.transform) return bobber.transform.rotation;
+
+        // Direction from the bobber origin to its attach point, in the bobber's own local space
+        // (rotation-invariant fixed geometry). The rest pose rotates that local axis to world up.
+        Vector3 localAttachDir = bobber.transform.InverseTransformPoint(attach.position);
+        if (localAttachDir.sqrMagnitude < 0.0001f) return bobber.transform.rotation;
+        localAttachDir.Normalize();
+
+        // 1) Point the attach axis straight up toward the anchor. Leaves the spin about up free.
+        Quaternion rot = Quaternion.FromToRotation(localAttachDir, Vector3.up);
+
+        // 2) Lock that free spin: aim a lure-side axis (local axis perpendicular to the attach
+        //    axis) along the rod's horizontal heading, so the facing is the same every spawn.
+        Vector3 localSide = Vector3.ProjectOnPlane(Vector3.up, localAttachDir);
+        if (localSide.sqrMagnitude < 0.0001f) localSide = Vector3.ProjectOnPlane(Vector3.forward, localAttachDir);
+        if (localSide.sqrMagnitude > 0.0001f)
+        {
+            Vector3 sideNow = Vector3.ProjectOnPlane(rot * localSide.normalized, Vector3.up);
+            Vector3 rodHeading = rodTip != null ? Vector3.ProjectOnPlane(rodTip.forward, Vector3.up) : Vector3.forward;
+            if (sideNow.sqrMagnitude > 0.0001f && rodHeading.sqrMagnitude > 0.0001f)
+                rot = Quaternion.FromToRotation(sideNow.normalized, rodHeading.normalized) * rot;
+        }
+
+        // 3) Per-item nudge so each model can be turned to present its good side to the player.
+        float yawOffset = currentBobber != null ? currentBobber.dangleFacingYawOffset : 0f;
+        if (Mathf.Abs(yawOffset) > 0.001f)
+            rot = Quaternion.AngleAxis(yawOffset, Vector3.up) * rot;
+
+        return rot;
+    }
+
     private void ApplyLinearLimit(float distance)
     {
         if (activeJoint == null) return;
@@ -348,8 +428,8 @@ public class FishingLine : MonoBehaviour
             // Velocities are zeroed only after going dynamic again — Unity 6 warns when you set
             // angularVelocity on a kinematic body.
             rb.isKinematic = true;
-            rb.position = anchorTransform.position;
-            rb.rotation = Quaternion.identity;
+            rb.position = DangleRestPosition();
+            rb.rotation = DangleRestRotation(activeBobber);
             Physics.SyncTransforms();
             rb.isKinematic = false;
             rb.linearVelocity = Vector3.zero;

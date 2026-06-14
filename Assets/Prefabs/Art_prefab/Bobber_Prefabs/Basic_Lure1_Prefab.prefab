@@ -233,6 +233,11 @@ MonoBehaviour:
   strugglePullAwayForce: 2.5
   maxPullAwayDistance: 3
   pullAwayAnchorSpeed: 0.5
+  fightJumpChance: 0.15
+  jumpUpSpeed: 3.62
+  jumpForwardSpeed: 2.05
+  jumpCooldown: 5
+  maxJumpDuration: 2.5
   tetherRadius: 3
   tetherReturnForce: 4
   tetherInwardBiasThreshold: 0.7
@@ -244,6 +249,7 @@ MonoBehaviour:
   hookedFishSilhouetteMaterial: {fileID: 2100000, guid: 7e2d9c4f6b1a4358a9d0e3f5c8b7a624, type: 2}
   cameraAnchor: {fileID: 0}
   lineAttachPoint: {fileID: 332894759975922099}
+  grabTowMaxSpeed: 6
   waterInertiaTensorOverride: 0
 --- !u!82 &8041325095107244617
 AudioSource:

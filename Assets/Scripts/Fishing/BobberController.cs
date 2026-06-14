@@ -123,6 +123,8 @@ public class BobberController : MonoBehaviour
     public float jumpCooldown = 5f;
     [Tooltip("Safety net: if the fish hasn't splashed back down after this many seconds (e.g. the leap never broke the surface), fight state is restored anyway.")]
     public float maxJumpDuration = 2.5f;
+    [Tooltip("Speeds up the whole leap without changing its shape: the launch velocity is scaled by this and matching extra gravity is added, so the fish pops up and splashes back faster while reaching the same height and landing spot. 1 = unchanged, 1.2 = ~20% faster.")]
+    [Range(1f, 2f)] public float jumpSpeedMultiplier = 1.2f;
 
     [Header("Struggle Tether")]
     [Tooltip("Radius of the AOE circle around the hook point that the fish prefers to stay within.")]
@@ -315,6 +317,16 @@ public class BobberController : MonoBehaviour
                 }
                 EndFightJump();
             }
+        }
+
+        // Time-warp the leap: extra gravity matched to the launch-velocity scale (jumpSpeedMultiplier)
+        // so the arc keeps its exact shape/height/landing spot but plays out faster. Scaling velocity
+        // by s and gravity by s² replays the same trajectory s× quicker, so extra = (s²-1)*g. Buoyancy
+        // is inert above bite depth during a leap, so this is the only vertical force shaping the arc.
+        if (jumpActive && jumpSpeedMultiplier > 1f && rb != null && !rb.isKinematic)
+        {
+            float extraJumpGravity = (jumpSpeedMultiplier * jumpSpeedMultiplier - 1f) * Physics.gravity.magnitude;
+            rb.AddForce(Vector3.down * extraJumpGravity, ForceMode.Acceleration);
         }
 
         if (isInWater)
@@ -652,7 +664,9 @@ public class BobberController : MonoBehaviour
         rb.linearDamping = initialLinearDamping;
 
         Vector3 horizontal = struggleDirection * jumpForwardSpeed;
-        rb.linearVelocity = new Vector3(horizontal.x, jumpUpSpeed, horizontal.z);
+        // Whole launch scaled together so the arc shape is preserved; the matching extra gravity in
+        // FixedUpdate then replays that same arc faster (see jumpSpeedMultiplier).
+        rb.linearVelocity = new Vector3(horizontal.x, jumpUpSpeed, horizontal.z) * jumpSpeedMultiplier;
 
         SpawnEffect(strugglePrefab, struggleLifetime);
         FishingEvents.OnHookedFishJumpChanged?.Invoke(true);

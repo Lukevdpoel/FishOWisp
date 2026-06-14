@@ -14,8 +14,8 @@ using UnityEngine.InputSystem.Controls;
 ///
 /// Default mapping (Xbox / PS5):
 ///   Left stick           - walk (deflection scales speed); steer the lure
-///   Left stick click     - tap to latch sprint on; it holds while you keep moving and
-///                          drops once you slow down/stop (no hold-to-sprint on the pad)
+///   Left stick click     - hold to run; release to drop back to a walk (hold-to-sprint,
+///                          mirrors keyboard Shift)
 ///   Right stick          - orbit camera / steer the aim while charging a cast /
 ///                          rotate the fish model while the notebook is open
 ///   A / Cross            - interact (NPCs, doors, vendor, pots, bounty board); cast the
@@ -163,9 +163,9 @@ public static class GamepadInput
     // --- Movement / camera (sticks aren't rebindable) ---
     public static Vector2 Move => Pad == null ? Vector2.zero : ApplyRadialDeadZone(Pad.leftStick.ReadValue());
     public static Vector2 Look => Pad == null ? Vector2.zero : ApplyRadialDeadZone(Pad.rightStick.ReadValue());
-    // Sprint is a single click that latches on; PlayerController holds the latch while the
-    // player keeps moving and drops it when they slow down. (No hold-to-sprint on the pad.)
-    public static bool SprintTogglePressed => Pressed(Table.sprintToggle);
+    // Sprint is hold-to-run: keep the bound control held to turn walking into running,
+    // release it to drop back to a walk (mirrors keyboard Shift).
+    public static bool SprintHeld => HeldButton(Table.sprintToggle);
 
     // --- Jump ---
     public static bool JumpPressed => Pressed(Table.jump);
@@ -198,6 +198,10 @@ public static class GamepadInput
     // --- Notebook / Inventory ---
     public static bool NotebookTogglePressed => Pressed(Table.notebookToggle);
     public static bool InventoryTogglePressed => Pressed(Table.inventoryToggle);
+    // Hold/release variants for the loadout selector: holding the inventory button keeps the
+    // gear menu open and the bobber-framing camera live; releasing closes it.
+    public static bool InventoryToggleHeld => HeldButton(Table.inventoryToggle);
+    public static bool InventoryToggleReleased => ReleasedButton(Table.inventoryToggle);
     public static bool PageNextPressed => Pressed(Table.pageNext);
     public static bool PagePrevPressed => Pressed(Table.pagePrev);
 

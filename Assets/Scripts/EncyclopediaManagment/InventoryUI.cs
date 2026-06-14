@@ -78,6 +78,32 @@ public class InventoryUI : MonoBehaviour
              "the inventory open when clicked.")]
     public List<RectTransform> additionalClickThroughRoots = new List<RectTransform>();
 
+    [Header("Loadout Selector")]
+    [Tooltip("When off, the caught-fish grid is hidden and this menu shows only the " +
+             "bobber/lure and bait rows. The fish drag/sell code stays intact but dormant.")]
+    [SerializeField] private bool showCaughtFish = false;
+
+    [Tooltip("Hold the inventory button to open the gear menu; release to close. Left/right " +
+             "cycles bobber/lure (live), down opens the bait sub-screen from a bobber, up returns.")]
+    [SerializeField] private bool holdToOpenLoadout = true;
+
+    [Tooltip("The player's visual model — used to place the framing camera in front of the " +
+             "angler. Falls back to the PlayerController transform if left empty.")]
+    [SerializeField] private Transform playerModel;
+
+    [Header("Loadout Camera (while held open)")]
+    [Tooltip("How far below the rod tip the tackle dangles. The camera aims here.")]
+    [SerializeField] private float dangleDrop = 0.4f;
+    [Tooltip("How far in FRONT of the dangling tackle (away from the player) the camera sits, " +
+             "so it looks back at the angler.")]
+    [SerializeField] private float cameraFrontDistance = 2.5f;
+    [Tooltip("Height of the camera above the tackle.")]
+    [SerializeField] private float cameraHeightOffset = 0.5f;
+    [Tooltip("Vertical offset of the point the camera looks at, relative to the tackle.")]
+    [SerializeField] private float cameraLookHeightOffset = 0.15f;
+    [Tooltip("How fast the camera eases into the framing pose. Higher = snappier.")]
+    [SerializeField] private float cameraLerpSpeed = 10f;
+
     private List<InventorySlotUI> spawnedSlots = new List<InventorySlotUI>();
     private Camera cachedCamera;
 
@@ -108,6 +134,35 @@ public class InventoryUI : MonoBehaviour
     private BobberBarUI bobberBar;
     private int openedFrame = -1;
 
+    // --- Loadout selector state ---
+    // loadoutMode: this open is the player's gear menu — live cycling + the bobber-framing
+    // camera are active. False for programmatic opens (vendor shop, bait-missing prompt),
+    // which keep the legacy click/drag behavior.
+    // closeOnRelease: releasing the inventory button closes the menu (hold-to-open flow).
+    private bool loadoutMode;
+    private bool closeOnRelease;
+    private bool isFishingActive;
+    private FishingLine fishingLine;
+    private Transform resolvedPlayer;
+    private PlayerController playerController;
+
+    // Pose of a fixed camera (e.g. a shop interior view) borrowed by the loadout framing, so it
+    // can be eased back exactly where it was once the menu closes. Null camera = nothing to
+    // restore (the player's own orbit camera is reset by PlayerCameraController instead).
+    private Camera loadoutBorrowedCamera;
+    private Vector3 loadoutBorrowedCamPos;
+    private Quaternion loadoutBorrowedCamRot;
+    private bool loadoutCamRestoring;
+
+    private enum LoadoutScreen { Bobber, Bait }
+    private LoadoutScreen loadoutScreen = LoadoutScreen.Bobber;
+
+    // Debounce for treating the analog left stick as discrete left/right/up/down steps.
+    private bool stickXNeutral = true;
+    private bool stickYNeutral = true;
+    private const float StickStepOn = 0.5f;
+    private const float StickStepOff = 0.3f;
+
     private void Awake()
     {
         // First-instance-wins. Duplicate inventories in additively-loaded scenes are kept
@@ -124,6 +179,19 @@ public class InventoryUI : MonoBehaviour
         clickRaycastResults = new List<RaycastResult>();
         baitBar = FindFirstObjectByType<BaitBarUI>();
         bobberBar = FindFirstObjectByType<BobberBarUI>();
+
+        // Refs for the loadout-framing camera. The FishingLine owns the dangling tackle (rod
+        // tip); the player transform places the camera in front of the angler.
+        fishingLine = FindFirstObjectByType<FishingLine>();
+        playerController = FindFirstObjectByType<PlayerController>();
+        if (playerModel != null) resolvedPlayer = playerModel;
+        else if (playerController != null) resolvedPlayer = playerController.transform;
+
+        // Mirror the bars' fishing-active tracking so the loadout can't be held open (and the
+        // camera can't be yanked) while a bobber is cast / a fish is on the line.
+        FishingEvents.OnThrowBobber += HandleFishingStarted;
+        FishingEvents.OnCancelFishing += HandleFishingEnded;
+        FishingEvents.OnReelingCompleted += HandleFishingEnded;
 
         noteMenu = GetComponent<NoteMenu>();
         if (noteMenu == null) noteMenu = FindFirstObjectByType<NoteMenu>(FindObjectsInactive.Include);
@@ -149,6 +217,10 @@ public class InventoryUI : MonoBehaviour
     {
         IsInventoryOpen = false;
 
+        FishingEvents.OnThrowBobber -= HandleFishingStarted;
+        FishingEvents.OnCancelFishing -= HandleFishingEnded;
+        FishingEvents.OnReelingCompleted -= HandleFishingEnded;
+
         if (Instance == this) Instance = null;
 
         if (PlayerInventory.Instance != null)
@@ -164,12 +236,7 @@ public class InventoryUI : MonoBehaviour
 
     private void Update()
     {
-        // B / gamepad Back toggles the inventory. Pressing it over the open notebook is
-        // allowed: OpenInventory closes the notebook first (mutual exclusion).
-        if (Input.GetKeyDown(toggleKey) || GamepadInput.InventoryTogglePressed)
-        {
-            ToggleInventory();
-        }
+        HandleInventoryButton();
 
         // Gamepad B / Circle backs out of the inventory — and with it the vendor shop and
         // bait bar, which only render while the inventory is open.
@@ -179,20 +246,20 @@ public class InventoryUI : MonoBehaviour
             return;
         }
 
-        // Controller navigation while the inventory is open (and the notebook isn't —
-        // there the D-pad cycles encyclopedia fish instead): up/down hops between the
-        // fish row, the bobber/lure bar and the bait bar; left/right moves within a
-        // section; A selects. The bait bar is skipped while a lure is equipped.
-        if (IsInventoryOpen && !NoteMenu.IsNotebookOpen)
+        // Loadout cycling while the gear menu is open (and the notebook isn't): left/right
+        // cycles the bobber/lure or bait live; down opens the bait sub-screen from a bobber,
+        // up returns. Programmatic opens (vendor/bait prompt) skip this.
+        if (loadoutMode && IsInventoryOpen && !NoteMenu.IsNotebookOpen)
         {
-            HandleGamepadNavigation();
+            HandleLoadoutNavigation();
         }
 
         // Click-away-to-close: a left click that lands outside the inventory panel
-        // (and outside the bait bar) closes the menu. Skipped on the frame it opened
-        // so the very click that opened it can't immediately close it again, and
-        // skipped mid-drag so dropping a fish doesn't count as a click-away.
+        // (and outside the bait bar) closes the menu. Only for non-loadout opens — the
+        // loadout menu is closed by releasing the held button. Skipped on the frame it
+        // opened and mid-drag.
         if (IsInventoryOpen
+            && !loadoutMode
             && Time.frameCount != openedFrame
             && currentDraggedModel == null
             && Input.GetMouseButtonDown(0)
@@ -204,6 +271,55 @@ public class InventoryUI : MonoBehaviour
 
         HandleFishDrag();
     }
+
+    // Hold-to-open / release-to-close for the gear menu, plus tap-to-close for menus opened
+    // programmatically (vendor shop, bait-missing prompt) or when hold-to-open is disabled.
+    private void HandleInventoryButton()
+    {
+        bool pressed  = Input.GetKeyDown(toggleKey) || GamepadInput.InventoryTogglePressed;
+        bool released = Input.GetKeyUp(toggleKey)   || GamepadInput.InventoryToggleReleased;
+
+        if (!IsInventoryOpen)
+        {
+            if (pressed && CanOpenLoadout()) OpenLoadout(closeWhenReleased: holdToOpenLoadout);
+            return;
+        }
+
+        if (closeOnRelease)
+        {
+            if (released) CloseInventory();
+        }
+        else if (pressed)
+        {
+            // Tap toggles closed: legacy toggle-mode loadout and vendor/bait-prompt opens.
+            CloseInventory();
+        }
+    }
+
+    private bool CanOpenLoadout()
+    {
+        if (isFishingActive) return false;
+        if (NoteMenu.IsNotebookOpen) return false;
+        if (DialogueManager.Instance != null && DialogueManager.Instance.IsDialogueActive()) return false;
+        return true;
+    }
+
+    private void OpenLoadout(bool closeWhenReleased)
+    {
+        OpenInventory();                 // resets loadoutMode/closeOnRelease, then we upgrade
+        loadoutMode = true;
+        closeOnRelease = closeWhenReleased;
+        loadoutScreen = LoadoutScreen.Bobber;
+        BeginLoadoutCameraBorrow();      // remember a fixed (shop) camera so we can reset it on close
+        // Start "armed but not neutral": if the stick happens to be deflected at open, require
+        // it to return to centre before the first cycle/screen step registers.
+        stickXNeutral = false;
+        stickYNeutral = false;
+        RefreshLoadoutFocus();
+    }
+
+    private void HandleFishingStarted(Vector3 dir, float force) => isFishingActive = true;
+    private void HandleFishingEnded() => isFishingActive = false;
 
     private bool IsPointerOverInventoryUI()
     {
@@ -245,8 +361,9 @@ public class InventoryUI : MonoBehaviour
     private void HandleSelectedBaitChanged(BaitItem bait)
     {
         // Picking a bait (e.g. from the bait bar that pops up when casting without bait)
-        // dismisses the inventory automatically.
-        if (bait != null && IsInventoryOpen)
+        // dismisses the inventory automatically — but NOT while cycling bait in the loadout
+        // sub-screen, where each step changes the equipped bait and must keep the menu open.
+        if (bait != null && IsInventoryOpen && !loadoutMode)
         {
             CloseInventory();
         }
@@ -423,131 +540,248 @@ public class InventoryUI : MonoBehaviour
         }
     }
 
-    // --- Controller navigation ---
-    // Sections in top-to-bottom screen order: the fish row (panel), the bobber/lure bar,
-    // and the bait bar stacked at the bottom. Up/down on the D-pad walks this order.
-    private enum PadSection { Fish, Bobber, Bait }
-    private PadSection padSection = PadSection.Fish;
+    // --- Loadout navigation ---
+    // Two screens: Bobber (cycle the bobber/lure on the rod, live) and Bait (cycle the
+    // equipped bait, live). Left/right cycles within a screen; down goes Bobber→Bait (only
+    // from a regular bobber — lures take no bait), up goes Bait→Bobber. The selection is
+    // applied immediately, so the bobber/lure model swaps and the bars re-highlight without
+    // any confirm button.
+    private readonly List<BaitItem> cyclableBaits = new List<BaitItem>();
 
-    // Index of the fish slot the D-pad currently has highlighted; -1 = nothing selected yet.
-    private int gamepadSelectedIndex = -1;
-
-    private void HandleGamepadNavigation()
+    private void HandleLoadoutNavigation()
     {
-        if (GamepadInput.DpadRightPressed) MoveInSection(1);
-        else if (GamepadInput.DpadLeftPressed) MoveInSection(-1);
-        else if (GamepadInput.DpadDownPressed) MoveSection(1);
-        else if (GamepadInput.DpadUpPressed) MoveSection(-1);
-        else if (GamepadInput.ConfirmPressed) ActivateSection();
+        int xStep = ReadHorizontalStep();
+        if (xStep != 0) { Cycle(xStep); return; }
+
+        int yStep = ReadVerticalStep();
+        if (yStep < 0) EnterBaitScreen();
+        else if (yStep > 0) EnterBobberScreen();
     }
 
-    private bool SectionAvailable(PadSection section)
+    // D-pad / arrow keys / WASD are discrete; the left stick is debounced into single steps so a
+    // held deflection doesn't spin through every option in a few frames. Player movement is
+    // disabled while the gear menu is open (ToggleInputScripts), so WASD is free to reuse here.
+    private int ReadHorizontalStep()
     {
-        switch (section)
+        if (GamepadInput.DpadRightPressed || Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.D)) return 1;
+        if (GamepadInput.DpadLeftPressed  || Input.GetKeyDown(KeyCode.LeftArrow)  || Input.GetKeyDown(KeyCode.A)) return -1;
+
+        float x = GamepadInput.Move.x;
+        if (stickXNeutral && Mathf.Abs(x) > StickStepOn) { stickXNeutral = false; return x > 0 ? 1 : -1; }
+        if (Mathf.Abs(x) < StickStepOff) stickXNeutral = true;
+        return 0;
+    }
+
+    private int ReadVerticalStep()
+    {
+        if (GamepadInput.DpadUpPressed   || Input.GetKeyDown(KeyCode.UpArrow)   || Input.GetKeyDown(KeyCode.W)) return 1;
+        if (GamepadInput.DpadDownPressed || Input.GetKeyDown(KeyCode.DownArrow) || Input.GetKeyDown(KeyCode.S)) return -1;
+
+        float y = GamepadInput.Move.y;
+        if (stickYNeutral && Mathf.Abs(y) > StickStepOn) { stickYNeutral = false; return y > 0 ? 1 : -1; }
+        if (Mathf.Abs(y) < StickStepOff) stickYNeutral = true;
+        return 0;
+    }
+
+    private void Cycle(int delta)
+    {
+        if (loadoutScreen == LoadoutScreen.Bait) CycleBait(delta);
+        else CycleBobber(delta);
+        RefreshLoadoutFocus();
+    }
+
+    private void CycleBobber(int delta)
+    {
+        if (BobberInventory.Instance == null) return;
+        IReadOnlyList<BobberItem> owned = BobberInventory.Instance.OwnedBobbers;
+        if (owned == null || owned.Count == 0) return;
+
+        int current = IndexOfSelectedBobber(owned);
+        int next = current < 0 ? (delta > 0 ? 0 : owned.Count - 1)
+                               : ((current + delta) % owned.Count + owned.Count) % owned.Count;
+        if (owned[next] != null) BobberInventory.Instance.SetSelectedBobber(owned[next]);
+    }
+
+    private void CycleBait(int delta)
+    {
+        if (BaitInventory.Instance == null) return;
+        List<BaitItem> baits = GetCyclableBaits();
+        if (baits.Count == 0) return;
+
+        BaitItem sel = BaitInventory.Instance.SelectedBait;
+        int current = sel != null ? baits.IndexOf(sel) : -1;
+        int next = current < 0 ? (delta > 0 ? 0 : baits.Count - 1)
+                               : ((current + delta) % baits.Count + baits.Count) % baits.Count;
+        BaitInventory.Instance.SetSelectedBait(baits[next]);
+    }
+
+    private int IndexOfSelectedBobber(IReadOnlyList<BobberItem> owned)
+    {
+        BobberItem sel = BobberInventory.Instance.SelectedBobber;
+        if (sel == null) return -1;
+        for (int i = 0; i < owned.Count; i++) if (owned[i] == sel) return i;
+        return -1;
+    }
+
+    // Registered bait that is on the shelf and actually obtainable (in stock or infinite).
+    private List<BaitItem> GetCyclableBaits()
+    {
+        cyclableBaits.Clear();
+        if (BaitInventory.Instance == null) return cyclableBaits;
+        IReadOnlyList<BaitItem> registered = BaitInventory.Instance.RegisteredBaits;
+        if (registered == null) return cyclableBaits;
+        for (int i = 0; i < registered.Count; i++)
         {
-            case PadSection.Fish: return spawnedSlots.Count > 0;
-            case PadSection.Bobber: return bobberBar != null && bobberBar.SlotCount > 0;
-            // "If I select bobber, I can select bait" — the bait bar is unreachable while
-            // a lure is equipped (lures don't take bait; BaitBarUI blocks the click too).
-            case PadSection.Bait:
-                return baitBar != null && baitBar.SlotCount > 0 && !BobberInventory.IsLureEquipped;
+            BaitItem b = registered[i];
+            if (b == null || !b.isAvailable) continue;
+            if (b.isAlwaysAvailable || BaitInventory.Instance.GetCount(b) > 0) cyclableBaits.Add(b);
         }
-        return false;
+        return cyclableBaits;
     }
 
-    private void MoveSection(int dir)
+    private void EnterBaitScreen()
     {
-        PadSection target = padSection;
-        do
-        {
-            int next = (int)target + dir;
-            if (next < 0 || next > (int)PadSection.Bait) return; // no wrap — stay put at the ends
-            target = (PadSection)next;
-        } while (!SectionAvailable(target));
-
-        LeaveSection(padSection);
-        padSection = target;
-        EnterSection(target);
+        if (loadoutScreen == LoadoutScreen.Bait) return;
+        // Reachable only from a regular bobber — lures take no bait.
+        if (BobberInventory.IsLureEquipped) return;
+        if (GetCyclableBaits().Count == 0) return;
+        loadoutScreen = LoadoutScreen.Bait;
+        RefreshLoadoutFocus();
     }
 
-    private void LeaveSection(PadSection section)
+    private void EnterBobberScreen()
     {
-        switch (section)
+        if (loadoutScreen == LoadoutScreen.Bobber) return;
+        loadoutScreen = LoadoutScreen.Bobber;
+        RefreshLoadoutFocus();
+    }
+
+    // Tint the equipped slot on the active screen's bar (reusing the bars' gamepad-focus
+    // highlight) so it's obvious which row left/right is steering. Always re-centres on the
+    // equipped item so the focus tracks the live selection.
+    private void RefreshLoadoutFocus()
+    {
+        if (loadoutScreen == LoadoutScreen.Bait)
         {
-            case PadSection.Fish:
-                if (gamepadSelectedIndex >= 0 && gamepadSelectedIndex < spawnedSlots.Count
-                    && spawnedSlots[gamepadSelectedIndex] != null)
-                {
-                    spawnedSlots[gamepadSelectedIndex].UnhighlightFromGamepad();
-                }
-                break;
-            case PadSection.Bobber: if (bobberBar != null) bobberBar.ClearGamepadFocus(); break;
-            case PadSection.Bait: if (baitBar != null) baitBar.ClearGamepadFocus(); break;
+            if (bobberBar != null) bobberBar.ClearGamepadFocus();
+            if (baitBar != null) { baitBar.ClearGamepadFocus(); baitBar.FocusGamepad(); }
+        }
+        else
+        {
+            if (baitBar != null) baitBar.ClearGamepadFocus();
+            if (bobberBar != null) { bobberBar.ClearGamepadFocus(); bobberBar.FocusGamepad(); }
         }
     }
 
-    private void EnterSection(PadSection section)
+    private void ResetLoadoutNavigation()
     {
-        switch (section)
-        {
-            case PadSection.Fish:
-                if (spawnedSlots.Count == 0) break;
-                if (gamepadSelectedIndex < 0 || gamepadSelectedIndex >= spawnedSlots.Count)
-                    gamepadSelectedIndex = 0;
-                if (spawnedSlots[gamepadSelectedIndex] != null)
-                    spawnedSlots[gamepadSelectedIndex].HighlightFromGamepad();
-                break;
-            case PadSection.Bobber: if (bobberBar != null) bobberBar.FocusGamepad(); break;
-            case PadSection.Bait: if (baitBar != null) baitBar.FocusGamepad(); break;
-        }
-    }
-
-    private void MoveInSection(int delta)
-    {
-        switch (padSection)
-        {
-            case PadSection.Fish: MoveGamepadSelection(delta); break;
-            case PadSection.Bobber: if (bobberBar != null) bobberBar.MoveGamepadFocus(delta); break;
-            case PadSection.Bait: if (baitBar != null) baitBar.MoveGamepadFocus(delta); break;
-        }
-    }
-
-    private void ActivateSection()
-    {
-        switch (padSection)
-        {
-            // Fish slots have no A-button action — fish actions are drag-and-drop (mouse).
-            case PadSection.Bobber: if (bobberBar != null) bobberBar.ActivateGamepadFocus(); break;
-            case PadSection.Bait: if (baitBar != null) baitBar.ActivateGamepadFocus(); break;
-        }
-    }
-
-    private void ResetGamepadNavigation()
-    {
+        loadoutScreen = LoadoutScreen.Bobber;
+        stickXNeutral = true;
+        stickYNeutral = true;
         if (bobberBar != null) bobberBar.ClearGamepadFocus();
         if (baitBar != null) baitBar.ClearGamepadFocus();
-        padSection = PadSection.Fish;
-        gamepadSelectedIndex = -1;
     }
 
-    private void MoveGamepadSelection(int delta)
+    // --- Loadout framing camera ---
+    // While the gear menu is held open, swing the main camera to a pose in FRONT of the
+    // angler looking back at the dangling tackle, so the player sees the bobber/lure they are
+    // cycling with themselves behind it. PlayerCameraController yields the camera while the
+    // inventory is open (see its UpdateCamera early-out), so we own it here uncontested.
+    //
+    // On close the player's orbit camera is resumed and snapped back by PlayerCameraController.
+    // But a fixed camera (e.g. a shop interior view) is driven by nobody, so for that case we
+    // captured its pose on open (BeginLoadoutCameraBorrow) and ease it back ourselves here.
+    private void LateUpdate()
     {
-        if (spawnedSlots.Count == 0) return;
+        if (loadoutMode && IsInventoryOpen) UpdateLoadoutCamera();
+        else if (loadoutCamRestoring) RestoreLoadoutCameraStep();
+    }
 
-        if (gamepadSelectedIndex >= 0 && gamepadSelectedIndex < spawnedSlots.Count
-            && spawnedSlots[gamepadSelectedIndex] != null)
+    // Captures the active camera's pose when the gear menu opens, but only if it's a fixed camera
+    // that PlayerCameraController won't restore (the player's own orbit camera is left alone — it
+    // snaps back on its own). The captured pose is the target RestoreLoadoutCameraStep eases to.
+    private void BeginLoadoutCameraBorrow()
+    {
+        Camera cam = ActiveCamera;
+        if (cam == null) { loadoutBorrowedCamera = null; loadoutCamRestoring = false; return; }
+
+        if (playerController == null) playerController = FindFirstObjectByType<PlayerController>();
+        Transform restorable = playerController != null ? playerController.ActivePlayerCameraTransform : null;
+        if (restorable != null && cam.transform == restorable)
         {
-            spawnedSlots[gamepadSelectedIndex].UnhighlightFromGamepad();
+            // Player orbit camera — PlayerCameraController owns the reset, nothing to remember.
+            loadoutBorrowedCamera = null;
+            loadoutCamRestoring = false;
+            return;
         }
 
-        // First press lands on an end of the row instead of skipping a slot.
-        if (gamepadSelectedIndex < 0)
-            gamepadSelectedIndex = delta > 0 ? 0 : spawnedSlots.Count - 1;
-        else
-            gamepadSelectedIndex = ((gamepadSelectedIndex + delta) % spawnedSlots.Count + spawnedSlots.Count) % spawnedSlots.Count;
+        // Reopening mid-restore of the same camera: keep the original home pose as the target so a
+        // half-finished restore doesn't become the new "home". Otherwise snapshot the current pose.
+        if (loadoutBorrowedCamera != cam)
+        {
+            loadoutBorrowedCamera = cam;
+            loadoutBorrowedCamPos = cam.transform.position;
+            loadoutBorrowedCamRot = cam.transform.rotation;
+        }
+        loadoutCamRestoring = false;
+    }
 
-        InventorySlotUI slot = spawnedSlots[gamepadSelectedIndex];
-        if (slot != null) slot.HighlightFromGamepad();
+    // Closing the menu hands the player camera back to PlayerCameraController; a borrowed fixed
+    // camera instead eases back to its captured pose over the next frames.
+    private void EndLoadoutCameraBorrow()
+    {
+        if (loadoutBorrowedCamera != null) loadoutCamRestoring = true;
+    }
+
+    private void RestoreLoadoutCameraStep()
+    {
+        if (loadoutBorrowedCamera == null) { loadoutCamRestoring = false; return; }
+
+        Transform ct = loadoutBorrowedCamera.transform;
+        float t = 1f - Mathf.Exp(-cameraLerpSpeed * Time.unscaledDeltaTime);
+        ct.position = Vector3.Lerp(ct.position, loadoutBorrowedCamPos, t);
+        ct.rotation = Quaternion.Slerp(ct.rotation, loadoutBorrowedCamRot, t);
+
+        if ((ct.position - loadoutBorrowedCamPos).sqrMagnitude < 0.0001f
+            && Quaternion.Angle(ct.rotation, loadoutBorrowedCamRot) < 0.1f)
+        {
+            ct.SetPositionAndRotation(loadoutBorrowedCamPos, loadoutBorrowedCamRot);
+            loadoutBorrowedCamera = null;
+            loadoutCamRestoring = false;
+        }
+    }
+
+    private void UpdateLoadoutCamera()
+    {
+        Camera cam = ActiveCamera;
+        if (cam == null || fishingLine == null || fishingLine.rodTip == null) return;
+
+        if (resolvedPlayer == null)
+        {
+            if (playerModel != null) resolvedPlayer = playerModel;
+            else { var pc = FindFirstObjectByType<PlayerController>(); if (pc != null) resolvedPlayer = pc.transform; }
+            if (resolvedPlayer == null) return;
+        }
+
+        Vector3 tackle = fishingLine.rodTip.position + Vector3.down * dangleDrop;
+
+        // Horizontal direction from the player out to the tackle (≈ the way the rod points).
+        Vector3 horizFwd = tackle - resolvedPlayer.position;
+        horizFwd.y = 0f;
+        if (horizFwd.sqrMagnitude < 0.0001f) { horizFwd = resolvedPlayer.forward; horizFwd.y = 0f; }
+        if (horizFwd.sqrMagnitude < 0.0001f) horizFwd = Vector3.forward;
+        horizFwd.Normalize();
+
+        Vector3 targetPos = tackle + horizFwd * cameraFrontDistance + Vector3.up * cameraHeightOffset;
+        Vector3 lookTarget = tackle + Vector3.up * cameraLookHeightOffset;
+        Vector3 lookDir = lookTarget - targetPos;
+        if (lookDir.sqrMagnitude < 0.0001f) return;
+        Quaternion targetRot = Quaternion.LookRotation(lookDir.normalized, Vector3.up);
+
+        // Ease in from wherever the camera currently is (the player view) for a smooth swing.
+        float t = 1f - Mathf.Exp(-cameraLerpSpeed * Time.unscaledDeltaTime);
+        cam.transform.position = Vector3.Lerp(cam.transform.position, targetPos, t);
+        cam.transform.rotation = Quaternion.Slerp(cam.transform.rotation, targetRot, t);
     }
 
     public void ToggleInventory()
@@ -565,6 +799,15 @@ public class InventoryUI : MonoBehaviour
             noteMenu.CloseNotebook();
         }
 
+        // Default every open to non-loadout (programmatic: vendor / bait prompt). OpenLoadout
+        // upgrades it afterwards for the player-driven gear menu.
+        loadoutMode = false;
+        closeOnRelease = false;
+        // If a programmatic open interrupts an active loadout, let any borrowed fixed (shop)
+        // camera ease back. Harmless on a normal open (no camera borrowed); OpenLoadout re-borrows
+        // immediately after this when it upgrades to loadout mode.
+        EndLoadoutCameraBorrow();
+
         IsInventoryOpen = true;
         openedFrame = Time.frameCount;
         if (uiPanel != null) uiPanel.SetActive(true);
@@ -579,9 +822,12 @@ public class InventoryUI : MonoBehaviour
     public void CloseInventory()
     {
         IsInventoryOpen = false;
+        loadoutMode = false;
+        closeOnRelease = false;
+        EndLoadoutCameraBorrow();   // ease a borrowed fixed (shop) camera back to its captured pose
         if (uiPanel != null) uiPanel.SetActive(false);
         if (tooltip != null) tooltip.HideTooltip();
-        ResetGamepadNavigation();
+        ResetLoadoutNavigation();
 
         if (currentDraggedModel != null) Destroy(currentDraggedModel);
 
@@ -619,8 +865,10 @@ public class InventoryUI : MonoBehaviour
             if (slot != null) Destroy(slot.gameObject);
         }
         spawnedSlots.Clear();
-        // Slots were rebuilt — any D-pad selection now points at destroyed objects.
-        gamepadSelectedIndex = -1;
+
+        // Loadout-only menu: the caught-fish grid is hidden. The fish drag/sell code below
+        // (and in TryDropFish) stays intact but dormant — no slots are spawned to drag.
+        if (!showCaughtFish) return;
 
         if (PlayerInventory.Instance == null) return;
 

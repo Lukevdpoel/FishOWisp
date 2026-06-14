@@ -43,6 +43,7 @@ public class FishingZone : MonoBehaviour
         movedDurationPerYank = 0.5f,
         crankMovedTopUp = 0.15f,
         directHitRadius = 0.8f,
+        maxHoverFish = 2,
         maxActiveChasers = 2,
         ringDistance = 2.5f,
         arrivalBiteDelayMin = 0.3f,
@@ -52,6 +53,7 @@ public class FishingZone : MonoBehaviour
         patienceMin = 2.5f,
         patienceMax = 5.5f,
         boredCooldown = 8f,
+        postMissCooldown = 1.5f,
         baseBiteChance = 0.15f,
         movingBiteChance = 0.3f,
         nightChanceMultiplier = 1.5f,
@@ -636,6 +638,10 @@ public class FishingZone : MonoBehaviour
         grabbingFish = null;
         isCatchingFish = false;
         autoNibbleTimer = -1f;
+
+        // Startle the school: no other chaser may roll a new strike for a beat, so a missed bite
+        // isn't instantly punished by a second fish pouncing the moment this one spits the lure.
+        lureBrain.OnBiteMissed(in lureBrainSettings);
 
         // Let the whole school resume normal behaviour — including the spitter, which is held off
         // the lure by its own re-engage cooldown (FishRipple) rather than the avoid flag, so it

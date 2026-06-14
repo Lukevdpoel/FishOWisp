@@ -4,7 +4,7 @@ using UnityEngine.UI;
 
 public class FishRipple : MonoBehaviour
 {
-    public enum FishState { Wandering, Attracted, Scared, Nibbling, Striking, Grabbing, Despawning }
+    public enum FishState { Wandering, Attracted, Scared, Nibbling, Striking, Grabbing, Despawning, Hunting }
 
     [Header("Movement")]
     public float swimSpeed = 1.5f;
@@ -39,6 +39,20 @@ public class FishRipple : MonoBehaviour
     public float separationRadius = 0.8f;
     [Tooltip("How strongly the wander path bends away from nearby fish.")]
     public float separationStrength = 1.2f;
+
+    [Header("Predator Hunting")]
+    [Tooltip("How far this predator spots prey (species listed in its FishPreset 'prey' list) before giving chase. Non-predators ignore all of these.")]
+    public float huntRadius = 6f;
+    [Tooltip("Swim speed while chasing prey — set above swimSpeed so a predator can actually run prey down.")]
+    public float huntSpeed = 3f;
+    [Tooltip("Heading turn rate (deg/sec) while chasing. Agile — sits between the lazy wander turn and a full strike.")]
+    public float huntTurnRate = 220f;
+    [Tooltip("Distance from the prey at which the lunge lands: the prey bolts directly away from this predator and the predator breaks off.")]
+    public float huntCatchRange = 1.5f;
+    [Tooltip("If a chased fish escapes beyond this distance the predator gives up. Keep above huntRadius so a fish that's just out of sight isn't dropped instantly.")]
+    public float huntLeashRadius = 9f;
+    [Tooltip("Seconds a predator rests (back to wandering) after scaring or losing prey before it can hunt again — paces the chase/scatter/regroup rhythm.")]
+    public float huntCooldown = 3f;
 
     [Header("Natural Curiosity")]
     [Tooltip("How strongly the fish drifts toward the bobber while wandering (0 = none, 1 = strong).")]
@@ -195,16 +209,24 @@ public class FishRipple : MonoBehaviour
     private float scareTimer;
 
     // Lifetime despawn — mirrors HookedFishController's escape swim-off: burst away from the
-    // player, diving and fading out, then despawn for good.
+    // player, diving and fading out, then despawn for good. A predator catching its prey routes
+    // through the same exit, but faster and aimed away from the hunter (DespawnFleeSpeed).
     private const float DespawnDuration = 1.8f;
     private const float DespawnSpeed = 2.6f;
+    private const float DespawnFleeSpeed = 4f;
     private const float DespawnDiveDepth = 0.35f;
     private float ageTimer;
     private float despawnTimer;
     private Vector3 despawnDirection;
+    private float despawnSpeed;
 
     // Bobber avoidance
     private bool shouldAvoidBobber;
+
+    // Predator hunting: the prey this fish is currently chasing, and a rest timer after a chase
+    // ends so it doesn't instantly re-lock the fish it just scared off.
+    private FishRipple preyTarget;
+    private float huntCooldownTimer;
 
     // Lure brain: scales the passive awareness radius (1 = normal). The brain raises it while
     // the lure is twitching so movement draws fish from farther away, TP-style.
@@ -572,6 +594,9 @@ public class FishRipple : MonoBehaviour
         // coasts through its follow-through instead of immediately wheeling into another grab.
         if (reengageCooldown > 0f) reengageCooldown -= Time.deltaTime;
 
+        // Rest between hunts so a predator doesn't re-lock the prey it just scared the same frame.
+        if (huntCooldownTimer > 0f) huntCooldownTimer -= Time.deltaTime;
+
         switch (currentState)
         {
             case FishState.Wandering:
@@ -594,6 +619,9 @@ public class FishRipple : MonoBehaviour
                 break;
             case FishState.Despawning:
                 UpdateDespawning();
+                break;
+            case FishState.Hunting:
+                UpdateHunting();
                 break;
         }
 
@@ -651,6 +679,7 @@ public class FishRipple : MonoBehaviour
             case FishState.Attracted:  return 1.5f;
             case FishState.Nibbling:   return 0.6f;
             case FishState.Scared:     return 2.5f;
+            case FishState.Hunting:    return 2.2f;  // aggressive pursuit, just short of a lure strike
             case FishState.Striking:   return 2.8f;
             case FishState.Grabbing:   return 3f;   // hardest thrash — the fish is wrestling the lure
             case FishState.Despawning: return 2.6f; // same urgent tail-beat as the escape swim-off
@@ -765,6 +794,17 @@ public class FishRipple : MonoBehaviour
                     return;
                 }
             }
+        }
+
+        // Predators give chase. Bobber interaction always wins — the auto-attract above already
+        // returned if the tackle pulled this fish in — and a predator told to give the bobber
+        // space (mid-catch) stays calm. Otherwise a wandering predator that spots prey in its
+        // school locks on and hunts. This even interrupts a wander rest, so a resting pike pounces.
+        if (huntCooldownTimer <= 0f && !shouldAvoidBobber
+            && preset != null && preset.IsPredator && TryAcquirePrey())
+        {
+            currentState = FishState.Hunting;
+            return;
         }
 
         if (wanderPauseTimer > 0f)
@@ -999,11 +1039,88 @@ public class FishRipple : MonoBehaviour
         }
     }
 
-    // Lifetime's up: this fish moves on. It simply keeps swimming the way it was already headed —
-    // diving into the murk and fading out — rather than wheeling around to flee the player, which
-    // read as unnatural for a calm wandering fish. The zone is told immediately so the replacement
-    // spawns while the fade plays.
-    private void BeginDespawn()
+    // The chase: a predator charges the prey it locked onto. When it closes within huntCatchRange
+    // the prey bolts directly away from this predator (a real flee, not a bobber/random scatter)
+    // and the predator breaks off to rest. If the prey outruns the leash, the hunt is abandoned.
+    private void UpdateHunting()
+    {
+        // Only ever chase a calm, wandering fish. The moment the prey gets pulled into anything
+        // else — the player's bobber, another predator, leaving — the predator breaks off, so a
+        // hunt never snatches a fish the player is actively working.
+        if (preyTarget == null || preyTarget.currentState != FishState.Wandering)
+        {
+            EndHunt();
+            return;
+        }
+
+        Vector3 preyPos = preyTarget.transform.position;
+        float dist = GetHorizontalDistance(GetHeadPosition(), preyPos);
+
+        // Caught up: the prey bolts straight away from this predator and vanishes — diving and
+        // fading out (the same exit a lifetime despawn plays). The zone is notified the instant the
+        // despawn begins, so a replacement fish spawns to take its place while the fade runs.
+        if (dist < huntCatchRange)
+        {
+            preyTarget.BeginDespawn(transform.position);
+            EndHunt();
+            return;
+        }
+
+        // Outran the leash — abandon the chase.
+        if (dist > huntLeashRadius)
+        {
+            EndHunt();
+            return;
+        }
+
+        preyPos.y = waterSurfaceY;
+        SteerToward(preyPos, huntSpeed, huntTurnRate);
+    }
+
+    // Scan the shared school for the nearest huntable prey within huntRadius. Only calm, wandering
+    // prey are eligible — fish already fleeing, leaving, or drawn to the player's tackle are left
+    // alone so a hunt picks a fresh target and never disrupts active fishing.
+    private bool TryAcquirePrey()
+    {
+        if (school == null) return false;
+
+        FishRipple closest = null;
+        float bestSqr = huntRadius * huntRadius;
+        for (int i = 0; i < school.Count; i++)
+        {
+            FishRipple other = school[i];
+            if (other == null || other == this) continue;
+            if (!preset.Hunts(other.preset)) continue;
+            if (other.currentState != FishState.Wandering) continue;
+
+            Vector3 diff = other.transform.position - transform.position;
+            diff.y = 0f;
+            float sqr = diff.sqrMagnitude;
+            if (sqr <= bestSqr)
+            {
+                bestSqr = sqr;
+                closest = other;
+            }
+        }
+
+        preyTarget = closest;
+        return closest != null;
+    }
+
+    private void EndHunt()
+    {
+        preyTarget = null;
+        huntCooldownTimer = huntCooldown;
+        currentState = FishState.Wandering;
+        PickNewWanderTarget();
+    }
+
+    // This fish leaves for good, and the zone is told at once so the replacement spawns while the
+    // fade plays. Two callers, two moods: calm lifetime expiry (fleeFrom == null) keeps the current
+    // heading and cruises off — wheeling around to flee reads as unnatural for an unbothered fish;
+    // a prey fish a predator just caught (fleeFrom == the predator's position) bursts directly away
+    // from it, faster. Either way it dives into the murk and fades out.
+    private void BeginDespawn(Vector3? fleeFrom = null)
     {
         currentState = FishState.Despawning;
         despawnTimer = 0f;
@@ -1011,12 +1128,25 @@ public class FishRipple : MonoBehaviour
         onGrabStartCallback = null;
         onGrabReleasedCallback = null;
 
-        // Continue along the current heading, but prefer one with clear water: probe the mid-point
-        // of the swim-off and yaw around until one fits. A blocked heading just means the fade
-        // plays against the shore — acceptable worst case, so the heading stands if nothing better.
-        Vector3 heading = GetFlatForward();
+        // Pick the swim-off heading, then prefer one with clear water: probe the mid-point of the
+        // swim-off and yaw around until one fits. A blocked heading just means the fade plays
+        // against the shore — acceptable worst case, so the heading stands if nothing better.
+        Vector3 heading;
+        if (fleeFrom.HasValue)
+        {
+            Vector3 away = transform.position - fleeFrom.Value;
+            away.y = 0f;
+            heading = away.sqrMagnitude > 0.0001f ? away.normalized : GetFlatForward();
+            despawnSpeed = DespawnFleeSpeed;
+        }
+        else
+        {
+            heading = GetFlatForward();
+            despawnSpeed = DespawnSpeed;
+        }
+
         despawnDirection = heading;
-        float probeDistance = DespawnSpeed * DespawnDuration * 0.5f;
+        float probeDistance = despawnSpeed * DespawnDuration * 0.5f;
         float[] yawOffsets = { 0f, 30f, -30f, 60f, -60f, 90f, -90f, 135f, -135f, 180f };
         for (int i = 0; i < yawOffsets.Length; i++)
         {
@@ -1054,7 +1184,7 @@ public class FishRipple : MonoBehaviour
         }
 
         transform.rotation = Quaternion.Euler(0f, Mathf.Atan2(despawnDirection.x, despawnDirection.z) * Mathf.Rad2Deg, 0f);
-        Vector3 pos = transform.position + despawnDirection * (DespawnSpeed * Time.deltaTime);
+        Vector3 pos = transform.position + despawnDirection * (despawnSpeed * Time.deltaTime);
         pos.y = waterSurfaceY - DespawnDiveDepth * t;
         transform.position = pos;
 

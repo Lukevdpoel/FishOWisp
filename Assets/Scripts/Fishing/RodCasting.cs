@@ -21,6 +21,19 @@ public class RodCasting : MonoBehaviour
     public float maxThrowForce = 25f;
     public float chargeRate = 10f;
 
+    [Tooltip("Gamepad only. Shapes how trigger pressure maps to throw force. 1 = linear (raw " +
+             "trigger pull). Higher values bend the curve so the lower part of the trigger's " +
+             "travel maps to gentle, short casts and you have to squeeze hard for a long one. " +
+             "Because bobber distance grows with the SQUARE of force, a light press already " +
+             "throws far on a linear map, so 2-3 here gives a far more even distance gradient.")]
+    [Range(1f, 4f)] public float gamepadChargeCurve = 2.5f;
+
+    [Tooltip("Gamepad only. How fast the live throw force chases the trigger pressure, per " +
+             "second. Lower = smoother and more forgiving of trigger jitter (the charge bar you " +
+             "see is exactly what gets cast, so it just settles a touch slower); higher = " +
+             "snappier. 0 = instant, no smoothing.")]
+    public float gamepadChargeSmoothing = 12f;
+
     [Header("Physics Prediction")]
     [Tooltip("MUST MATCH the 'Extra Gravity' value in your BobberController script.")]
     public float bobberExtraGravity = 30f;
@@ -130,8 +143,18 @@ public class RodCasting : MonoBehaviour
             // holding to cast at this value (FishingRodController); letting the trigger go fully
             // cancels the charge. Because A commits with the trigger still down, there's no
             // spring-back to bleed the force, so the live value is exactly what gets thrown.
-            float t = Mathf.InverseLerp(GamepadInput.TriggerPressPoint, 1f, GamepadInput.ThrowChargeAnalog);
-            currentThrowForce = Mathf.Lerp(minThrowForce, maxThrowForce, t);
+            //
+            // The raw trigger pull is bent by gamepadChargeCurve before mapping to force:
+            // distance grows with the square of force, so a linear pull makes even a light press
+            // throw far and crams the usable distance range into the bottom of the trigger. The
+            // exponent spreads that range across the whole travel for a consistent gradient. A
+            // little smoothing then chases the target so trigger jitter doesn't snap the force.
+            float pull = Mathf.InverseLerp(GamepadInput.TriggerPressPoint, 1f, GamepadInput.ThrowChargeAnalog);
+            float shaped = Mathf.Pow(pull, gamepadChargeCurve);
+            float target = Mathf.Lerp(minThrowForce, maxThrowForce, shaped);
+            currentThrowForce = gamepadChargeSmoothing > 0f
+                ? Mathf.Lerp(currentThrowForce, target, 1f - Mathf.Exp(-gamepadChargeSmoothing * Time.deltaTime))
+                : target;
         }
         else
         {

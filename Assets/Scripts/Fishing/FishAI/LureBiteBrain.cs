@@ -45,7 +45,9 @@ public class LureBiteBrain
         public float directHitRadius;
 
         [Header("Chasers")]
-        [Tooltip("How many hovering fish actively roll for bites at once (TP caps chasers at 2). The rest just school around the lure.")]
+        [Tooltip("How many fish may be interested in (hover around) the lure at once. The brain keeps the nearest this-many engaged and tells every other fish to keep clear, so the lure never gathers a crowd. Set 0 to leave hovering uncapped.")]
+        public int maxHoverFish;
+        [Tooltip("How many hovering fish actively roll for bites at once (TP caps chasers at 2). The rest just school around the lure. Keep ≤ maxHoverFish.")]
         public int maxActiveChasers;
         [Tooltip("Distance from the lure at which an approaching chaser counts as 'in the ring' and starts its bite/patience timers. Keep above followerHoverDistance.")]
         public float ringDistance;
@@ -62,6 +64,8 @@ public class LureBiteBrain
         public float patienceMax;
         [Tooltip("After getting bored, the fish ignores the lure for this long (avoid flag), then may re-notice it.")]
         public float boredCooldown;
+        [Tooltip("After a fish spits the lure on a missed reaction, NO chaser may roll a new strike for this long. Stops a second fish from instantly biting the moment the first one is missed — the whole school gets a beat. Set 0 to disable.")]
+        public float postMissCooldown;
 
         [Header("Bite Chance")]
         [Tooltip("Strike probability per roll while the lure sits still (TP: 0.15).")]
@@ -78,6 +82,11 @@ public class LureBiteBrain
 
     private enum Phase { Approaching, InRing, Striking }
 
+    // Priority tiers for filling the capped hover set: a committed biter is never dropped, a fish
+    // already hovering keeps its slot over a wandering newcomer, and free slots go to the nearest
+    // wandering fish. This keeps the interested pair stable instead of churning as fish mill about.
+    private enum Tier { Committed, Hovering, Wandering }
+
     private class Chaser
     {
         public FishRipple fish;
@@ -92,8 +101,14 @@ public class LureBiteBrain
     private readonly List<Chaser> chasers = new List<Chaser>();
     private readonly List<FishRipple> boredFish = new List<FishRipple>();
     private readonly List<float> boredTimers = new List<float>();
+    // The fish currently allowed to be interested in the lure (rebuilt each tick by EnforceHoverCap).
+    private readonly List<FishRipple> hoverSet = new List<FishRipple>();
 
     private float movedTimer;
+
+    // While > 0 no chaser may roll a new strike: set when a grab is missed (the school is briefly
+    // startled) so a second fish can't instantly pounce on the lure the moment the first is spat out.
+    private float biteLockTimer;
 
     // onGrabStart fires when a striking fish clamps onto the lure (the reaction window opens);
     // onGrabReleased fires when it spits the lure on a missed bite. The zone wires both — the
@@ -147,6 +162,13 @@ public class LureBiteBrain
         movedTimer = Mathf.Max(movedTimer, s.movedDurationPerYank);
     }
 
+    // Zone calls this when a grab lapsed with no player response (a missed bite). Locks out every
+    // chaser's bite roll for postMissCooldown so the next fish can't instantly take its place.
+    public void OnBiteMissed(in Settings s)
+    {
+        biteLockTimer = Mathf.Max(biteLockTimer, s.postMissCooldown);
+    }
+
     // Full reset on reel-in / cancel / lure leaving the zone. Striking fish drop back to
     // wandering; bored fish are freed (a fresh cast is a fresh start). The zone's own
     // scatter/scare sweeps handle the hovering school.
@@ -165,6 +187,7 @@ public class LureBiteBrain
         }
         boredFish.Clear();
         boredTimers.Clear();
+        hoverSet.Clear();
 
         if (allFish != null)
         {
@@ -175,6 +198,7 @@ public class LureBiteBrain
         }
 
         movedTimer = 0f;
+        biteLockTimer = 0f;
     }
 
     public void Tick(float dt, List<FishRipple> fish, BobberController lure, bool crankActive, in Settings s)
@@ -182,6 +206,7 @@ public class LureBiteBrain
         if (lure == null || fish == null) return;
 
         movedTimer = Mathf.Max(0f, movedTimer - dt);
+        biteLockTimer = Mathf.Max(0f, biteLockTimer - dt);
         if (crankActive) movedTimer = Mathf.Max(movedTimer, s.crankMovedTopUp);
 
         bool lureMoved = movedTimer > 0f;
@@ -194,9 +219,81 @@ public class LureBiteBrain
         }
 
         TickBoredCooldowns(dt);
+        EnforceHoverCap(fish, lure, in s);
         PruneChasers();
         RecruitChasers(fish, lure, in s);
         TickChasers(dt, lure, lureMoved, in s);
+    }
+
+    // Cap how many fish may be interested in the lure at once. Each tick we rebuild the allowed
+    // "hover set" (nearest first, committed/already-hovering fish kept for stability) and tell
+    // everyone outside it to keep clear — so the lure draws an interested pair, never a crowd.
+    private void EnforceHoverCap(List<FishRipple> fish, BobberController lure, in Settings s)
+    {
+        if (s.maxHoverFish <= 0) return; // 0 = leave hovering uncapped (old behaviour)
+
+        Vector3 lurePos = lure.transform.position;
+        hoverSet.Clear();
+        FillHoverTier(fish, lurePos, s.maxHoverFish, Tier.Committed);
+        FillHoverTier(fish, lurePos, s.maxHoverFish, Tier.Hovering);
+        FillHoverTier(fish, lurePos, s.maxHoverFish, Tier.Wandering);
+
+        for (int i = 0; i < fish.Count; i++)
+        {
+            FishRipple f = fish[i];
+            if (f == null || f.preset == null || !f.preset.RespondsToLure) continue;
+            // Bored fish keep clear on their own cooldown; scared/despawning fish are mid-exit.
+            if (boredFish.Contains(f)) continue;
+            FishRipple.FishState st = f.CurrentState;
+            if (st == FishRipple.FishState.Scared || st == FishRipple.FishState.Despawning) continue;
+
+            if (hoverSet.Contains(f))
+            {
+                f.SetAvoidBobber(false);
+            }
+            else
+            {
+                f.StopFollowing();      // drop it out of any hover it had snuck into
+                f.SetAvoidBobber(true); // and keep it away so it can't re-attract
+            }
+        }
+    }
+
+    // Add fish matching the given tier to the hover set, nearest first, until the cap is reached.
+    private void FillHoverTier(List<FishRipple> fish, Vector3 lurePos, int cap, Tier tier)
+    {
+        while (hoverSet.Count < cap)
+        {
+            FishRipple best = null;
+            float bestDist = float.MaxValue;
+            for (int i = 0; i < fish.Count; i++)
+            {
+                FishRipple f = fish[i];
+                if (f == null || f.preset == null || !f.preset.RespondsToLure) continue;
+                if (boredFish.Contains(f) || hoverSet.Contains(f)) continue;
+                if (!TierMatches(f.CurrentState, tier)) continue;
+
+                float d = FishMovementHelpers.GetHorizontalDistance(f.transform.position, lurePos);
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    best = f;
+                }
+            }
+            if (best == null) return;
+            hoverSet.Add(best);
+        }
+    }
+
+    private static bool TierMatches(FishRipple.FishState st, Tier tier)
+    {
+        switch (tier)
+        {
+            case Tier.Committed: return st == FishRipple.FishState.Striking || st == FishRipple.FishState.Grabbing;
+            case Tier.Hovering:  return st == FishRipple.FishState.Attracted;
+            case Tier.Wandering: return st == FishRipple.FishState.Wandering;
+            default:             return false;
+        }
     }
 
     private void TickBoredCooldowns(float dt)
@@ -281,9 +378,23 @@ public class LureBiteBrain
         return false;
     }
 
+    private bool AnyStriking()
+    {
+        for (int i = 0; i < chasers.Count; i++)
+        {
+            if (chasers[i].phase == Phase.Striking) return true;
+        }
+        return false;
+    }
+
     private void TickChasers(float dt, BobberController lure, bool lureMoved, in Settings s)
     {
         Vector3 lurePos = lure.transform.position;
+
+        // Only one fish may ever be committed to the lure at a time. A strike is blocked while
+        // another chaser is already dashing in (AnyStriking) or while the post-miss lock is up —
+        // and once we launch one this tick, the local flag stops a second firing the same frame.
+        bool strikeBlocked = biteLockTimer > 0f || AnyStriking();
 
         for (int i = chasers.Count - 1; i >= 0; i--)
         {
@@ -316,7 +427,9 @@ public class LureBiteBrain
                     c.patience = Random.Range(s.patienceMin, s.patienceMax);
                 }
 
-                if (c.timerArmed)
+                // While another fish owns the bite (or the post-miss lock is up) the timer is
+                // frozen — the chaser hovers, armed, and takes its turn once the lure is free.
+                if (c.timerArmed && !strikeBlocked)
                 {
                     c.biteTimer -= dt;
                     if (c.biteTimer <= 0f)
@@ -328,6 +441,7 @@ public class LureBiteBrain
                             if (c.fish.CurrentState == FishRipple.FishState.Striking)
                             {
                                 c.phase = Phase.Striking;
+                                strikeBlocked = true; // this fish now owns the lure for this tick onward
                                 continue;
                             }
                         }

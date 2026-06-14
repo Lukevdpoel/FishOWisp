@@ -378,6 +378,12 @@ public class FishingRodController : MonoBehaviour
             Debug.Log("[FishFight] StartCharging BLOCKED — controls locked");
             return;
         }
+        // Can't cast while jumping or otherwise airborne — must be planted on the ground.
+        if (playerController != null && !playerController.IsGrounded)
+        {
+            Debug.Log("[FishFight] StartCharging BLOCKED — player is airborne");
+            return;
+        }
         if (bobberInWater != null || activeBobber != null)
         {
             Debug.Log($"[FishFight] StartCharging BLOCKED — bobberInWater: {(bobberInWater != null ? "exists" : "null")}, activeBobber: {(activeBobber != null ? "exists" : "null")}");
