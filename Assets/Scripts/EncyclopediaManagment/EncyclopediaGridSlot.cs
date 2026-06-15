@@ -17,21 +17,23 @@ public class EncyclopediaGridSlot : MonoBehaviour, IPointerClickHandler
         myEntry = entry;
         controller = uiController;
 
-        if (entry.preset != null)
-        {
-            iconImage.sprite = entry.preset.fishImage;
-        }
+        bool isCaught = entry != null && entry.hasCaught > 0;
 
-        bool isCaught = entry.hasCaught > 0;
+        if (iconImage != null)
+        {
+            // Guard the icon: only assign a sprite that is actually present. A fishImage that is
+            // unassigned OR points at a since-deleted asset reads as Unity "fake null", and pushing
+            // that into Image.sprite hard-crashes a player build — the engine reads sprite.rect on
+            // assignment and faults on the dangling native object (NOT a catchable managed exception).
+            // Assigning real null is safe, so collapse the fake-null down to null.
+            Sprite icon = (entry != null && entry.preset != null) ? entry.preset.fishImage : null;
+            iconImage.sprite = icon != null ? icon : null;
+            iconImage.color = isCaught ? Color.white : Color.black;
+        }
 
         if (unknownOverlay != null)
         {
             unknownOverlay.SetActive(!isCaught);
-        }
-
-        if (iconImage != null)
-        {
-            iconImage.color = isCaught ? Color.white : Color.black;
         }
 
         Deselect();
