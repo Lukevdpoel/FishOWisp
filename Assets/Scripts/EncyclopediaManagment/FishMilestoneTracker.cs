@@ -25,6 +25,13 @@ public class FishMilestoneTracker : GenericSingleton<FishMilestoneTracker>
 
     public static event Action<MilestoneEvent> OnMilestoneReached;
 
+    // Fires once for EVERY secured catch (after counts are updated), unlike OnMilestoneReached which
+    // only fires at the tier thresholds. This is the authoritative "a fish was actually caught and
+    // kept" signal — listeners that care about every catch (e.g. achievements for landing a
+    // legendary or completing the encyclopedia) hook this rather than a hook-time fishing event,
+    // which would fire before the catch is secured.
+    public static event Action<CaughtFish> OnCatchRegistered;
+
     [Serializable]
     private class CountEntry
     {
@@ -48,6 +55,22 @@ public class FishMilestoneTracker : GenericSingleton<FishMilestoneTracker>
 
     private string SavePath => Path.Combine(Application.persistentDataPath, "fish_milestones.json");
 
+    // This tracker is the source of the milestone/catch events the achievement system listens to,
+    // but it was never placed in any scene or prefab — so GenericSingleton.Instance stayed null,
+    // PlayerInventory.AddFish's null-check skipped RegisterCatch, and no catch ever reached the
+    // milestone pipeline (the encyclopedia still updated because its manager IS in the scene).
+    // Self-bootstrap into a persistent object so the tracker always exists, mirroring how the
+    // partner AchievementManager installs itself. It has no inspector-configured state, so a
+    // code-created instance is fully functional.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void Bootstrap()
+    {
+        if (Instance != null) return;
+        var go = new GameObject(nameof(FishMilestoneTracker));
+        go.AddComponent<FishMilestoneTracker>();
+        DontDestroyOnLoad(go);
+    }
+
     protected override void Awake()
     {
         base.Awake();
@@ -63,18 +86,22 @@ public class FishMilestoneTracker : GenericSingleton<FishMilestoneTracker>
 
         string speciesKey = fish.preset.fishName;
         string sizeKey = SizeClassHelper.FromLengthCm(fish.lengthCm).ToString();
-        string weatherKey = fish.preset.preferredWeather.ToString();
+        // Time of day this fish was actually caught (Day/Night), not a fixed per-species trait.
+        string timeOfDayKey = (WorldStateManager.Instance != null && WorldStateManager.Instance.IsNight)
+            ? "Night" : "Day";
 
         int speciesCount = Increment(speciesCounts, speciesKey);
         int sizeCount = Increment(sizeClassCounts, sizeKey);
-        int weatherCount = Increment(weatherCounts, weatherKey);
+        int timeOfDayCount = Increment(weatherCounts, timeOfDayKey);
         totalCount++;
 
         Save();
 
+        OnCatchRegistered?.Invoke(fish);
+
         TryFireMilestone(MilestoneCategory.Species, speciesKey, speciesCount, fish);
         TryFireMilestone(MilestoneCategory.SizeClass, sizeKey, sizeCount, fish);
-        TryFireMilestone(MilestoneCategory.Weather, weatherKey, weatherCount, fish);
+        TryFireMilestone(MilestoneCategory.Weather, timeOfDayKey, timeOfDayCount, fish);
         TryFireMilestone(MilestoneCategory.Total, "All", totalCount, fish);
     }
 
@@ -100,7 +127,7 @@ public class FishMilestoneTracker : GenericSingleton<FishMilestoneTracker>
 
     public int GetSpeciesCount(string speciesName) => speciesCounts.TryGetValue(speciesName, out var c) ? c : 0;
     public int GetSizeClassCount(SizeClass sizeClass) => sizeClassCounts.TryGetValue(sizeClass.ToString(), out var c) ? c : 0;
-    public int GetWeatherCount(WeatherType weather) => weatherCounts.TryGetValue(weather.ToString(), out var c) ? c : 0;
+    public int GetTimeOfDayCount(bool isNight) => weatherCounts.TryGetValue(isNight ? "Night" : "Day", out var c) ? c : 0;
     public int GetTotalCount() => totalCount;
 
     private void Save()

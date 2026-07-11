@@ -98,9 +98,14 @@ public class ShopDoorController : MonoBehaviour
     {
         if (state != State.Outside && state != State.Inside) return;
         if (currentPlayer == null) return;
+        // Door interacts wait until any charge jump has fully landed (hint hidden too).
+        if (currentPlayer.IsJumping) return;
 
         bool canEnter = state == State.Outside && playerInOutsideZone;
         bool canExit = state == State.Inside && (insideExitTrigger == null ? playerInOutsideZone : playerInInsideZone);
+
+        // Tell the HUD prompt bar an interact is available at the door.
+        if (canEnter || canExit) InteractHint.Ping();
 
         bool interactPressed = Input.GetKeyDown(interactKey) || GamepadInput.InteractPressed;
         if (canEnter && interactPressed) StartCoroutine(EnterSequence());

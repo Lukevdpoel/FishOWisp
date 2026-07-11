@@ -23,8 +23,8 @@ MonoBehaviour:
     pagePrev: 276
   xbox:
     sprintToggle: 7
-    jump: 1
-    interact: 2
+    jump: 3
+    interact: 1
     cancel: 3
     notebookToggle: 11
     inventoryToggle: 4
@@ -37,9 +37,23 @@ MonoBehaviour:
     reel: 8
   playStation:
     sprintToggle: 7
-    jump: 1
-    interact: 2
+    jump: 3
+    interact: 1
     cancel: 3
+    notebookToggle: 11
+    inventoryToggle: 4
+    pageNext: 6
+    pagePrev: 5
+    throwCharge: 8
+    resetCast: 6
+    aim: 5
+    attract: 8
+    reel: 8
+  nintendo:
+    sprintToggle: 7
+    jump: 1
+    interact: 3
+    cancel: 1
     notebookToggle: 11
     inventoryToggle: 4
     pageNext: 6

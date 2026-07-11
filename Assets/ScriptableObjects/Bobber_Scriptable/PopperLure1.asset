@@ -13,8 +13,11 @@ MonoBehaviour:
   m_Name: PopperLure1
   m_EditorClassIdentifier: Assembly-CSharp::BobberItem
   id: PopperLure1
-  displayName: PopperLure1
+  displayName: Popper Lure
   icon: {fileID: 0}
-  description: used to attract fish that prefer bigger, livelier prey.
+  description: A noisy surface lure. Press {walk} to wiggle it and tempt fish into
+    chasing. Press {Hook} to hook a fish when it bites!
   kind: 1
+  lureStyle: 1
   bobberPrefab: {fileID: 2032432550669248663, guid: 2ae3d38e94dbcc24ab83dc60426a030c, type: 3}
+  dangleFacingYawOffset: 0

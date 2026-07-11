@@ -9,14 +9,16 @@ public class CameraFovTracker
     private bool hasBaseFov;
     private bool isBiteActive;
 
-    public void Initialize(Camera camera)
+    // baseFieldOfView is the authoritative gameplay FOV. We set it explicitly rather than reading
+    // cam.fieldOfView so the Cinemachine vcams' FOV — which drives the menu reveal and is whatever the
+    // camera happens to sit at during the handoff — can't leak in and silently change how gameplay
+    // looks. The live FOV is snapped to it so no wider vcam FOV lingers after the handoff.
+    public void Initialize(Camera camera, float baseFieldOfView)
     {
         cam = camera;
-        if (cam != null)
-        {
-            baseFov = cam.fieldOfView;
-            hasBaseFov = true;
-        }
+        baseFov = baseFieldOfView;
+        hasBaseFov = true;
+        if (cam != null) cam.fieldOfView = baseFov;
     }
 
     public void OnBiteStart() => isBiteActive = true;
@@ -30,7 +32,10 @@ public class CameraFovTracker
         float biteFovZoom,
         float biteFovLerpSpeed,
         float sprintFovBoost,
-        float sprintFovLerpSpeed)
+        float sprintFovLerpSpeed,
+        bool isAimTracking,
+        float aimTrackFovZoom,
+        float aimTrackFovLerpSpeed)
     {
         if (cam == null && cameraTransform != null) cam = cameraTransform.GetComponent<Camera>();
         if (cam == null) return;
@@ -41,12 +46,19 @@ public class CameraFovTracker
             hasBaseFov = true;
         }
 
+        // Priority: a bite zoom (the reaction window) always wins; otherwise a zoom-research fish
+        // lock narrows the FOV to lean in on the fish; otherwise sprint widens / base.
         float targetFov;
         float lerpSpeed;
         if (isBiteActive)
         {
             targetFov = baseFov - biteFovZoom;
             lerpSpeed = biteFovLerpSpeed;
+        }
+        else if (isAimTracking)
+        {
+            targetFov = baseFov - aimTrackFovZoom;
+            lerpSpeed = aimTrackFovLerpSpeed;
         }
         else
         {

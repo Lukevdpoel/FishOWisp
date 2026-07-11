@@ -191,7 +191,9 @@ public class ReflectRenderPass : ScriptableRendererFeature
                 // For some reason BlitCameraTexture(cmd, dest, dest) scenario (as with before transparents effects) blitter fails to correctly blit the data
                 // Sometimes it copies only one effect out of two, sometimes second, sometimes data is invalid (as if sampling failed?).
                 // Adding RTHandle in between solves this issue.
+#pragma warning disable CS0618 // cameraColorTargetHandle: intentional URP compatibility-mode path, not migrating to Render Graph
                 var source = isBeforeTransparents ? cameraData.renderer.cameraColorTargetHandle : cameraData.renderer.cameraColorTargetHandle;
+#pragma warning restore CS0618
 
                 Blitter.BlitCameraTexture(cmd, source, copiedColor);
                 passMaterial.SetTexture(m_BlitTextureShaderID, copiedColor);
@@ -282,13 +284,17 @@ public class ReflectRenderPass : ScriptableRendererFeature
                 // For some reason BlitCameraTexture(cmd, dest, dest) scenario (as with before transparents effects) blitter fails to correctly blit the data
                 // Sometimes it copies only one effect out of two, sometimes second, sometimes data is invalid (as if sampling failed?).
                 // Adding RTHandle in between solves this issue.
+#pragma warning disable CS0618 // cameraColorTargetHandle: intentional URP compatibility-mode path, not migrating to Render Graph
                 var source = isBeforeTransparents ? cameraData.renderer.cameraColorTargetHandle : cameraData.renderer.cameraColorTargetHandle;
+#pragma warning restore CS0618
 
                 Blitter.BlitCameraTexture(cmd, source, copiedColor);
                 passMaterial.SetTexture(m_BlitTextureShaderID, copiedColor);
             }
 
+#pragma warning disable CS0618 // cameraColorTargetHandle: intentional URP compatibility-mode path, not migrating to Render Graph
             CoreUtils.SetRenderTarget(cmd, cameraData.renderer.cameraColorTargetHandle);
+#pragma warning restore CS0618
             CoreUtils.DrawFullScreen(cmd, passMaterial);
             context.ExecuteCommandBuffer(cmd);
             cmd.Clear();

@@ -9,6 +9,13 @@ public class FishingUIController : MonoBehaviour
     public GameObject fightUIPanel;
     public Slider progressBar;
     public TextMeshProUGUI fishNameText;
+    [Tooltip("Keep the on-screen fight progress slider hidden. The reel meter is meant to be a " +
+             "feel-based gauge read off the rod/fish, not a HUD bar. Turn off to show it again. " +
+             "Ignored when Hide Fight Panel is on (the whole panel is suppressed).")]
+    public bool hideProgressBar = true;
+    [Tooltip("Suppress the entire fight panel (slider + fish-name text) during a fight, so no fishing " +
+             "HUD appears at all. Turn off to bring the panel back.")]
+    public bool hideFightPanel = true;
 
     [Header("Charge UI (deprecated)")]
     [Tooltip("Legacy on-screen charge panel. Force-hidden — charge feedback now lives on the camera (zoom/pitch).")]
@@ -64,6 +71,7 @@ public class FishingUIController : MonoBehaviour
     {
         HideFightPanel();
         HideChargePanel();
+        ApplyProgressBarVisibility();
     }
 
     private void HideChargePanel()
@@ -86,14 +94,33 @@ public class FishingUIController : MonoBehaviour
 
     private void ShowFightUI(FishPreset fish)
     {
+        // Fully suppress the fight HUD when requested — keep the panel off entirely.
+        if (hideFightPanel)
+        {
+            HideFightPanel();
+            return;
+        }
+
         if (fightUIPanel != null)
         {
             fightUIPanel.SetActive(true);
         }
 
+        ApplyProgressBarVisibility();
+
         if (fishNameText != null && fish != null)
         {
             fishNameText.text = $"A {fish.fishName} is on the line!";
+        }
+    }
+
+    // The reel meter is a hidden gauge by default — keep its slider GameObject off so activating
+    // the fight panel (for the fish-name text) never reveals the bar.
+    private void ApplyProgressBarVisibility()
+    {
+        if (progressBar != null && hideProgressBar)
+        {
+            progressBar.gameObject.SetActive(false);
         }
     }
 
@@ -116,6 +143,7 @@ public class FishingUIController : MonoBehaviour
 
     private void UpdateProgress(float current, float max)
     {
+        if (hideProgressBar) return;
         if (progressBar != null)
         {
             progressBar.maxValue = max;

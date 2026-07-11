@@ -68,6 +68,9 @@ public class LureReelHandler
         public float lureAngularDamping;
 
         [Header("Retract")]
+        [Tooltip("Distance from the waterline nearest the player at which a bite-less lure auto-retracts " +
+                 "(and the crank/yank forces stop). Measured to the shore, not the player, so a lure cast " +
+                 "from well back on the bank still completes its reel-in once it reaches the water's edge.")]
         public float retractDistance;
 
         [Header("Visual")]
@@ -80,6 +83,21 @@ public class LureReelHandler
         public float visualBobAmplitude;
         [Tooltip("Vertical bounce frequency (Hz).")]
         public float visualBobFrequencyHz;
+
+        [Header("Popper (surface chatter — Popper lures only)")]
+        [Tooltip("Nose-bounce amplitude (deg) for a Popper lure: while being tugged or reeled its " +
+                 "front pitches up/down this far to read as a chattering surface popper (scaled by " +
+                 "movement intensity, so a still popper sits level). Applied directly (bypasses the " +
+                 "buoyancy slerp) so the high-frequency pop is actually visible. 0 = no chatter. " +
+                 "Reel/yank physics are unaffected — this is purely visual.")]
+        public float popperBounceAmplitudeDeg;
+        [Tooltip("Nose-bounce frequency (Hz) for a Popper lure. Higher = faster surface chatter.")]
+        public float popperBounceFrequencyHz;
+        [Tooltip("Seconds between splash particles spawned at a Popper lure's nose WHILE IT'S MOVING " +
+                 "(being tugged or reeled). A still popper makes no splash. ≤ 0 disables the splashes " +
+                 "(the bounce still plays). The splash prefab is set on the BobberController (falls " +
+                 "back to its nibble splash).")]
+        public float popperSplashInterval;
     }
 
     public enum Outcome { Continue, RetractRequested }
@@ -89,11 +107,16 @@ public class LureReelHandler
     // almost immediately — the visible watery tail lives in the managed decay above this.
     private const float PullCutoffSpeed = 0.05f;
 
+    // Below this movement intensity the popper is treated as still — no splashes spawn and the
+    // nose bounce has faded to nothing. Keeps the long decay tail of a tug from dribbling splashes.
+    private const float PopperSplashMinIntensity = 0.1f;
+
     private float nudgeIntensity;
     private float prevLateralInput;
     private float pullSpeed;
     private float headingDeg; // signed offset of the pull from the lure→rod line; + = player's left
     private bool reelHeldBroadcast; // last state sent via OnLureReelChanged
+    private float popperSplashTimer; // counts down to the next popper nose-splash
 
     public void Reset()
     {
@@ -101,6 +124,7 @@ public class LureReelHandler
         prevLateralInput = 0f;
         pullSpeed = 0f;
         headingDeg = 0f;
+        popperSplashTimer = 0f;
         BroadcastReelHeld(false);
     }
 
@@ -136,12 +160,13 @@ public class LureReelHandler
 
     public Outcome Tick(
         BobberController activeBobber,
-        Transform playerModel,
+        Vector3 reelTarget,
         bool reelHeld,
         float lateralInput,
+        bool isPopper,
         in Settings s)
     {
-        if (activeBobber == null || playerModel == null) return Outcome.Continue;
+        if (activeBobber == null) return Outcome.Continue;
         if (!activeBobber.IsInWater) return Outcome.Continue;
 
         Rigidbody rb = activeBobber.GetComponent<Rigidbody>();
@@ -170,10 +195,16 @@ public class LureReelHandler
         BroadcastReelHeld(reelHeld);
 
         Vector3 bobberPos = rb.position;
-        Vector3 toPlayer = playerModel.position - bobberPos;
-        toPlayer.y = 0f;
-        float dist = toPlayer.magnitude;
-        Vector3 toRodDirHoriz = dist > 0.001f ? toPlayer / dist : Vector3.zero;
+        // "Home" for the reel is the waterline between the player and the lure (reelTarget,
+        // computed by the rod), not the player themselves. A lure cast while the player stands
+        // back from the bank would otherwise beach at the shore and stall just short of
+        // retractDistance, never finishing the reel-in. When the player is at/over the water the
+        // target collapses to the player, so behavior there is unchanged. Only this reference
+        // point moves — the reel/yank forces, decay and buoyancy are all untouched.
+        Vector3 toTarget = reelTarget - bobberPos;
+        toTarget.y = 0f;
+        float dist = toTarget.magnitude;
+        Vector3 toRodDirHoriz = dist > 0.001f ? toTarget / dist : Vector3.zero;
 
         // Continuous reel-in while the player holds LMB. This is the primary travel mechanism —
         // the wiggle-only design was unreadable, so cranking the reel actually does what it
@@ -268,6 +299,11 @@ public class LureReelHandler
             Mathf.Sin(Time.time * s.visualBobFrequencyHz * Mathf.PI * 2f)
             * s.visualBobAmplitude * nudgeIntensity;
 
+        // Popper surface chatter: a constant fast nose-bounce written into a separate channel the
+        // BobberController applies directly (the buoyancy slerp would damp this frequency away).
+        // Layers on top of the speedboat lean above without touching the reel/yank physics.
+        UpdatePopperVisual(activeBobber, isPopper, dt, in s);
+
         if (dist <= s.retractDistance)
         {
             ClearVisualState(activeBobber);
@@ -276,16 +312,58 @@ public class LureReelHandler
         return Outcome.Continue;
     }
 
+    // Drives the popper's constant surface chatter (nose bounce + periodic nose-splash). Writes the
+    // instantaneous bounce into BobberController.popperBounceDeg and flags isPopperLure so its
+    // ApplyBuoyancy applies the bounce directly. A basic lure (isPopper false) clears the channel.
+    private void UpdatePopperVisual(BobberController lure, bool isPopper, float dt, in Settings s)
+    {
+        if (!isPopper)
+        {
+            lure.isPopperLure = false;
+            lure.popperBounceDeg = 0f;
+            popperSplashTimer = 0f;
+            return;
+        }
+
+        lure.isPopperLure = true;
+
+        // The chatter only plays while the lure is actually moving (being tugged or reeled).
+        // nudgeIntensity is the same movement signal that drives the speedboat lean — 1 on a
+        // yank/crank, decaying to 0 when motion stops — so the bounce fades in on a tug and dies
+        // down as the lure settles. A still popper sits level: no bounce, no splash.
+        lure.popperBounceDeg =
+            Mathf.Sin(Time.time * s.popperBounceFrequencyHz * Mathf.PI * 2f)
+            * s.popperBounceAmplitudeDeg * nudgeIntensity;
+
+        if (s.popperSplashInterval > 0f && nudgeIntensity > PopperSplashMinIntensity)
+        {
+            popperSplashTimer -= dt;
+            if (popperSplashTimer <= 0f)
+            {
+                lure.PlayPopperSplash();
+                popperSplashTimer = s.popperSplashInterval;
+            }
+        }
+        else
+        {
+            // Still: keep the timer armed at 0 so the first tug splashes promptly.
+            popperSplashTimer = 0f;
+        }
+    }
+
     private void ClearVisualState(BobberController lure)
     {
         if (lure != null)
         {
             lure.lureVisualPitchDeg = 0f;
             lure.lureBobOffset = 0f;
+            lure.isPopperLure = false;
+            lure.popperBounceDeg = 0f;
         }
         nudgeIntensity = 0f;
         pullSpeed = 0f;
         headingDeg = 0f;
+        popperSplashTimer = 0f;
         BroadcastReelHeld(false);
     }
 

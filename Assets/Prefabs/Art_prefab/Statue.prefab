@@ -11,7 +11,8 @@ GameObject:
   - component: {fileID: 5574103894495276604}
   - component: {fileID: 5010331646612525936}
   - component: {fileID: 2845316719480385638}
-  m_Layer: 0
+  - component: {fileID: 8588924543671071943}
+  m_Layer: 8
   m_Name: Statue
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -90,3 +91,26 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!136 &8588924543671071943
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4097769340738866968}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 1.1123625
+  m_Height: 2.5923262
+  m_Direction: 1
+  m_Center: {x: -0.0017049909, y: 0.038559973, z: -0.028623462}

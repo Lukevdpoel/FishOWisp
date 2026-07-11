@@ -4872,6 +4872,15 @@ MonoBehaviour:
   wanderWeaveFrequency: 0.35
   separationRadius: 0.8
   separationStrength: 1.2
+  schoolPerceptionRadius: 8
+  schoolCohesionStrength: 0.8
+  schoolAlignmentStrength: 0.6
+  huntRadius: 6
+  huntSpeed: 3
+  huntTurnRate: 220
+  huntCatchRange: 1.5
+  huntLeashRadius: 9
+  huntCooldown: 3
   naturalAttraction: 0.05
   naturalAttractionMinDist: 3.5
   weaveAmplitude: 4
@@ -4898,11 +4907,28 @@ MonoBehaviour:
   scareRange: 1
   bobberAvoidRadius: 3
   followerHoverDistance: 1.4
+  nibbleStartRange: 1.3
+  nibbleCircleRadius: 1
+  nibbleCircleSpeed: 1.3
+  nibbleDashSpeed: 3.5
+  nibbleTouchRadius: 0.45
+  nibblePassDistance: 1.2
+  nibbleGapRange: {x: 2, y: 5}
+  nibblesBeforeBite: {x: 0, y: 3}
+  nibbleTurnRate: 200
+  nibbleRadiusJitter: 0.35
+  nibbleWanderStrength: 0.4
+  nibbleDashRise: 0.33
   actionRadius: 8
   strikeSpeed: 3.5
   strikeLeapRange: 0.9
-  strikeLeapHeight: 0.45
-  strikeLeapDuration: 0.4
+  strikeRiseDistance: 1.6
+  strikeRiseSpeed: 4
+  grabHoldDuration: 0.6
+  grabForwardSpeed: 2.2
+  grabPullDownDepth: 0.25
+  grabReleaseFollowThrough: 2.5
+  grabReleaseAvoidTime: 2.5
   aimRevealRange: 20.04
   glimpseIntervalMin: 1.5
   glimpseIntervalMax: 4
@@ -4912,7 +4938,27 @@ MonoBehaviour:
   glimpseFadeOut: 0.6
   alwaysShowIndicator: 1
   enableBaitIndicator: 0
+  enableInterestIndicators: 1
+  noticeText: '!'
+  noticeColor: {r: 1, g: 0.79607844, b: 0.15686275, a: 1}
+  noticeFontSize: 8
+  noticeSound: {fileID: 8300000, guid: 2657a5c5a2579ab4b9dcfa6a3b9e9f1b, type: 3}
+  noticeSoundVolume: 1
+  noticeDuration: 1
+  investigateDotSpeed: 3
+  investigateDotColor: {r: 1, g: 0.7971703, b: 0.15566039, a: 1}
+  investigateDotFontSize: 5.82
+  indicatorHeight: 0.04
+  indicatorScale: 0.5
+  indicatorFadeTime: 0.15
+  indicatorSortingOrder: 100
   scareCooldown: 2
   wanderPauseMin: 0.5
   wanderPauseMax: 1
+  restChance: 0.734
+  restDurationRange: {x: 4, y: 10}
+  restEaseSeconds: 1.2
+  lifetimeSeconds: 120
+  lifetimeJitterSeconds: 20
+  spawnFadeInSeconds: 2.5
   preset: {fileID: 0}

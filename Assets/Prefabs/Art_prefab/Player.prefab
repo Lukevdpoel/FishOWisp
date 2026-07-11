@@ -366,6 +366,7 @@ MonoBehaviour:
   pricePerCmText: {fileID: 0}
   baitText: {fileID: 0}
   weatherText: {fileID: 0}
+  researchChecklist: {fileID: 0}
 --- !u!1 &659269392260550871
 GameObject:
   m_ObjectHideFlags: 0
@@ -1788,7 +1789,6 @@ GameObject:
   - component: {fileID: 1914067530932370018}
   - component: {fileID: 3597150921749443375}
   - component: {fileID: 9122994942126807759}
-  - component: {fileID: 2931106924116900303}
   m_Layer: 6
   m_Name: Casting
   m_TagString: Player
@@ -1827,8 +1827,8 @@ MonoBehaviour:
   currentState: 0
   danglingBobber: {fileID: 73350193116209274}
   playerModel: {fileID: 5864620747877901436}
-  minigameUI: {fileID: 2931106924116900303}
   inspectionHandler: {fileID: 9122994942126807759}
+  inventoryUIRef: {fileID: 0}
   playerAnimator: {fileID: 5048647682359618787}
   failAnimationTrigger: FailHook
   failCooldown: 1
@@ -1841,6 +1841,30 @@ MonoBehaviour:
   maxFightProgress: 100
   initialFightProgress: 30
   fallbackFightProgressRate: 10
+  catchDistance: 3
+  reelPullSpeed: 2
+  pullStopInset: 0.2
+  waterlineMask:
+    serializedVersion: 2
+    m_Bits: 0
+  lureSettings:
+    reelHoldForce: 30
+    reelAlignRate: 6
+    yankPullSpeed: 2.5
+    pullDecayRate: 2.5
+    yankArcAngleDeg: 30
+    maxArcAngleDeg: 45
+    headingRecenterRate: 2
+    yankAlignmentImpulse: 0.6
+    lureAngularDamping: 1.5
+    retractDistance: 3
+    intensityDecayRate: 4
+    visualPitchAngleDeg: 10
+    visualBobAmplitude: 0
+    visualBobFrequencyHz: 3
+    popperBounceAmplitudeDeg: 6
+    popperBounceFrequencyHz: 5
+    popperSplashInterval: 0.4
 --- !u!114 &3597150921749443375
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1863,6 +1887,7 @@ MonoBehaviour:
   bobberExtraGravity: 20
   aimConeAngle: 30
   aimSensitivity: 2
+  gamepadAimSpeed: 90
   aimSmoothing: 10
   playerAimRotationSpeed: 10
 --- !u!114 &9122994942126807759
@@ -1884,26 +1909,6 @@ MonoBehaviour:
   fishRotationSpeed: 45
   minInspectionTime: 0.5
   showCatchAnimBool: ShowCatch
---- !u!114 &2931106924116900303
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 4269814841537903898}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9e4769da2a76cf144bc7eb5777540620, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::DirectionalFishingMinigame
-  rodSensitivity: 0.15
-  rodReturnSpeed: 1.5
-  rodDeadZone: 0.15
-  struggleDuration: 4
-  restDuration: 2.5
-  clickFillAmount: 20
-  progressLossRate: 4
-  progressLossFloor: -1
 --- !u!1 &4763755357318450505
 GameObject:
   m_ObjectHideFlags: 0
@@ -2369,6 +2374,7 @@ GameObject:
   - component: {fileID: 6037031500218460685}
   - component: {fileID: 4795543610252042434}
   - component: {fileID: 1589148470438689418}
+  - component: {fileID: 1628014675412749566}
   m_Layer: 6
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -2384,13 +2390,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5930554567775440345}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.30652788, y: -0.36100653, z: 0.126968, w: 0.8715469}
-  m_LocalPosition: {x: 2.67, y: 3.91, z: -2.71}
+  m_LocalRotation: {x: 0.023168398, y: 0.564835, z: -0.015867477, w: 0.824726}
+  m_LocalPosition: {x: 3.8065636, y: -0.11982966, z: 2.5516212}
   m_LocalScale: {x: 0.697788, y: 0.697788, z: 0.697788}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 8869207768773921664}
-  m_LocalEulerAnglesHint: {x: 38.754, y: -45, z: 0}
+  m_LocalEulerAnglesHint: {x: 19.13, y: -3.169, z: -1.056}
 --- !u!20 &6037031500218460685
 Camera:
   m_ObjectHideFlags: 0
@@ -2495,6 +2501,38 @@ AudioListener:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5930554567775440345}
   m_Enabled: 1
+--- !u!114 &1628014675412749566
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5930554567775440345}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 72ece51f2901e7445ab60da3685d6b5f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.Cinemachine::Unity.Cinemachine.CinemachineBrain
+  ShowDebugText: 0
+  ShowCameraFrustum: 1
+  IgnoreTimeScale: 0
+  WorldUpOverride: {fileID: 0}
+  ChannelMask: -1
+  UpdateMethod: 2
+  BlendUpdateMethod: 1
+  LensModeOverride:
+    Enabled: 0
+    DefaultMode: 2
+  DefaultBlend:
+    Style: 1
+    Time: 2
+    CustomCurve:
+      serializedVersion: 2
+      m_Curve: []
+      m_PreInfinity: 2
+      m_PostInfinity: 2
+      m_RotationOrder: 4
+  CustomBlends: {fileID: 0}
 --- !u!1 &5980623457944547605
 GameObject:
   m_ObjectHideFlags: 0
@@ -2578,6 +2616,7 @@ GameObject:
   - component: {fileID: 6006548028760527155}
   - component: {fileID: 3093615613455608882}
   - component: {fileID: 8077196077363261873}
+  - component: {fileID: 9074487161771502401}
   - component: {fileID: 4828984241985365499}
   - component: {fileID: 1053628332194079481}
   - component: {fileID: 2131489110961700025}
@@ -2783,7 +2822,6 @@ MonoBehaviour:
   animator: {fileID: 5048647682359618787}
   playerModel: {fileID: 5864620747877901436}
   normalMeshRoot: {fileID: 457833080931538018}
-  ballMeshRoot: {fileID: 0}
   cameraController: {fileID: 9141111527247244841}
   fishingAnimHandler: {fileID: 5922089739667301084}
   walkSpeed: 5
@@ -2849,6 +2887,12 @@ MonoBehaviour:
     m_RotationOrder: 4
   bounceForwardMultiplier: 0.592
   bounceUpwardMultiplier: 0.63
+  airSteerAccel: 6
+  wallBounceRestitution: 0.6
+  wallBounceMaxSurfaceY: 0.5
+  chainJumpWindow: 0.3
+  chainJumpWindowAfterBounce: 0.15
+  chainFullChargeThreshold: 0.95
   chargeMaxSquash: 0.55
   scaleLerpSpeed: 18
   bounceImpactCurve:
@@ -2894,11 +2938,22 @@ MonoBehaviour:
     m_PostInfinity: 2
     m_RotationOrder: 4
   bounceImpactDuration: 0.35
+  bounceImpactIntensity: 0.5
+  enableJumpStretch: 1
+  jumpStretchMaxSpeed: 12
+  jumpStretchAmount: 0.6
+  jumpStretchDecay: 6
+  jumpStretchBounceScale: 0.4
   ballTransitionInTrigger: BallTransitionIn
   ballTransitionOutTrigger: BallTransitionOut
-  ballSpinDegPerUnitSpeed: 30
-  ballSpinAxisJitter: 0.35
-  ballSpinSpeedJitter: 0.2
+  ballToFormTrigger: BallToForm
+  enableBallTumble: 0
+  ballTumbleMinSpeed: 220
+  ballTumbleMaxSpeed: 540
+  ballPivotExcludeRoots: []
+  enableJumpArcLook: 1
+  jumpArcPitchScale: 1
+  hideRenderersDuringJump: []
   sitdownAnimTrigger: Sitdown
   sitDownHoldTime: 5
   useStaticCamera: 1
@@ -2906,6 +2961,7 @@ MonoBehaviour:
   groundedDownForce: -2
   speedAnimDampTime: 0.1
   areControlsLocked: 0
+  suppressCameraControl: 0
 --- !u!114 &9141111527247244841
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2921,9 +2977,10 @@ MonoBehaviour:
   cameraTransform: {fileID: 7708899931553779794}
   framingTarget: {fileID: 0}
   cameraSpeed: 120
+  gamepadLookSpeedX: 150
+  gamepadLookSpeedY: 90
   cameraYClamp: {x: -2.88, y: 57.64}
-  pivotHeight: 1.3
-  screenYTarget: 0.25
+  pivotHeight: 1.5
   catchLookDownAngle: 25
   catchZoomDistance: 7
   catchVerticalOffset: 1.6
@@ -2934,13 +2991,20 @@ MonoBehaviour:
   catchCameraLerpSpeed: 5
   fightCameraLerpSpeed: 2
   cameraSmoothTime: 0.05
-  aimZoomDistance: 7
-  aimYAngleOffset: -3
-  aimCameraLerpSpeed: 2
+  gameplayFieldOfView: 38
+  aimZoomInAmount: 2.5
   bobberFollowHeight: 1.8
-  bobberFollowDistance: 3
+  bobberFollowDistance: 5.87
   bobberFollowLerpSpeed: 4
   bobberReturnDuration: 0.35
+  bobberOrbitWithMouse: 1
+  bobberFollowPositionSmoothTime: 0.3
+  bobberCameraWaterClearance: 0.4
+  fightShoulderSide: 1.4
+  fightShoulderBack: 1.2
+  fightShoulderHeight: 1.7
+  fightFramingAimT: 0.4
+  fightFramingLerpSpeed: 4
   chargeZoomAmount: 3
   chargeMinDistance: 0.6
   chargePitchUpAngle: 22
@@ -2960,6 +3024,14 @@ MonoBehaviour:
   sprintFovLerpSpeed: 2.23
   useStaticCamera: 0
   staticCameraTarget: {fileID: 0}
+  aimTrackLerpSpeed: 4
+  aimTrackVerticalOffset: 1.5
+  aimTrackLiftSmoothTime: 0.3
+  aimTrackMaxPitch: 78
+  aimTrackFramingHeight: 0.6
+  aimTrackFovZoom: 8
+  aimTrackFovLerpSpeed: 1
+  aimTrackFovDelay: 0
 --- !u!114 &5922089739667301084
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2983,6 +3055,8 @@ MonoBehaviour:
   rodDirectionAnimFloat: RodDirection
   attractAnim: Attract
   biteReactionAnim: BiteReaction
+  defaultLocomotionState: Locomotion
+  cancelTransitionDuration: 0.05
 --- !u!114 &312645371176146031
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3079,6 +3153,34 @@ MonoBehaviour:
   stampRadiusUV: 0.0604
   stampStrength: 1
   updateInterval: 2
+--- !u!114 &9074487161771502401
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6127945813577850835}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ed6122fcc3c9f5645a9577dcb261fabc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FishResearchScanner
+  maxLockRange: 25
+  reticleRadiusFraction: 0.245
+  reticleVerticalOffset: 0.239
+  studyDuration: 3
+  studyAudioSource: {fileID: 0}
+  studyChargeClip: {fileID: 0}
+  studyProgressFill: {fileID: 0}
+  learnedBannerGroup: {fileID: 0}
+  learnedBannerText: {fileID: 0}
+  learnedMessage: You learned this fish's bait preferences!
+  bannerHoldTime: 2.5
+  bannerFadeTime: 0.4
+  mouseSwitchThreshold: 3
+  stickSwitchThreshold: 0.5
+  switchCooldown: 0.3
+  switchAngleTolerance: 65
 --- !u!330 &4828984241985365499
 ParticleSystemForceField:
   m_ObjectHideFlags: 0
@@ -4680,6 +4782,26 @@ MonoBehaviour:
   landedTightenAmount: 0.25
   nibbleTightenAmount: 0.6
   nibbleTightenDecay: 0.4
+  tugTightenAmount: 0.85
+  tugTightenDecay: 0.35
+  reelTightenAmount: 0.9
+  reelTightenAttack: 0.12
+  reelTightenRelease: 0.4
+  jumpSlackAmount: 0.85
+  jumpSlackAttack: 0.08
+  jumpSlackRelease: 0.6
+  coilOnCast: 0
+  coilTurns: 8
+  coilRadius: 0.35
+  coilSpineStraighten: 0.6
+  coilBobberFraction: 0.4
+  coilEndTaper: 0.06
+  coilRampInTime: 0.1
+  coilDecayRate: 0.5
+  coilRelease: 0.25
+  coilSpinSpeed: 1.5
+  coilChargeInfluence: 1
+  coilRenderPoints: 64
 --- !u!114 &7239395823905670954
 MonoBehaviour:
   m_ObjectHideFlags: 0

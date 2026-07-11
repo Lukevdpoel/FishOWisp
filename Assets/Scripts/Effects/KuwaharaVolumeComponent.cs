@@ -2,7 +2,8 @@ using System;
 
 namespace UnityEngine.Rendering.Universal
 {
-    [Serializable, VolumeComponentMenuForRenderPipeline("GapperGames/Kuwahara DOF", typeof(UniversalRenderPipeline))]
+    [Serializable, VolumeComponentMenu("GapperGames/Kuwahara DOF")]
+    [SupportedOnRenderPipeline(typeof(UniversalRenderPipelineAsset))]
     public sealed class KuwaharaVolumeComponent : VolumeComponent, IPostProcessComponent
     {
         public BoolParameter enabled = new BoolParameter(false);

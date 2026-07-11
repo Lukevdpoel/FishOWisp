@@ -43,20 +43,12 @@ public class PauseMenu : MonoBehaviour
         Resume();
     }
 
-    void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.Escape))
-        {
-            if (isPaused)
-            {
-                Resume();
-            }
-            else if (!TryCloseOtherUIs())
-            {
-                Pause();
-            }
-        }
-    }
+    // The Escape keybind that opened/closed this menu during gameplay has been removed by request:
+    // the pause menu still exists and can be driven via Pause()/Resume() (e.g. from a UI button),
+    // but it is no longer bound to a key, so it cannot be triggered during normal play.
+    //
+    // TryCloseOtherUIs() is kept below because Pause()/Resume() and any future caller may still want
+    // it; NoteMenu and InventoryUI handle their own close input independently of this script.
 
     // Returns true if any other UI was open and got closed by this press, so the pause
     // menu itself does NOT open on the same Esc press. The next Esc will then open it.

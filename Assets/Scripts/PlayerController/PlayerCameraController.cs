@@ -32,7 +32,6 @@ public class PlayerCameraController : MonoBehaviour
     [SerializeField] private float gamepadLookSpeedY = 90f;
     [SerializeField] private Vector2 cameraYClamp = new Vector2(20f, 55f);
     [SerializeField] private float pivotHeight = 1.3f;
-    [SerializeField, Range(0f, 1f)] private float screenYTarget = 0.25f;
 
     [Header("Catch Camera Settings")]
     [SerializeField] private float catchLookDownAngle = 25f;
@@ -50,10 +49,30 @@ public class PlayerCameraController : MonoBehaviour
     [Header("Camera Smoothing")]
     [SerializeField] private float cameraSmoothTime = 0.05f;
 
+    [Header("Field of View")]
+    [Tooltip("Authoritative base FOV for gameplay. Set explicitly so the Cinemachine vcams' FOV (used " +
+             "for the menu reveal/handoff) can't leak in and change the game's look. Sprint and bite " +
+             "zoom are applied relative to this. The original pre-Cinemachine value was 38.")]
+    [SerializeField] private float gameplayFieldOfView = 38f;
+
     [Header("Aim Camera Settings")]
-    [SerializeField] private float aimZoomDistance = 3.5f;
-    [SerializeField] private float aimYAngleOffset = -3f;
-    [SerializeField] private float aimCameraLerpSpeed = 4f;
+    [Tooltip("Units the camera pulls IN from its resting distance while aiming (right mouse). Relative " +
+             "rather than absolute so it always zooms in regardless of the resting distance the camera " +
+             "inherits from the Cinemachine handoff at startup. Clamped to chargeMinDistance so it never " +
+             "crosses the player.")]
+    [SerializeField] private float aimZoomInAmount = 2.5f;
+
+    [Header("Manual Zoom (scroll wheel)")]
+    [Tooltip("Metres of camera distance added/removed per scroll-wheel notch. Wheel up = zoom in.")]
+    [SerializeField] private float zoomStep = 1f;
+    [Tooltip("Closest the PLAYER orbit camera can be manually zoomed in (m from the pivot).")]
+    [SerializeField] private float playerZoomMinDistance = 2f;
+    [Tooltip("Furthest the PLAYER orbit camera can be manually zoomed out (m from the pivot).")]
+    [SerializeField] private float playerZoomMaxDistance = 12f;
+    [Tooltip("Closest the BOBBER/LURE camera can be manually zoomed in (m from the bobber pivot).")]
+    [SerializeField] private float bobberZoomMinDistance = 1.5f;
+    [Tooltip("Furthest the BOBBER/LURE camera can be manually zoomed out (m from the bobber pivot).")]
+    [SerializeField] private float bobberZoomMaxDistance = 8f;
 
     [Header("Bobber Follow Camera Settings")]
     [Tooltip("Height above the bobber the camera pivots around while orbiting in water.")]
@@ -66,6 +85,8 @@ public class PlayerCameraController : MonoBehaviour
     [SerializeField] private float bobberReturnDuration = 0.35f;
     [Tooltip("When true, the in-water camera orbits the bobber using mouse input. When false, falls back to the bobber prefab's CameraAnchor (or a fixed pose) like the old behavior.")]
     [SerializeField] private bool bobberOrbitWithMouse = true;
+    [Tooltip("SmoothDamp time (seconds) for the point the follow camera orbits around. The follow now starts at the throw, so the camera would otherwise chase the fast flight arc exactly. Higher = the camera trails the bobber more loosely and stays stable/straight in the air; it still settles precisely once the bobber lands and stops. ~0.25–0.4 keeps the airborne ride steady. 0 = track the bobber exactly (old behavior).")]
+    [SerializeField] private float bobberFollowPositionSmoothTime = 0.3f;
     [Tooltip("Minimum height the in-water camera stays above the water surface. Prevents the camera from clipping through the water plane when pitched down.")]
     [SerializeField] private float bobberCameraWaterClearance = 0.4f;
 
@@ -126,6 +147,21 @@ public class PlayerCameraController : MonoBehaviour
     private bool isCatchCameraActive = false;
     private float startDistance, cameraXAngle, cameraYAngle, smoothXAngle, smoothYAngle, xVel, yVel;
     private float currentCameraDistance, distanceVelocity;
+
+    // Player-chosen bobber orbit radius (scroll wheel). -1 = untouched, use bobberFollowDistance.
+    // Kept for the whole session so the chosen framing carries across casts.
+    private float zoomedBobberDistance = -1f;
+    private float ZoomedBobberDistance => zoomedBobberDistance > 0f ? zoomedBobberDistance : bobberFollowDistance;
+
+    // Resting orbit distance captured at the Cinemachine handoff (the HUTBUILT menu's PlayerFollow
+    // pose). Static so it survives scene loads: the player is rebuilt per scene, and scenes entered
+    // later have no menu / no PlayerFollow vcam, so their Start() would otherwise fall back to the
+    // prefab Main Camera's offset — which sits further out than the tuned handoff framing, making the
+    // camera "zoom back out" on every scene change. Reusing the captured distance keeps every scene
+    // at the same framing the player saw after the intro. -1 = not captured yet this session.
+    private static float persistedRestingDistance = -1f;
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetPersistedRestingDistance() => persistedRestingDistance = -1f;
     private Vector3 currentPivotPosition;
     private Vector3 pivotVelocity;
 
@@ -137,6 +173,16 @@ public class PlayerCameraController : MonoBehaviour
     // Player-side orbit pose; bobber side lives in bobberTracker.
     private CameraPose playerCameraPose;
 
+    // One-shot ease for an external handoff (the main menu). After a Cinemachine blend ends on an
+    // approximate behind-player vcam, the first frames of gameplay would otherwise SNAP to the
+    // reconstructed orbit pose. While this is active, the final written transform is lerped from the
+    // captured handoff pose into the live orbit pose so the takeover is smooth.
+    private bool handoffActive;
+    private float handoffT;
+    private float handoffDuration;
+    private Vector3 handoffStartPos;
+    private Quaternion handoffStartRot;
+
     // Smoothed over-shoulder fight pose. Ramps from the orbit pose into the framing pose so the
     // transition into a fish fight is smooth instead of a snap.
 
@@ -147,7 +193,41 @@ public class PlayerCameraController : MonoBehaviour
     // controls are locked for fishing.
     public bool IsBobberCameraActive => bobberTracker.BobberCameraDominant;
 
+    // True while the catch showcase camera is framing a just-caught fish. Like the bobber camera,
+    // fishing owns the view here, so the cursor should stay locked + hidden.
+    public bool IsCatchCameraActive => isCatchCameraActive;
+
     public void SetCatchCamera(bool active) => isCatchCameraActive = active;
+
+    [Header("Aim Fish Tracking")]
+    [Tooltip("How fast (per second) the aim camera turns to keep a zoom-researched fish framed while aiming. Higher = snappier follow.")]
+    [SerializeField] private float aimTrackLerpSpeed = 4f;
+    [Tooltip("Extra height (m) the orbit pivot rises while tracking a fish, so the camera looks DOWN over the player at the fish instead of through the player body (which sits at the pivot and would otherwise obscure the fish). 0 = no lift.")]
+    [SerializeField] private float aimTrackVerticalOffset = 1.5f;
+    [Tooltip("SmoothDamp time (s) for the tracking pivot lift easing in/out, so it doesn't pop when aim/lock starts or ends.")]
+    [SerializeField] private float aimTrackLiftSmoothTime = 0.3f;
+    [Tooltip("Downward-pitch ceiling (deg) used ONLY while tracking a fish, replacing the normal cameraYClamp.y. The fish sits below the raised pivot, so tracking needs to look down steeper than normal orbit allows — without this the fish gets pinned low in frame.")]
+    [SerializeField] private float aimTrackMaxPitch = 78f;
+    [Tooltip("Aim this far BELOW the fish (m) while tracking, which lifts the fish higher in the frame (pairs with the player sitting low on screen). 0 = centre on the fish; negative = push the fish lower.")]
+    [SerializeField] private float aimTrackFramingHeight = 0.6f;
+    [Tooltip("Degrees subtracted from base FOV while tracking a fish — leans the view in on the locked fish. 0 = no FOV zoom.")]
+    public float aimTrackFovZoom = 8f;
+    [Tooltip("How fast (per second) the FOV interpolates toward the tracking zoom and back. Lower = gentler/slower zoom.")]
+    public float aimTrackFovLerpSpeed = 3.5f;
+    [Tooltip("Seconds the fish lock must be held before the FOV zoom STARTS, so it doesn't fire while the camera is still swinging into the track (which looks abrupt). The pivot/angle move happens first, then the FOV eases in.")]
+    public float aimTrackFovDelay = 0.45f;
+
+    // Set by FishResearchScanner while the player is aiming and locked onto a fish: the aim camera
+    // gently turns to keep this fish framed until aim is released (then cleared with null).
+    private Transform aimTrackTarget;
+    public void SetAimTrackTarget(Transform fish) => aimTrackTarget = fish;
+
+    // Eased current value of the tracking pivot lift (toward aimTrackVerticalOffset while tracking,
+    // back to 0 otherwise), so the rise/return is smooth.
+    private float currentAimTrackLift;
+    private float aimTrackLiftVel;
+    // How long the current fish lock has been held while aiming, used to delay the FOV zoom start.
+    private float aimTrackFovElapsed;
 
     private void OnEnable()
     {
@@ -165,9 +245,12 @@ public class PlayerCameraController : MonoBehaviour
         FishingEvents.OnThrowBobber += HandleChargeReleased;
         FishingEvents.OnCancelFishing += HandleChargeEnded;
 
-        FishingEvents.OnBobberLandedInWater += HandleBobberLanded;
+        FishingEvents.OnBobberLaunched += HandleBobberLaunched;
         FishingEvents.OnStartReeling += HandleStartReeling;
-        FishingEvents.OnHookFishSuccess += HandleBobberFollowEnd;
+        // The bobber-follow rig deliberately survives the hook-set (no OnHookFishSuccess
+        // teardown): the fish fight is played AS the fish now, so the camera stays framed on
+        // it for the whole fight. It fades out at the catch reel (OnStartReeling) — where the
+        // catch camera takes over — or on a fail/cancel.
         FishingEvents.OnStartReeling += HandleBobberFollowEnd;
         FishingEvents.OnCancelFishing += HandleBobberFollowEnd;
     }
@@ -185,9 +268,8 @@ public class PlayerCameraController : MonoBehaviour
         FishingEvents.OnThrowBobber -= HandleChargeReleased;
         FishingEvents.OnCancelFishing -= HandleChargeEnded;
 
-        FishingEvents.OnBobberLandedInWater -= HandleBobberLanded;
+        FishingEvents.OnBobberLaunched -= HandleBobberLaunched;
         FishingEvents.OnStartReeling -= HandleStartReeling;
-        FishingEvents.OnHookFishSuccess -= HandleBobberFollowEnd;
         FishingEvents.OnStartReeling -= HandleBobberFollowEnd;
         FishingEvents.OnCancelFishing -= HandleBobberFollowEnd;
     }
@@ -209,7 +291,7 @@ public class PlayerCameraController : MonoBehaviour
     private void HandleFishBite(BobberController b) { fovTracker.OnBiteStart(); reactionTracker.OnBite(); }
     private void HandleBiteRelease() { fovTracker.OnBiteRelease(); }
 
-    private void HandleBobberLanded(BobberController b) => bobberTracker.OnBobberLanded(b);
+    private void HandleBobberLaunched(BobberController b) => bobberTracker.BeginFollow(b);
 
     // Empty-line reel: tear the bobber rig down. Hooked-fish path keeps the rig live until the
     // catch camera takes over.
@@ -221,23 +303,147 @@ public class PlayerCameraController : MonoBehaviour
 
     private void HandleBobberFollowEnd() => bobberTracker.OnFollowEnd();
 
-    public void Initialize(Transform playerModel)
+    // measureFromPivot=false (normal Start): seed the orbit from the prefab-placed Main Camera —
+    // yaw/pitch from its rotation, resting distance to the player origin — matching how the camera
+    // has always been tuned.
+    //
+    // measureFromPivot=true (the Cinemachine handoff): the camera is sitting at the PlayerFollow
+    // vcam's pose, which is an ARBITRARY pose that does NOT look dead-on at the player. An orbit
+    // camera can only sit on a sphere around the pivot looking inward, and it rebuilds its position
+    // as pivot + direction*distance where `direction` comes from the yaw/pitch. So we must derive
+    // those angles from the camera's POSITION relative to the pivot (not its rotation): the
+    // pivot->camera direction. Then pivot + direction*distance reproduces the vcam's POSITION exactly
+    // and the handover doesn't jump. (Deriving the angles from the vcam's ROTATION instead — the old
+    // behavior — only lands back on the vcam if it looked straight at the pivot; otherwise the camera
+    // snaps sideways by the framing offset, which is the bug this fixes.) The look direction settles
+    // to "at the pivot", which is what gameplay orbiting uses anyway; the tiny rotation change is
+    // eased by the handoff blend.
+    public void Initialize(Transform playerModel, bool measureFromPivot = false)
     {
         if (cameraTransform && playerModel)
         {
-            startDistance = Vector3.Distance(cameraTransform.position, playerModel.position);
+            Vector3 pivot = playerModel.position + Vector3.up * pivotHeight;
+
+            if (measureFromPivot)
+            {
+                Vector3 fromPivot = cameraTransform.position - pivot;
+                startDistance = fromPivot.magnitude;
+                if (startDistance > 0.0001f)
+                {
+                    Quaternion lookFromPivot = Quaternion.LookRotation(-fromPivot / startDistance);
+                    cameraXAngle = lookFromPivot.eulerAngles.y;
+                    cameraYAngle = lookFromPivot.eulerAngles.x;
+                    // Remember the handoff framing so scenes entered later reuse it instead of the
+                    // (further-out) prefab camera offset.
+                    persistedRestingDistance = startDistance;
+                }
+                else
+                {
+                    Vector3 ang = cameraTransform.eulerAngles;
+                    cameraXAngle = ang.y;
+                    cameraYAngle = ang.x;
+                }
+            }
+            else
+            {
+                // Reuse the distance captured at the intro handoff if we have one; only fall back to
+                // the prefab camera offset when this session never ran the menu handoff.
+                startDistance = persistedRestingDistance > 0f
+                    ? persistedRestingDistance
+                    : Vector3.Distance(cameraTransform.position, playerModel.position);
+                Vector3 initialCameraAngles = cameraTransform.eulerAngles;
+                cameraXAngle = initialCameraAngles.y;
+                cameraYAngle = initialCameraAngles.x;
+            }
+
             currentCameraDistance = startDistance;
-            Vector3 initialCameraAngles = cameraTransform.eulerAngles;
-            cameraXAngle = initialCameraAngles.y;
-            cameraYAngle = initialCameraAngles.x;
             smoothXAngle = cameraXAngle;
             smoothYAngle = cameraYAngle;
-            fovTracker.Initialize(cameraTransform.GetComponent<Camera>());
-            currentPivotPosition = playerModel.position + Vector3.up * pivotHeight;
+            fovTracker.Initialize(cameraTransform.GetComponent<Camera>(), gameplayFieldOfView);
+            currentPivotPosition = pivot;
             playerCameraPose.position = cameraTransform.position;
             playerCameraPose.rotation = cameraTransform.rotation;
         }
         if (framingTarget == null) framingTarget = playerModel;
+    }
+
+    // Seeds the resting orbit pose for the title handoff DIRECTLY from the PlayerFollow vcam's world
+    // pose, without moving the live camera (so BeginHandoffBlend can then ease from wherever the
+    // flythrough left it into this pose in one continuous move).
+    //
+    // Unlike Initialize(measureFromPivot:true), this does NOT reconstruct the angles from the
+    // camera's position relative to the pivot. At the press the player has only just been enabled and
+    // hasn't fallen to the ground yet, so that pivot is transient and position-derived angles land
+    // the camera off to the side / not behind. Instead we take the resting ANGLES straight from the
+    // vcam's ROTATION — a fixed "behind + looking down" orientation that doesn't depend on where the
+    // player is right now — and rebuild the pose as pivot + back*distance each frame, so it stays
+    // squarely behind the player as it settles. The DISTANCE is the vcam-to-pivot distance (its
+    // horizontal span dominates, so the player's transient height barely moves it) and is persisted
+    // so later scenes reuse the same framing.
+    public void SeedRestingPoseFromMenuVcam(Transform playerModel, Vector3 vcamPos, Quaternion vcamRot)
+    {
+        if (cameraTransform == null || playerModel == null) return;
+
+        Vector3 pivot = playerModel.position + Vector3.up * pivotHeight;
+
+        startDistance = Mathf.Max(0.01f, Vector3.Distance(vcamPos, pivot));
+        persistedRestingDistance = startDistance;
+
+        Vector3 ang = vcamRot.eulerAngles;
+        cameraXAngle = ang.y;
+        cameraYAngle = ang.x;
+
+        currentCameraDistance = startDistance;
+        smoothXAngle = cameraXAngle;
+        smoothYAngle = cameraYAngle;
+        currentPivotPosition = pivot;
+
+        // Reconstruct the resting pose the same way UpdateCamera does, so it's the exact target the
+        // handoff blend eases toward.
+        Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f);
+        Vector3 cameraDirection = -(rotation * Vector3.forward);
+        playerCameraPose.position = pivot + cameraDirection * currentCameraDistance;
+        playerCameraPose.rotation = rotation;
+
+        // Set the gameplay base FOV but keep the live (flythrough) FOV so the tracker glides it over
+        // during the ease instead of popping on the press.
+        var cam = cameraTransform.GetComponent<Camera>();
+        float liveFov = cam != null ? cam.fieldOfView : 0f;
+        fovTracker.Initialize(cam, gameplayFieldOfView);
+        if (cam != null) cam.fieldOfView = liveFov;
+
+        if (framingTarget == null) framingTarget = playerModel;
+    }
+
+    // Capture the current (e.g. Cinemachine-blended) camera pose so the next `duration` seconds of
+    // UpdateCamera ease from it into the live orbit pose instead of snapping. Call right after the
+    // pose is seeded via Initialize(), while the camera still sits at the blend's end pose.
+    public void BeginHandoffBlend(float duration)
+    {
+        if (cameraTransform == null || duration <= 0f) return;
+        handoffStartPos = cameraTransform.position;
+        handoffStartRot = cameraTransform.rotation;
+        handoffDuration = duration;
+        handoffT = 0f;
+        handoffActive = true;
+    }
+
+    // Lerps the just-written transform from the captured handoff pose toward the live orbit pose.
+    // Runs at the very end of UpdateCamera, so `cameraTransform` already holds the target pose.
+    //
+    // Uses an ease-OUT curve (not SmoothStep's ease-in-out): the camera has to START moving the
+    // instant the button is pressed and then glide to a gentle stop at the player. SmoothStep's flat
+    // ease-in tail meant it crept for the first ~half-second before visibly moving, which read as a
+    // long pause before the handoff "kicked in".
+    private void ApplyHandoffBlend()
+    {
+        if (!handoffActive) return;
+        handoffT += Time.deltaTime / handoffDuration;
+        float u = Mathf.Clamp01(handoffT);
+        float s = Mathf.Sin(u * Mathf.PI * 0.5f); // ease-out sine: prompt, steady start; gentle stop
+        cameraTransform.position = Vector3.Lerp(handoffStartPos, cameraTransform.position, s);
+        cameraTransform.rotation = Quaternion.Slerp(handoffStartRot, cameraTransform.rotation, s);
+        if (handoffT >= 1f) handoffActive = false;
     }
 
     public void UpdateCamera(CameraInput input)
@@ -259,8 +465,10 @@ public class PlayerCameraController : MonoBehaviour
 
         bobberTracker.ComputePose(input.playerModel, cameraTransform,
             smoothXAngle, smoothYAngle,
-            bobberFollowHeight, bobberFollowDistance,
-            bobberOrbitWithMouse, bobberCameraWaterClearance);
+            bobberFollowHeight, ZoomedBobberDistance,
+            bobberOrbitWithMouse, bobberCameraWaterClearance,
+            bobberFollowPositionSmoothTime,
+            collisionLayers, collisionRadius, zoomDampTime);
 
         // Dedicated reel-press return takes priority over the blend system. Currently no caller
         // ever flips IsReturningToPlayer to true; kept for forward compatibility.
@@ -299,12 +507,20 @@ public class PlayerCameraController : MonoBehaviour
             bobberTracker.ReleaseIfFadedOut();
         }
 
+        ApplyHandoffBlend();
+
         UpdateFov(input);
     }
 
     private void ComputePlayerCameraPose(CameraInput input)
     {
         if (float.IsNaN(xVel) || float.IsNaN(yVel) || float.IsNaN(distanceVelocity)) { xVel = 0f; yVel = 0f; distanceVelocity = 0f; }
+
+        // Tracking lift: ease the orbit pivot up while aiming-and-locked on a fish, so the camera
+        // looks over the player at the fish (the player sits at the pivot and would block it).
+        bool aimTracking = input.isAiming && aimTrackTarget != null;
+        float targetLift = aimTracking ? aimTrackVerticalOffset : 0f;
+        currentAimTrackLift = Mathf.SmoothDamp(currentAimTrackLift, targetLift, ref aimTrackLiftVel, aimTrackLiftSmoothTime);
 
         bool isDialogueCamera = input.areControlsLocked && DialogueManager.Instance != null && DialogueManager.Instance.IsDialogueActive();
         bool isBoardCamera = input.areControlsLocked && input.isBountyBoardActive && input.activeBountyBoard != null;
@@ -325,8 +541,32 @@ public class PlayerCameraController : MonoBehaviour
                 cameraYAngle = Mathf.LerpAngle(cameraYAngle, dialogueCameraYAngle, Time.deltaTime * dialogueCameraLerpSpeed);
             }
         }
-        else if (!input.isFightingFish && !isCatchCameraActive
-                 && (!input.areControlsLocked || bobberCameraDominant))
+        else if (aimTracking)
+        {
+            // Zoom research: while aiming and locked on a fish, turn the camera to keep it framed
+            // until aim is released. Aim from the LIFTED pivot so the look direction matches the
+            // raised orbit centre used below, and aim a touch BELOW the fish so it rides higher in
+            // the frame (the player sits low on screen, so the fish wants to be above centre).
+            Vector3 pivot = input.playerModel.position + Vector3.up * (pivotHeight + currentAimTrackLift);
+            Vector3 lookTarget = aimTrackTarget.position - Vector3.up * aimTrackFramingHeight;
+            Vector3 dirToFish = lookTarget - pivot;
+            if (dirToFish.sqrMagnitude > 0.0001f)
+            {
+                Quaternion targetRot = Quaternion.LookRotation(dirToFish.normalized);
+                cameraXAngle = Mathf.LerpAngle(cameraXAngle, targetRot.eulerAngles.y, Time.deltaTime * aimTrackLerpSpeed);
+                cameraYAngle = Mathf.LerpAngle(cameraYAngle, targetRot.eulerAngles.x, Time.deltaTime * aimTrackLerpSpeed);
+                // Steeper down-pitch ceiling than normal orbit so the camera can actually look down
+                // at the fish instead of capping at cameraYClamp.y and leaving it low in frame.
+                cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, aimTrackMaxPitch);
+            }
+        }
+        // Orbit input also stays live through the fish fight while the bobber rig owns the
+        // view: steering is on A/D + left stick there, so mouse / right stick are free to
+        // rotate around the fish (the rig's pose already handles terrain collision and the
+        // water-surface clearance). The auto-yaw fight branch below is only the fallback for
+        // a fight with no bobber rig.
+        else if (!isCatchCameraActive
+                 && (bobberCameraDominant || (!input.isFightingFish && !input.areControlsLocked)))
         {
             // Returning-to-player is the one in-water case where orbit input is suppressed so the
             // camera doesn't fight the one-shot return lerp.
@@ -338,6 +578,8 @@ public class PlayerCameraController : MonoBehaviour
                 cameraXAngle += mouseX + stickLook.x * gamepadLookSpeedX * Time.deltaTime;
                 cameraYAngle -= mouseY + stickLook.y * gamepadLookSpeedY * Time.deltaTime;
                 cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
+
+                ApplyManualZoom(bobberCameraDominant);
             }
         }
         else if (isCatchCameraActive)
@@ -372,7 +614,9 @@ public class PlayerCameraController : MonoBehaviour
         }
         else
         {
-            targetPivot = basePos + Vector3.up * pivotHeight;
+            // pivotHeight plus the eased tracking lift — raises the orbit centre over the player's
+            // head while tracking a fish so the player no longer sits between the camera and the fish.
+            targetPivot = basePos + Vector3.up * (pivotHeight + currentAimTrackLift);
             currentPivotPosition = targetPivot;
             pivotVelocity = Vector3.zero;
         }
@@ -381,7 +625,7 @@ public class PlayerCameraController : MonoBehaviour
         RaycastHit hit;
 
         if (isCatchCameraActive) targetDistance = catchZoomDistance;
-        else if (input.isAiming) targetDistance = aimZoomDistance;
+        else if (input.isAiming) targetDistance = Mathf.Max(chargeMinDistance, startDistance - aimZoomInAmount);
 
         if (!isCatchCameraActive && chargeProgress > 0.001f)
         {
@@ -403,9 +647,44 @@ public class PlayerCameraController : MonoBehaviour
             fightFramingAimT, fightFramingLerpSpeed);
     }
 
+    // Scroll-wheel zoom, applied to whichever orbit currently owns the view. Runs only inside the
+    // free-orbit input branch, so it is naturally suppressed everywhere orbiting is (dialogue,
+    // catch camera, menus, the no-rig fight fallback). One wheel notch reads as ±0.1 from
+    // GetAxis, so the delta is normalized to notches before scaling by zoomStep.
+    private void ApplyManualZoom(bool bobberCameraDominant)
+    {
+        float scroll = Input.GetAxis("Mouse ScrollWheel");
+        if (Mathf.Abs(scroll) < 0.0001f) return;
+
+        float delta = -(scroll / 0.1f) * zoomStep; // wheel up (positive) pulls the camera in
+
+        if (bobberCameraDominant)
+        {
+            zoomedBobberDistance = Mathf.Clamp(ZoomedBobberDistance + delta,
+                bobberZoomMinDistance, bobberZoomMaxDistance);
+        }
+        else
+        {
+            startDistance = Mathf.Clamp(startDistance + delta,
+                playerZoomMinDistance, playerZoomMaxDistance);
+            // Keep the persisted resting distance in sync so a scene change doesn't snap the
+            // camera back to the pre-zoom framing captured at the menu handoff.
+            persistedRestingDistance = startDistance;
+        }
+    }
+
     private void UpdateFov(CameraInput input)
     {
+        bool aimTracking = input.isAiming && aimTrackTarget != null;
+
+        // Delay the FOV zoom until the lock has been held a moment, so it doesn't fire while the
+        // camera is still swinging/lifting into the track (which reads as abrupt). Resets when the
+        // lock drops, so a fresh lock waits out the delay again.
+        aimTrackFovElapsed = aimTracking ? aimTrackFovElapsed + Time.deltaTime : 0f;
+        bool fovZoomActive = aimTracking && aimTrackFovElapsed >= aimTrackFovDelay;
+
         fovTracker.Tick(cameraTransform, input.isSprinting,
-            biteFovZoom, biteFovLerpSpeed, sprintFovBoost, sprintFovLerpSpeed);
+            biteFovZoom, biteFovLerpSpeed, sprintFovBoost, sprintFovLerpSpeed,
+            fovZoomActive, aimTrackFovZoom, aimTrackFovLerpSpeed);
     }
 }

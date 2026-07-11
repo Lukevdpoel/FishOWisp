@@ -1,5 +1,10 @@
 using UnityEngine;
 
+// RETIRED — safe to delete. This was the first ripple attempt (analytic rings via global
+// shader arrays); no shader ever consumed _Ripples and nothing calls Emit anymore. Water
+// ripples now run through WaterRippleSimRenderer + WaterRippleBinder (wave-sim render
+// texture anchored to the bobber). Its shader half, Shaders/Ripples/WaterRipples.hlsl,
+// is equally dead.
 public static class WaterRippleEmitter
 {
     public const int MaxRipples = 8;

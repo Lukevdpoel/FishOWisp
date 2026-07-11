@@ -5,7 +5,9 @@ public class ModelViewer : GenericSingleton<ModelViewer>
 {
     [Header("Setup")]
     public Transform modelContainer;
-    public Transform camera;
+    // 'new' silences CS0108: this intentionally shadows the deprecated Component.camera shortcut.
+    // Keep the field named 'camera' so the serialized Inspector reference is preserved.
+    public new Transform camera;
 
     [Header("Uncaught Display")]
     [Tooltip("Unlit black silhouette for fish the player hasn't caught yet — the same material " +
@@ -58,7 +60,20 @@ public class ModelViewer : GenericSingleton<ModelViewer>
         // Instantiate new model as child of container
         if (prefab.fishPrefab != null)
         {
-            currentModel = Instantiate(prefab.fishPrefab, modelContainer);
+            // Non-generic Instantiate + explicit cast: the generic Instantiate<GameObject> was
+            // throwing InvalidCastException on these nested fish prefabs. Guarded so a bad prefab
+            // can never break the notebook — the encyclopedia keeps working without the 3D model.
+            try
+            {
+                currentModel = (GameObject)Instantiate((UnityEngine.Object)prefab.fishPrefab, modelContainer);
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"{nameof(ModelViewer)}: could not instantiate fish model for '{prefab.fishName}': {e.Message}", this);
+                currentModel = null;
+            }
+            if (currentModel == null) return;
+
             currentModel.transform.localPosition = Vector3.zero;
             currentModel.transform.localRotation = Quaternion.identity;
             currentModel.transform.localScale = Vector3.one;

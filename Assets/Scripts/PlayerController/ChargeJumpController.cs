@@ -31,6 +31,15 @@ public class ChargeJumpController
         // A hit surface bounces the player when its normal.y is below this; flatter (more upward)
         // surfaces are treated as ground and left to the landing bounce.
         public float wallBounceMaxSurfaceY;
+        // Chain jump: a jump press buffered within this many seconds BEFORE the fully-charged jump's
+        // landing touchdown relaunches at the same velocity instead of taking the weak rebound.
+        // 0 disables the pre-landing chain.
+        public float chainJumpWindow;
+        // The tighter window AFTER the bounce: a press this many seconds past touchdown still chains.
+        // Kept shorter than chainJumpWindow so a late press is harder to land. 0 disables post-bounce chaining.
+        public float chainJumpWindowAfterBounce;
+        // Minimum charge normal (0..1) for a launch to count as "fully charged" and so chain-eligible.
+        public float chainFullChargeThreshold;
     }
 
     private JumpPhase phase = JumpPhase.None;
@@ -43,23 +52,64 @@ public class ChargeJumpController
     // or bounce, so steering can curve the path but not accelerate beyond the original throw.
     private float airSteerSpeedCap;
 
+    // --- Chain jump ---
+    // Whether the active jump was launched from a full charge. Only a fully-charged jump can be
+    // chained, and each chain re-applies that same full velocity so the chain can keep going.
+    private bool launchedAtFullCharge;
+    // Time.time of the most recent in-air jump press and of the most recent landing bounce. A press
+    // within cfg.chainJumpWindow of the bounce (either side) relaunches at full velocity.
+    private float lastJumpPressTime = float.NegativeInfinity;
+    private float lastBounceTime = float.NegativeInfinity;
+    // Raised on a chain so PlayerController can fire the elastic launch stretch even when the phase
+    // doesn't change (Launched→Launched), which its phase-edge detection would otherwise miss.
+    private bool chainStretchPending;
+    // Set once a mid-air wall/obstacle ricochet happens — it kills chaining for the rest of the jump
+    // sequence (the combo only survives clean landing bounces). Cleared only by a fresh charged launch,
+    // not by a chain relaunch, so a single wall clip ends the run until the player recharges.
+    private bool wallBouncedSinceLaunch;
+    // How many times the CURRENT run has chained (perfect-timed relaunches since the charged launch).
+    // Reset to 0 on every fresh charged launch, incremented on each ChainJump. Broadcast on
+    // OnJumpChainExtended so listeners (e.g. AchievementManager) can reward long chains without this
+    // class knowing anything about achievements.
+    private int chainCount;
+
+    /// <summary>
+    /// Raised each time an active jump successfully chains, carrying the running chain length (1 for the
+    /// first chain off a charged launch, 2 for the next, ...). Static because ChargeJumpController is a
+    /// plain (non-Unity) object owned by PlayerController; a static event is the simplest hook for a
+    /// persistent listener. Resets implicitly on the next charged launch (the counter restarts at 0).
+    /// </summary>
+    public static event Action<int> OnJumpChainExtended;
+
     private CharacterController characterController;
     private Animator animator;
     private int hashBallIn;
     private int hashBallOut;
+    private int hashBallToForm;
     private PlayerSquashStretch squash;
     private Action notifyAction;
 
     public JumpPhase Phase => phase;
     public float ChargeTimer => chargeTimer;
 
-    public void Init(CharacterController cc, Animator anim, int hashBallIn, int hashBallOut,
+    // One-shot: true on the frame a chain relaunch happened. PlayerController polls this to fire the
+    // elastic launch stretch on a same-phase chain (Launched→Launched), which its phase-edge
+    // detection can't see. Reading it clears it.
+    public bool ConsumeChainStretch()
+    {
+        if (!chainStretchPending) return false;
+        chainStretchPending = false;
+        return true;
+    }
+
+    public void Init(CharacterController cc, Animator anim, int hashBallIn, int hashBallOut, int hashBallToForm,
                      PlayerSquashStretch squash, Action notifyAction)
     {
         this.characterController = cc;
         this.animator = anim;
         this.hashBallIn = hashBallIn;
         this.hashBallOut = hashBallOut;
+        this.hashBallToForm = hashBallToForm;
         this.squash = squash;
         this.notifyAction = notifyAction;
     }
@@ -77,14 +127,25 @@ public class ChargeJumpController
 
         if (inputDisabled && phase == JumpPhase.Charging)
         {
-            // Charge interrupted before launch (UI opened, controls locked, etc). We already fired
-            // BallTransitionIn entering the charge, so morph back out — otherwise the player would
-            // be stranded in ball form once the BallForm hold state is wired up.
+            // Charge interrupted before launch (UI opened, controls locked, etc). The body is mid/holding
+            // BallMorphIn, so settle it into BallForm then morph back out — otherwise it'd be stranded in
+            // the half-balled hold pose (BallMorphIn has no direct exit; BallForm -> BallMorphOut does).
             phase = JumpPhase.None;
             chargeTimer = 0f;
-            if (animator != null) animator.SetTrigger(hashBallOut);
+            if (animator != null)
+            {
+                animator.SetTrigger(hashBallToForm);
+                animator.SetTrigger(hashBallOut);
+            }
             return;
         }
+
+        // Buffer in-air jump presses for chaining. Recording the time lets a press shortly BEFORE the
+        // landing bounce still chain (checked at touchdown in the Launched case); presses AFTER the
+        // bounce are handled live in the Bounced case.
+        bool jumpPressed = !inputDisabled && (Input.GetKeyDown(cfg.chargeJumpKey) || GamepadInput.JumpPressed);
+        if (jumpPressed && (phase == JumpPhase.Launched || phase == JumpPhase.Bounced))
+            lastJumpPressTime = Time.time;
 
         switch (phase)
         {
@@ -92,6 +153,8 @@ public class ChargeJumpController
                 if (!inputDisabled && characterController.isGrounded
                     && (Input.GetKeyDown(cfg.chargeJumpKey) || GamepadInput.JumpPressed))
                 {
+                    // Morph into the ball as the charge begins: BallMorphIn plays then holds on its last
+                    // frame (it no longer auto-advances to BallForm — that waits for BallToForm on release).
                     phase = JumpPhase.Charging;
                     chargeTimer = 0f;
                     if (animator != null) animator.SetTrigger(hashBallIn);
@@ -112,10 +175,24 @@ public class ChargeJumpController
             case JumpPhase.Launched:
                 ApplyAirSteer(ref targetVelocity, steerDir, in cfg);
                 if (!characterController.isGrounded) airborneSinceLaunch = true;
-                else if (airborneSinceLaunch) BounceOnLand(ref targetVelocity, in cfg);
+                else if (airborneSinceLaunch)
+                {
+                    // Landing. A jump press buffered within the pre-landing window relaunches at full
+                    // velocity (perfect bounce); otherwise take the normal weak rebound.
+                    if (CanChain(Time.time - lastJumpPressTime, cfg.chainJumpWindow))
+                        ChainJump(ref targetVelocity, in cfg);
+                    else
+                        BounceOnLand(ref targetVelocity, in cfg);
+                }
                 break;
 
             case JumpPhase.Bounced:
+                // A jump press within the tighter post-bounce window also relaunches at full velocity.
+                if (jumpPressed && CanChain(Time.time - lastBounceTime, cfg.chainJumpWindowAfterBounce))
+                {
+                    ChainJump(ref targetVelocity, in cfg);
+                    break;
+                }
                 ApplyAirSteer(ref targetVelocity, steerDir, in cfg);
                 if (!characterController.isGrounded)
                 {
@@ -144,6 +221,14 @@ public class ChargeJumpController
     private void LaunchJump(float chargeNorm, ref Vector3 targetVelocity,
                             Vector3 modelForward, Vector3 fallbackForward, in JumpConfig cfg)
     {
+        // Capture chain eligibility from the raw charge (before the min-launch floor below) — only a
+        // jump released at (near) full charge can be chained off its landing bounce.
+        launchedAtFullCharge = chargeNorm >= cfg.chainFullChargeThreshold;
+        wallBouncedSinceLaunch = false;
+        chainCount = 0; // a fresh charged launch starts a new chain run
+        lastJumpPressTime = float.NegativeInfinity;
+        lastBounceTime = float.NegativeInfinity;
+
         chargeNorm = Mathf.Clamp01(Mathf.Max(chargeNorm, cfg.minLaunchCharge));
         launchHorizontalSpeed = cfg.forwardByCharge.Evaluate(chargeNorm);
         launchUpwardSpeed = cfg.upwardByCharge.Evaluate(chargeNorm);
@@ -159,11 +244,14 @@ public class ChargeJumpController
 
         phase = JumpPhase.Launched;
         airborneSinceLaunch = false;
+        // Release: advance the held BallMorphIn into BallForm (the morph-in already played during the charge).
+        if (animator != null) animator.SetTrigger(hashBallToForm);
         notifyAction?.Invoke();
     }
 
     private void BounceOnLand(ref Vector3 targetVelocity, in JumpConfig cfg)
     {
+        lastBounceTime = Time.time; // arm the post-bounce chain window
         // Steering may have curved the launch direction by now — bounce off the current heading
         // rather than the original launch vector so the rebound continues where the player aimed.
         Vector3 currentHoriz = new Vector3(targetVelocity.x, 0f, targetVelocity.z);
@@ -180,6 +268,53 @@ public class ChargeJumpController
         if (animator != null) animator.SetTrigger(hashBallOut);
     }
 
+    // True when a fully-charged jump can chain off an event — a press buffered just before landing,
+    // or a press just after the bounce — that happened within `window` seconds (each side has its own).
+    private bool CanChain(float secondsSinceEvent, float window)
+    {
+        return window > 0f
+            && launchedAtFullCharge
+            && !wallBouncedSinceLaunch
+            && secondsSinceEvent >= 0f
+            && secondsSinceEvent <= window;
+    }
+
+    // Relaunches the active jump at its original full-charge velocity without re-charging, triggered
+    // by a well-timed jump press around the landing bounce. The chained jump keeps the full velocity,
+    // so launchedAtFullCharge stays true and the player can keep the bounce combo going.
+    private void ChainJump(ref Vector3 targetVelocity, in JumpConfig cfg)
+    {
+        bool reBallNeeded = phase == JumpPhase.Bounced; // the bounce already started morphing out
+
+        // Continue along the current heading — steering or wall bounces may have curved it.
+        Vector3 currentHoriz = new Vector3(targetVelocity.x, 0f, targetVelocity.z);
+        if (currentHoriz.sqrMagnitude > 0.001f) launchDirection = currentHoriz.normalized;
+
+        Vector3 horiz = launchDirection * launchHorizontalSpeed;
+        targetVelocity = new Vector3(horiz.x, launchUpwardSpeed, horiz.z);
+        airSteerSpeedCap = launchHorizontalSpeed;
+
+        phase = JumpPhase.Launched;
+        airborneSinceLaunch = false;
+        lastJumpPressTime = float.NegativeInfinity; // consume the press
+        lastBounceTime = float.NegativeInfinity;
+        chainStretchPending = true;
+
+        chainCount++;
+        OnJumpChainExtended?.Invoke(chainCount);
+
+        squash.TriggerBounceImpact();
+
+        // Re-ball only if the landing bounce already began morphing the body back to normal. From
+        // Launched the body is still in BallForm, so no animator change is needed there.
+        if (animator != null && reBallNeeded)
+        {
+            animator.SetTrigger(hashBallIn);     // AnyState → BallMorphIn
+            animator.SetTrigger(hashBallToForm); // BallMorphIn → BallForm
+        }
+        notifyAction?.Invoke();
+    }
+
     // Ricochets the player off a mid-air obstacle. Called from PlayerController.OnControllerColliderHit
     // for every contact, so it self-gates: it only acts while airborne in a jump, only on wall/overhang
     // surfaces (steeper than wallBounceMaxSurfaceY — floors are left to the landing bounce), and only
@@ -190,6 +325,9 @@ public class ChargeJumpController
         if (characterController == null || characterController.isGrounded) return;
         if (hitNormal.y >= cfg.wallBounceMaxSurfaceY) return;
         if (Vector3.Dot(targetVelocity, hitNormal) >= 0f) return;
+
+        // A mid-air ricochet breaks the chain combo — no more chaining until the next charged launch.
+        wallBouncedSinceLaunch = true;
 
         // Angle-correct reflection across the surface, scaled by restitution for impact energy loss.
         targetVelocity = Vector3.Reflect(targetVelocity, hitNormal) * cfg.wallBounceRestitution;

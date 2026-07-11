@@ -66,6 +66,11 @@ public class LureBiteBrain
         public float boredCooldown;
         [Tooltip("After a fish spits the lure on a missed reaction, NO chaser may roll a new strike for this long. Stops a second fish from instantly biting the moment the first one is missed — the whole school gets a beat. Set 0 to disable.")]
         public float postMissCooldown;
+        [Tooltip("After ANY fish responds — a nibble OR a committed bite — NO chaser may roll again for " +
+                 "this long, so the school doesn't take turns nibbling/biting the lure one after another. " +
+                 "The lock is global (applies to every active fish, not just the one that responded). " +
+                 "0/unset falls back to postMissCooldown.")]
+        public float responseCooldown;
 
         [Header("Bite Chance")]
         [Tooltip("Strike probability per roll while the lure sits still (TP: 0.15).")]
@@ -74,10 +79,23 @@ public class LureBiteBrain
         [Range(0f, 1f)] public float movingBiteChance;
         [Tooltip("Chance multiplier at Night (TP: ×1.5 outside midday hours).")]
         public float nightChanceMultiplier;
-        [Tooltip("Chance multiplier in Rainy/Stormy weather (TP: ×1.75 while raining).")]
-        public float rainChanceMultiplier;
         [Tooltip("FishPreset.catchProbability equal to this value is neutral (×1). Above = more eager than average, below = warier (TP gave the catfish ×2).")]
         [Range(0.05f, 1f)] public float neutralCatchProbability;
+        [Tooltip("When a roll succeeds (the fish responds to the lure), this is the chance it's a full " +
+                 "BITE — a dash-grab that opens the reaction window. Otherwise it's a NIBBLE: the fish " +
+                 "darts through the lure, twitches it, and stays interested, so the player has to keep " +
+                 "tugging to re-roll for a real bite. A bite always overtakes a nibble rolled the same " +
+                 "moment. 1 (or 0/unset, treated as 1) = every response is a bite, the old behaviour.")]
+        [Range(0f, 1f)] public float biteCommitChance;
+
+        [Header("Popper Preference")]
+        [Tooltip("Awareness-radius multiplier applied to a popper-preferring fish (FishPreset.prefersPopper) " +
+                 "while a Popper lure is equipped — they notice the splashing popper from farther and swim " +
+                 "over. Stacks with the moving-lure bonus. 1 = no extra pull.")]
+        public float popperPreferenceRadiusMultiplier;
+        [Tooltip("Bite-chance multiplier applied to a popper-preferring fish while a Popper lure is equipped " +
+                 "— they strike the popper more readily. 1 = no bonus, 2 = twice as likely per roll.")]
+        public float popperPreferenceBiteMultiplier;
     }
 
     private enum Phase { Approaching, InRing, Striking }
@@ -103,8 +121,15 @@ public class LureBiteBrain
     private readonly List<float> boredTimers = new List<float>();
     // The fish currently allowed to be interested in the lure (rebuilt each tick by EnforceHoverCap).
     private readonly List<FishRipple> hoverSet = new List<FishRipple>();
+    // Fish that rolled a NIBBLE this tick. Their tease passes are deferred until the whole chaser
+    // sweep is done, so a bite committed by any chaser the same tick can overtake (drop) them.
+    private readonly List<FishRipple> nibbleCandidates = new List<FishRipple>();
 
     private float movedTimer;
+
+    // True while a Popper-style lure is equipped (set each Tick). Gates the popper-preference
+    // awareness/bite bonuses so they only apply to popper-preferring fish with the popper out.
+    private bool popperEquipped;
 
     // While > 0 no chaser may roll a new strike: set when a grab is missed (the school is briefly
     // startled) so a second fish can't instantly pounce on the lure the moment the first is spat out.
@@ -125,6 +150,10 @@ public class LureBiteBrain
     // nearest such fish strike instantly.
     public void OnSplashdown(in Settings s, List<FishRipple> fish, Vector3 splashPos)
     {
+        // Splashdown happens outside the Tick loop, so refresh the popper flag here too — the
+        // direct-hit strike below must respect the popper split (only popper fish can be struck
+        // by a popper landing on them). The next Tick's scare sweep chases the rest off.
+        popperEquipped = BobberInventory.IsPopperEquipped;
         movedTimer = Mathf.Max(movedTimer, s.movedDurationPerYank);
 
         if (fish == null || s.directHitRadius <= 0f) return;
@@ -135,7 +164,7 @@ public class LureBiteBrain
         {
             FishRipple candidate = fish[i];
             if (candidate == null || candidate.preset == null) continue;
-            if (!candidate.preset.RespondsToLure) continue;
+            if (!RespondsToEquippedLure(candidate.preset)) continue;
             if (candidate.CurrentState != FishRipple.FishState.Wandering
                 && candidate.CurrentState != FishRipple.FishState.Attracted) continue;
 
@@ -201,21 +230,36 @@ public class LureBiteBrain
         biteLockTimer = 0f;
     }
 
-    public void Tick(float dt, List<FishRipple> fish, BobberController lure, bool crankActive, in Settings s)
+    public void Tick(float dt, List<FishRipple> fish, BobberController lure, bool crankActive, bool isPopper, in Settings s)
     {
         if (lure == null || fish == null) return;
 
+        popperEquipped = isPopper;
         movedTimer = Mathf.Max(0f, movedTimer - dt);
         biteLockTimer = Mathf.Max(0f, biteLockTimer - dt);
         if (crankActive) movedTimer = Mathf.Max(movedTimer, s.crankMovedTopUp);
 
         bool lureMoved = movedTimer > 0f;
 
-        // NOTICE: a moving lure is visible from farther away.
+        // POPPER SCARE: while the popper is moving (reeling or wiggling — both feed movedTimer),
+        // its aggressive pop chases off every fish that isn't a popper-lover, bobber species
+        // included. Gated on lureMoved so a still popper is safe to drift past; already-fleeing
+        // fish are skipped inside the sweep.
+        if (popperEquipped && lureMoved) ScareNonPopperFish(fish);
+
+        // NOTICE: a moving lure is visible from farther away, and a popper-preferring fish notices
+        // the splashing popper from farther still (its bonus stacks on top of the moving bonus).
         float awareness = lureMoved ? s.movingRadiusMultiplier : 1f;
         for (int i = 0; i < fish.Count; i++)
         {
-            if (fish[i] != null) fish[i].SetAwarenessScale(awareness);
+            if (fish[i] == null) continue;
+            float a = awareness;
+            // > 0 guard: a setting left at 0 (e.g. an old serialized zone before this field
+            // existed) must read as "no bonus" (×1), never multiply awareness down to nothing.
+            if (popperEquipped && fish[i].preset != null && fish[i].preset.prefersPopper
+                && s.popperPreferenceRadiusMultiplier > 0f)
+                a *= s.popperPreferenceRadiusMultiplier;
+            fish[i].SetAwarenessScale(a);
         }
 
         TickBoredCooldowns(dt);
@@ -241,7 +285,7 @@ public class LureBiteBrain
         for (int i = 0; i < fish.Count; i++)
         {
             FishRipple f = fish[i];
-            if (f == null || f.preset == null || !f.preset.RespondsToLure) continue;
+            if (f == null || f.preset == null || !RespondsToEquippedLure(f.preset)) continue;
             // Bored fish keep clear on their own cooldown; scared/despawning fish are mid-exit.
             if (boredFish.Contains(f)) continue;
             FishRipple.FishState st = f.CurrentState;
@@ -269,7 +313,7 @@ public class LureBiteBrain
             for (int i = 0; i < fish.Count; i++)
             {
                 FishRipple f = fish[i];
-                if (f == null || f.preset == null || !f.preset.RespondsToLure) continue;
+                if (f == null || f.preset == null || !RespondsToEquippedLure(f.preset)) continue;
                 if (boredFish.Contains(f) || hoverSet.Contains(f)) continue;
                 if (!TierMatches(f.CurrentState, tier)) continue;
 
@@ -328,7 +372,9 @@ public class LureBiteBrain
                 && (c.phase == Phase.Striking
                     ? (c.fish.CurrentState == FishRipple.FishState.Striking
                        || c.fish.CurrentState == FishRipple.FishState.Grabbing)
-                    : c.fish.CurrentState == FishRipple.FishState.Attracted);
+                    // An in-ring chaser is normally Attracted; while it's mid lure-nibble pass its
+                    // fish briefly reads Striking, so keep it (it returns to hovering on its own).
+                    : (c.fish.CurrentState == FishRipple.FishState.Attracted || c.fish.IsLureNibbling));
             if (!valid) chasers.RemoveAt(i);
         }
     }
@@ -345,7 +391,7 @@ public class LureBiteBrain
             {
                 FishRipple candidate = fish[i];
                 if (candidate == null || candidate.preset == null) continue;
-                if (!candidate.preset.RespondsToLure) continue;
+                if (!RespondsToEquippedLure(candidate.preset)) continue;
                 if (candidate.CurrentState != FishRipple.FishState.Attracted) continue;
                 if (IsChaser(candidate) || boredFish.Contains(candidate)) continue;
 
@@ -366,6 +412,31 @@ public class LureBiteBrain
                 timerArmed = false,
                 patience = Random.Range(s.patienceMin, s.patienceMax),
             });
+        }
+    }
+
+    // Whether a species engages the CURRENTLY equipped lure. The popper splits the lure fish:
+    // with the popper out only popper-lovers respond; with the plain lure out only non-lovers do.
+    // Mirrors BobberInventory.PresetRespondsToEquippedTackle for the lure path (popperEquipped is
+    // refreshed each Tick and on splashdown).
+    private bool RespondsToEquippedLure(FishPreset preset)
+    {
+        if (preset == null || !preset.RespondsToLure) return false;
+        return popperEquipped ? preset.prefersPopper : !preset.prefersPopper;
+    }
+
+    // Scare every non-popper fish out of the water while the popper is moving. Popper-lovers stay;
+    // fish already fleeing or despawning are mid-exit, so leave them be (Scare re-fleeing a fleer
+    // would just re-jitter it in place).
+    private void ScareNonPopperFish(List<FishRipple> fish)
+    {
+        for (int i = 0; i < fish.Count; i++)
+        {
+            FishRipple f = fish[i];
+            if (f == null || f.preset == null || f.preset.prefersPopper) continue;
+            FishRipple.FishState st = f.CurrentState;
+            if (st == FishRipple.FishState.Scared || st == FishRipple.FishState.Despawning) continue;
+            f.Scare();
         }
     }
 
@@ -390,6 +461,12 @@ public class LureBiteBrain
     private void TickChasers(float dt, BobberController lure, bool lureMoved, in Settings s)
     {
         Vector3 lurePos = lure.transform.position;
+        nibbleCandidates.Clear();
+
+        // Global lockout applied after ANY response (nibble or bite) so the school can't take turns
+        // pecking the lure — every active fish waits this long before the next roll. Falls back to
+        // the post-miss cooldown when unset.
+        float responseCooldown = s.responseCooldown > 0f ? s.responseCooldown : s.postMissCooldown;
 
         // Only one fish may ever be committed to the lure at a time. A strike is blocked while
         // another chaser is already dashing in (AnyStriking) or while the post-miss lock is up —
@@ -428,8 +505,10 @@ public class LureBiteBrain
                 }
 
                 // While another fish owns the bite (or the post-miss lock is up) the timer is
-                // frozen — the chaser hovers, armed, and takes its turn once the lure is free.
-                if (c.timerArmed && !strikeBlocked)
+                // frozen — the chaser hovers, armed, and takes its turn once the lure is free. It's
+                // also frozen while this fish is mid lure-nibble pass, so a re-tug can't fire a
+                // second roll until the tease finishes and it's hovering again.
+                if (c.timerArmed && !strikeBlocked && !c.fish.IsLureNibbling)
                 {
                     c.biteTimer -= dt;
                     if (c.biteTimer <= 0f)
@@ -437,12 +516,27 @@ public class LureBiteBrain
                         c.timerArmed = false;
                         if (Random.value < ComputeBiteChance(c.fish, lureMoved, in s))
                         {
-                            c.fish.StartLureStrike(onGrabStart, onGrabReleased);
-                            if (c.fish.CurrentState == FishRipple.FishState.Striking)
+                            // The fish responds. Decide bite vs. nibble. An unset (0) commit chance
+                            // reads as 1 (always bite) so old serialized zones keep their behaviour.
+                            float commit = s.biteCommitChance > 0f ? s.biteCommitChance : 1f;
+                            if (Random.value < commit)
                             {
-                                c.phase = Phase.Striking;
-                                strikeBlocked = true; // this fish now owns the lure for this tick onward
-                                continue;
+                                c.fish.StartLureStrike(onGrabStart, onGrabReleased);
+                                if (c.fish.CurrentState == FishRipple.FishState.Striking)
+                                {
+                                    c.phase = Phase.Striking;
+                                    strikeBlocked = true; // this fish now owns the lure for this tick onward
+                                    // Lock the whole school after this response so no fish takes a turn.
+                                    biteLockTimer = Mathf.Max(biteLockTimer, responseCooldown);
+                                    continue;
+                                }
+                            }
+                            else
+                            {
+                                // Nibble: stay interested (refresh patience) and defer the tease pass
+                                // until the sweep is done, so a bite this tick can overtake it.
+                                c.patience = Random.Range(s.patienceMin, s.patienceMax);
+                                nibbleCandidates.Add(c.fish);
                             }
                         }
                     }
@@ -459,6 +553,19 @@ public class LureBiteBrain
                 chasers.RemoveAt(i);
             }
         }
+
+        // Bite priority: if any chaser committed a strike this tick (or one was already ongoing /
+        // the post-miss lock is up), the bite overtakes — drop every nibble rolled this tick. Only
+        // when the lure is free do the teasing passes actually fire.
+        if (!strikeBlocked && nibbleCandidates.Count > 0)
+        {
+            for (int i = 0; i < nibbleCandidates.Count; i++)
+                nibbleCandidates[i]?.StartLureNibble();
+            // Same global lockout as a bite — after a nibble the whole school waits, so fish don't
+            // peck the lure in turns.
+            biteLockTimer = Mathf.Max(biteLockTimer, responseCooldown);
+        }
+        nibbleCandidates.Clear();
     }
 
     private float ComputeBiteChance(FishRipple fish, bool lureMoved, in Settings s)
@@ -469,23 +576,22 @@ public class LureBiteBrain
             ? s.movingBiteChance + (1f - s.movingBiteChance) * s.baseBiteChance
             : s.baseBiteChance;
 
-        if (WorldStateManager.Instance != null)
+        if (WorldStateManager.Instance != null && WorldStateManager.Instance.IsNight)
         {
-            switch (WorldStateManager.Instance.GetActiveFishingWeather())
-            {
-                case WeatherType.Night:
-                    p *= s.nightChanceMultiplier;
-                    break;
-                case WeatherType.Rainy:
-                case WeatherType.Stormy:
-                    p *= s.rainChanceMultiplier;
-                    break;
-            }
+            p *= s.nightChanceMultiplier;
         }
 
         if (fish.preset != null && s.neutralCatchProbability > 0.001f)
         {
             p *= fish.preset.catchProbability / s.neutralCatchProbability;
+        }
+
+        // Popper preference: a fish that loves the popper strikes it more readily. The > 0 guard
+        // keeps an unset (0) multiplier as "no bonus" (×1) instead of zeroing the bite chance.
+        if (popperEquipped && fish.preset != null && fish.preset.prefersPopper
+            && s.popperPreferenceBiteMultiplier > 0f)
+        {
+            p *= s.popperPreferenceBiteMultiplier;
         }
 
         return p;

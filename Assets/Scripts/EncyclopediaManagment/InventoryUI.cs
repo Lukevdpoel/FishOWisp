@@ -8,6 +8,12 @@ public class InventoryUI : MonoBehaviour
 {
     public static bool IsInventoryOpen { get; private set; }
 
+    // True only while the player-driven gear menu (loadout cycling) is open — false for
+    // programmatic opens (vendor shop, bait-missing prompt). The bobber/bait selectors read this
+    // to decide their layout: in loadout mode only the dimension you're steering is shown, while
+    // a programmatic open shows whatever is relevant (e.g. bait for the bait-missing prompt).
+    public static bool IsLoadoutActive { get; private set; }
+
     // Self-registering static instance. Set in Awake, cleared in OnDestroy. Lets other
     // systems (FishingRodController, PauseMenu, FishVendor, BaitShopUI) reach the
     // inventory without ever calling FindFirstObjectByType — which was returning null
@@ -23,6 +29,7 @@ public class InventoryUI : MonoBehaviour
     {
         Instance = null;
         IsInventoryOpen = false;
+        IsLoadoutActive = false;
     }
 
     [Header("Keybindings")]
@@ -142,6 +149,14 @@ public class InventoryUI : MonoBehaviour
     private bool loadoutMode;
     private bool closeOnRelease;
     private bool isFishingActive;
+    // True only during the cast charge-up (OnStartCharging → throw/abandon). isFishingActive
+    // doesn't cover this window because it only flips true once the bobber is thrown, so the
+    // gear/bait menu could otherwise be opened mid-charge. Cleared on throw (isFishingActive
+    // takes over from there) or when the charge is abandoned.
+    private bool isChargingCast;
+    // True while the caught fish is being shown off (FishingState.InspectingCatch). Tracked
+    // separately because OnReelingCompleted clears isFishingActive right before the showcase begins.
+    private bool isInspectingCatch;
     private FishingLine fishingLine;
     private Transform resolvedPlayer;
     private PlayerController playerController;
@@ -193,6 +208,14 @@ public class InventoryUI : MonoBehaviour
         FishingEvents.OnCancelFishing += HandleFishingEnded;
         FishingEvents.OnReelingCompleted += HandleFishingEnded;
 
+        // Track the charge-up window so the gear/bait menu can't open while winding up a cast.
+        FishingEvents.OnStartCharging += HandleCastChargeStarted;
+        FishingEvents.OnChargeCanceled += HandleCastChargeEnded;
+
+        // …and the catch-showcase window, which isn't covered by isFishingActive (see field).
+        FishingEvents.OnCatchInspectionStarted += HandleCatchInspectionStarted;
+        FishingEvents.OnCatchInspectionEnded += HandleCatchInspectionEnded;
+
         noteMenu = GetComponent<NoteMenu>();
         if (noteMenu == null) noteMenu = FindFirstObjectByType<NoteMenu>(FindObjectsInactive.Include);
 
@@ -220,6 +243,12 @@ public class InventoryUI : MonoBehaviour
         FishingEvents.OnThrowBobber -= HandleFishingStarted;
         FishingEvents.OnCancelFishing -= HandleFishingEnded;
         FishingEvents.OnReelingCompleted -= HandleFishingEnded;
+
+        FishingEvents.OnStartCharging -= HandleCastChargeStarted;
+        FishingEvents.OnChargeCanceled -= HandleCastChargeEnded;
+
+        FishingEvents.OnCatchInspectionStarted -= HandleCatchInspectionStarted;
+        FishingEvents.OnCatchInspectionEnded -= HandleCatchInspectionEnded;
 
         if (Instance == this) Instance = null;
 
@@ -298,7 +327,14 @@ public class InventoryUI : MonoBehaviour
 
     private bool CanOpenLoadout()
     {
+        if (MainMenuController.IsTitleSequenceActive) return false; // not until the title hands off the camera
+        // A control-locked player is mid-cinematic or in a menu that owns the view (the 3D shop, the
+        // door walk-in). The loadout must not pop on top of those — it would override the shop menu.
+        if (playerController != null && playerController.areControlsLocked) return false;
         if (isFishingActive) return false;
+        if (isChargingCast) return false; // No popping the menu mid-cast-charge.
+        if (isInspectingCatch) return false; // …or while showing off the catch.
+        if (playerController != null && playerController.IsJumping) return false; // …or mid-jump.
         if (NoteMenu.IsNotebookOpen) return false;
         if (DialogueManager.Instance != null && DialogueManager.Instance.IsDialogueActive()) return false;
         return true;
@@ -308,6 +344,7 @@ public class InventoryUI : MonoBehaviour
     {
         OpenInventory();                 // resets loadoutMode/closeOnRelease, then we upgrade
         loadoutMode = true;
+        IsLoadoutActive = true;
         closeOnRelease = closeWhenReleased;
         loadoutScreen = LoadoutScreen.Bobber;
         BeginLoadoutCameraBorrow();      // remember a fixed (shop) camera so we can reset it on close
@@ -318,8 +355,12 @@ public class InventoryUI : MonoBehaviour
         RefreshLoadoutFocus();
     }
 
-    private void HandleFishingStarted(Vector3 dir, float force) => isFishingActive = true;
-    private void HandleFishingEnded() => isFishingActive = false;
+    private void HandleFishingStarted(Vector3 dir, float force) { isFishingActive = true; isChargingCast = false; }
+    private void HandleFishingEnded() { isFishingActive = false; isChargingCast = false; }
+    private void HandleCastChargeStarted() => isChargingCast = true;
+    private void HandleCastChargeEnded() => isChargingCast = false;
+    private void HandleCatchInspectionStarted() => isInspectingCatch = true;
+    private void HandleCatchInspectionEnded() => isInspectingCatch = false;
 
     private bool IsPointerOverInventoryUI()
     {
@@ -547,6 +588,8 @@ public class InventoryUI : MonoBehaviour
     // applied immediately, so the bobber/lure model swaps and the bars re-highlight without
     // any confirm button.
     private readonly List<BaitItem> cyclableBaits = new List<BaitItem>();
+    // "No bait" (null) + cyclable baits — the stops CycleBait steps through (see BaitBarUI parity).
+    private readonly List<BaitItem> cycleBaitStops = new List<BaitItem>();
 
     private void HandleLoadoutNavigation()
     {
@@ -605,14 +648,19 @@ public class InventoryUI : MonoBehaviour
     private void CycleBait(int delta)
     {
         if (BaitInventory.Instance == null) return;
-        List<BaitItem> baits = GetCyclableBaits();
-        if (baits.Count == 0) return;
 
-        BaitItem sel = BaitInventory.Instance.SelectedBait;
-        int current = sel != null ? baits.IndexOf(sel) : -1;
-        int next = current < 0 ? (delta > 0 ? 0 : baits.Count - 1)
-                               : ((current + delta) % baits.Count + baits.Count) % baits.Count;
-        BaitInventory.Instance.SetSelectedBait(baits[next]);
+        // Cycle stops = "no bait" (null — an empty hook is always a valid choice) + each owned/
+        // infinite bait, so the player can deliberately fish baitless from the gear menu. Mirrors
+        // BaitBarUI.CycleSelection so the keyboard/gamepad path reaches the same stops as the arrows.
+        cycleBaitStops.Clear();
+        cycleBaitStops.Add(null);
+        cycleBaitStops.AddRange(GetCyclableBaits());
+        if (cycleBaitStops.Count <= 1) return; // only "no bait" available — nothing to cycle to
+
+        int current = cycleBaitStops.IndexOf(BaitInventory.Instance.SelectedBait); // null resolves to 0
+        if (current < 0) current = 0;
+        int next = ((current + delta) % cycleBaitStops.Count + cycleBaitStops.Count) % cycleBaitStops.Count;
+        BaitInventory.Instance.SetSelectedBait(cycleBaitStops[next]);
     }
 
     private int IndexOfSelectedBobber(IReadOnlyList<BobberItem> owned)
@@ -802,6 +850,7 @@ public class InventoryUI : MonoBehaviour
         // Default every open to non-loadout (programmatic: vendor / bait prompt). OpenLoadout
         // upgrades it afterwards for the player-driven gear menu.
         loadoutMode = false;
+        IsLoadoutActive = false;
         closeOnRelease = false;
         // If a programmatic open interrupts an active loadout, let any borrowed fixed (shop)
         // camera ease back. Harmless on a normal open (no camera borrowed); OpenLoadout re-borrows
@@ -823,6 +872,7 @@ public class InventoryUI : MonoBehaviour
     {
         IsInventoryOpen = false;
         loadoutMode = false;
+        IsLoadoutActive = false;
         closeOnRelease = false;
         EndLoadoutCameraBorrow();   // ease a borrowed fixed (shop) camera back to its captured pose
         if (uiPanel != null) uiPanel.SetActive(false);

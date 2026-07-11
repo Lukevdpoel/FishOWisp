@@ -128,6 +128,11 @@ public class NoteMenu : MonoBehaviour
         else
             debugInfo = "NoteMenu: Keyboard OK, isOpen=" + isNoteOpen + ", tab=" + Keyboard.current.tabKey.isPressed;
 
+        // Don't let the notebook open during the title flythrough / camera handoff — the player
+        // isn't in control of the world yet. The fishing scripts are gated by MainMenuController
+        // disabling them; the notebook lives in a different prefab, so it self-gates here.
+        if (MainMenuController.IsTitleSequenceActive) return;
+
         bool togglePressed = (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
                           || GamepadInput.NotebookTogglePressed;
         if (togglePressed)

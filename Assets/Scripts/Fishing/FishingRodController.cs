@@ -9,10 +9,20 @@ public class FishingRodController : MonoBehaviour
     [Header("State")]
     [SerializeField] public FishingState currentState = FishingState.Idle;
 
+    // True while a cast is out — a bobber/lure is in the water, a fish is on the line, or a
+    // fight/reel-in is in progress. The research scanner reads this to refuse "analyzing" fish
+    // while you're actively fishing: research is meant for observing free-swimming fish, not the
+    // ones your cast is already working. Aim/zoom itself is unaffected.
+    public bool IsCastActive =>
+        currentState == FishingState.WaitingForBite
+        || currentState == FishingState.LureReeling
+        || currentState == FishingState.FishOnTheLine
+        || currentState == FishingState.FightingFish
+        || currentState == FishingState.Reeling;
+
     [Header("Object References")]
     public GameObject danglingBobber;
     public Transform playerModel;
-    public DirectionalFishingMinigame minigameUI;
 
     [Header("Component References")]
     [SerializeField] private CatchInspectionHandler inspectionHandler;
@@ -40,18 +50,35 @@ public class FishingRodController : MonoBehaviour
     [Tooltip("Grace time after casting before turn-away auto-reel can trigger, so the cast animation can settle.")]
     public float turnAwayGracePeriod = 0.5f;
 
-    [Header("Fish Fight Settings")]
-    public float maxFightProgress = 40f;
-    public float initialFightProgress = 15f;
-    public float fallbackFightProgressRate = 10f;
+    [Header("Fish Fight (play as the fish)")]
+    [Tooltip("Tunables for the fish-control fight: tank-steer the hooked fish, reel to drag it to the bank, ride out its fight bursts. See FishFightHandler.")]
+    public FishFightHandler.Settings fightSettings = new FishFightHandler.Settings
+    {
+        swimSpeed = 1.0f,
+        fightSwimSpeed = 2.5f,
+        steerTurnRate = 140f,
+        fightTurnRate = 220f,
+        fightSteerAuthority = 0.3f,
+        fightArcDegrees = 75f,
+        calmDurationRange = new Vector2(1.5f, 3.0f),
+        fightDurationRange = new Vector2(0.5f, 1.1f),
+        sizeIntensity = 0.5f,
+        minFightSeconds = 1.5f,
+    };
+    [Tooltip("Extra line (m) beyond the hook distance the fish can take before the line snaps and it escapes. The break distance is fixed at hook time, so every fight has the same stakes whether the cast was long or short.")]
+    public float lineSlackBeforeBreak = 8f;
 
     [Header("Reel-In Pull")]
-    [Tooltip("Horizontal distance from the player at which the fish counts as caught (once the minimum reel meter is also full). Player height doesn't matter — only XZ distance is checked.")]
+    [Tooltip("Horizontal distance from the WATERLINE (where the line player→bobber crosses onto the water) at which the fish counts as caught. Measuring to the shore — not the player — lets the catch close even when the player stands well back from the bank. Height doesn't matter; only XZ distance is checked.")]
     public float catchDistance = 3.0f;
-    [Tooltip("How fast (m/s) the bobber is pulled horizontally toward the player while the player holds reel during a rest phase.")]
+    [Tooltip("Extra speed (m/s) added along the fish's FACING while the player holds reel — cranking the line hauls the fish head-first wherever it points. Toward the bank when steered right; straight into its escape when it isn't, which is how the line gets snapped.")]
     public float reelPullSpeed = 2.0f;
-    [Tooltip("Pulling stops once the bobber is this far INSIDE the catch radius — guarantees the catch check passes instead of stalling on the boundary.")]
-    public float pullStopInset = 0.2f;
+    [Tooltip("Collider layer of the water-surface mesh (WaterColliderFish) used to locate the waterline " +
+             "the catch/retract reels to. catchDistance & the lure's retractDistance are measured from " +
+             "the point where the line player→bobber crosses this water surface, so a player standing back " +
+             "from the bank can still complete the reel-in. Leave at WaterColliderFish; if 0/unset it's " +
+             "resolved by name at Awake, and if that fails the old measure-to-the-player behavior is used.")]
+    public LayerMask waterlineMask;
 
     [Header("Lure Settings")]
     [Tooltip("Tunables for the Twilight-Princess-style lure reel physics. Bites are decided by " +
@@ -72,9 +99,11 @@ public class FishingRodController : MonoBehaviour
         visualPitchAngleDeg = 10.0f,
         visualBobAmplitude = 0.0f,
         visualBobFrequencyHz = 3.0f,
+        popperBounceAmplitudeDeg = 6.0f,
+        popperBounceFrequencyHz = 5.0f,
+        popperSplashInterval = 0.4f,
     };
 
-    private Coroutine fishFightCoroutine;
     private Coroutine fishEscapeCoroutine;
     // True while a fish is gripping the lure and the player's reaction window is open. The real
     // fish (FishRipple) owns the timeout; the rod just routes the hook press.
@@ -84,10 +113,8 @@ public class FishingRodController : MonoBehaviour
     private InventoryUI cachedInventoryUI;
     private FishingLine fishingLine;
 
-    private float currentFightProgress;
     private CaughtFish caughtFishInstance = null;
     private PlayerController playerController;
-    private bool wasReelingLastFrame;
     private bool isAiming;
     // Tracks the RT pressure-charge bracket frame-to-frame so we can detect the press edge
     // (start charging) and the release edge (cast) without a separate Input System press point.
@@ -98,6 +125,9 @@ public class FishingRodController : MonoBehaviour
     private int hashFail;
 
     private readonly LureReelHandler lureReel = new LureReelHandler();
+    private readonly FishFightHandler fishFight = new FishFightHandler();
+    // Hook-time distance from fish to the bank, for the (hidden-by-default) HUD progress bar.
+    private float fightStartDistance;
 
     private void Awake()
     {
@@ -106,6 +136,16 @@ public class FishingRodController : MonoBehaviour
         if (playerController == null) Debug.LogError("FishingRodController: PlayerController missing!");
 
         hashFail = Animator.StringToHash(failAnimationTrigger);
+
+        // If the mask wasn't assigned in the inspector, resolve it by name so the waterline
+        // measurement still works out of the box. Falls back to the old player-distance behavior
+        // (handled in FishingBobberPull) when the layer doesn't exist in this project.
+        if (waterlineMask.value == 0)
+        {
+            waterlineMask = LayerMask.GetMask("WaterColliderFish");
+            if (waterlineMask.value == 0)
+                Debug.LogWarning("FishingRodController: no 'WaterColliderFish' layer found and waterlineMask unset — reel-in distance will measure to the player, not the waterline.");
+        }
 
         fishingLine = GetComponentInChildren<FishingLine>(includeInactive: true);
         if (fishingLine == null) fishingLine = FindFirstObjectByType<FishingLine>(FindObjectsInactive.Include);
@@ -178,16 +218,64 @@ public class FishingRodController : MonoBehaviour
     // outside FixedUpdate only persist for the NEXT physics step — ticking it from Update made
     // the reel-in speed scale with frame rate (slow at low fps, fast at high fps). At fixed
     // rate it's exactly one application per step; Time.deltaTime inside FixedUpdate returns
-    // fixedDeltaTime, so the handler's decay math needs no change.
+    // fixedDeltaTime, so the handler's decay math needs no change. The fish fight drives the
+    // same rigidbody, so it ticks here too.
     private void FixedUpdate()
     {
         TickLure();
+        TickFishFight();
+    }
+
+    // The fish-control fight: the player IS the fish now. Tank-steer with A/D / left stick;
+    // holding reel (LMB/RT) hauls the fish along its FACING — bankward when aligned, into its
+    // escape when not. The handler runs the fish's own fight bursts and the snap tension.
+    private void TickFishFight()
+    {
+        if (currentState != FishingState.FightingFish) return;
+        if (activeBobber == null) return;
+
+        // Same input gate as the lure crank: the notebook owns LMB/RT while open. Both reads
+        // are state (not edge), so they're FixedUpdate-safe.
+        bool inputBlocked = NoteMenu.IsNotebookOpen || Time.timeScale == 0f;
+        bool reelHeld = !inputBlocked
+            && (Input.GetKey(KeyCode.Mouse0) || GamepadInput.ReelHeld);
+        float steer = inputBlocked
+            ? 0f
+            : Mathf.Clamp(Input.GetAxisRaw("Horizontal") + GamepadInput.Move.x, -1f, 1f);
+
+        Vector3 reelTarget = ComputeReelTarget(activeBobber);
+        FishFightHandler.Outcome outcome = fishFight.Tick(
+            activeBobber, reelTarget, transform.position, reelHeld, steer,
+            in fightSettings, reelPullSpeed, catchDistance, waterlineMask);
+
+        // Feed the (hidden-by-default) HUD bar a normalized approach: 0 at the hook spot,
+        // 1 at the bank.
+        Vector3 toBank = activeBobber.transform.position - reelTarget;
+        toBank.y = 0f;
+        float span = Mathf.Max(0.01f, fightStartDistance - catchDistance);
+        FishingEvents.OnFishFightProgressUpdate?.Invoke(
+            Mathf.Clamp01(1f - (toBank.magnitude - catchDistance) / span), 1f);
+
+        if (outcome == FishFightHandler.Outcome.Caught)
+        {
+            WinFishFight();
+        }
+        else if (outcome == FishFightHandler.Outcome.Escaped)
+        {
+            Debug.Log("[FishFight] Fish took all the line slack — it got away.");
+            fishFight.End(activeBobber);
+            StartCoroutine(FailRoutine());
+        }
     }
 
     private void TickLure()
     {
         if (currentState != FishingState.LureReeling) return;
         if (bobberInWater == null) return;
+        // Don't probe the waterline (or tick the handler) until the lure is actually floating —
+        // the handler no-ops out of water anyway, so skipping here keeps the raycasts in
+        // ComputeReelTarget from running during the cast's flight or if the lure ever beaches.
+        if (!bobberInWater.IsInWater) return;
 
         // The notebook owns LMB and RT (page flip) while open; without this gate cranking
         // continues underneath it. Both reads are state (not edge), so they're FixedUpdate-safe.
@@ -199,7 +287,7 @@ public class FishingRodController : MonoBehaviour
             : Mathf.Clamp(Input.GetAxisRaw("Horizontal") + GamepadInput.Move.x, -1f, 1f);
 
         LureReelHandler.Outcome outcome = lureReel.Tick(
-            bobberInWater, playerModel, reelHeld, lateral, in lureSettings);
+            bobberInWater, ComputeReelTarget(bobberInWater), reelHeld, lateral, BobberInventory.IsPopperEquipped, in lureSettings);
 
         // Bites no longer come from here — the LureBiteBrain (per FishingZone) drives a real
         // fish to strike and calls BobberController.HookFish, which lands in HandleFishBite.
@@ -209,6 +297,17 @@ public class FishingRodController : MonoBehaviour
             currentState = FishingState.Reeling;
             StartCoroutine(ReelInBobberRoutine(null));
         }
+    }
+
+    // The reel/retract reference point: the waterline where the line from the player out to the
+    // bobber crosses onto the water (or the player themselves when they're at/over the water).
+    // Both the lure retract and the fish-fight catch measure their completion distance to this
+    // point so a player standing back from the bank can still finish the reel-in.
+    private Vector3 ComputeReelTarget(BobberController bobber)
+    {
+        Vector3 playerPos = playerModel != null ? playerModel.position : transform.position;
+        if (bobber == null) return playerPos;
+        return FishingBobberPull.NearestWaterlinePoint(playerPos, bobber.transform.position, waterlineMask);
     }
 
     private void CheckCastDistance()
@@ -282,32 +381,31 @@ public class FishingRodController : MonoBehaviour
             }
         }
 
-        // --- RT: hold to charge. RodCasting maps the trigger pressure to throw force live, so
-        // the player dials distance up or down by how hard they hold RT. Press A (below) while
-        // still holding to cast at the dialed charge; letting RT go fully cancels the cast and
-        // resets to idle. Only armed from Idle/Charging so RT keeps its post-cast meanings
-        // (attract, lure crank, fight reel) without cross-firing here. ---
+        // --- RT: hold to charge, release to cast — identical on every pad brand and a mirror of
+        // mouse/keyboard (LMB). The throw force time-ramps while held (RodCasting), so letting go
+        // casts at whatever charge the bar has reached; there is no separate "press A to cast"
+        // step. Only armed from Idle/Charging so RT keeps its post-cast meanings (attract, lure
+        // crank, fight reel) without cross-firing here. ---
         bool throwHeld = GamepadInput.ThrowHeld;
         if (currentState == FishingState.Idle && throwHeld && !throwHeldLast)
         {
             StartCharging();
         }
-        else if (currentState == FishingState.Charging && throwHeldLast && !throwHeld
-                 && !GamepadInput.ConfirmPressed)
+        else if (currentState == FishingState.Charging && throwHeldLast && !throwHeld)
         {
-            // Let go of the trigger without committing → cancel the charge back to idle. The
-            // ConfirmPressed guard lets an A press landing on the same frame as the release win,
-            // so thumbing A as your finger leaves the trigger still throws instead of cancelling.
-            FishingEvents.OnCancelFishing?.Invoke();
-            FishingEvents.OnChargeCanceled?.Invoke();  // snap the cast animation back to idle at once
+            // Released the trigger — commit the throw at the time-ramped charge (mirrors LMB up).
+            FishingEvents.OnCancelCharging?.Invoke();
         }
         throwHeldLast = throwHeld;
 
-        // --- RB: reset a cast already in the water (bobber or lure alike). ---
-        if (GamepadInput.ResetCastPressed
-            && (currentState == FishingState.WaitingForBite || currentState == FishingState.LureReeling))
+        // --- RB: reset a cast already in the water (bobber or lure alike), or cut the line
+        // mid-fight to give up the fish. ---
+        if (GamepadInput.ResetCastPressed)
         {
-            ReelLineBack();
+            if (currentState == FishingState.WaitingForBite || currentState == FishingState.LureReeling)
+                ReelLineBack();
+            else if (currentState == FishingState.FightingFish)
+                CutLineDuringFight();
         }
 
         // --- RT tap: attract fish toward the bobber while waiting for a bite. ---
@@ -316,7 +414,7 @@ public class FishingRodController : MonoBehaviour
             FishingEvents.OnAttractFish?.Invoke();
         }
 
-        // --- A: cast the held charge, hook a biting fish, or confirm/finish catch inspection. ---
+        // --- A: cast the held charge or confirm/finish catch inspection. ---
         if (GamepadInput.ConfirmPressed)
         {
             switch (currentState)
@@ -324,14 +422,19 @@ public class FishingRodController : MonoBehaviour
                 case FishingState.Charging:
                     FishingEvents.OnCancelCharging?.Invoke();  // commit the throw at the current charge
                     break;
-                case FishingState.FishOnTheLine:
-                    if (isLureGrabActive) ConfirmLureHook();
-                    else HookFishAndStartFight();
-                    break;
                 case FishingState.InspectingCatch:
                     TryFinishInspection();
                     break;
             }
+        }
+
+        // --- Reel button (default RT) press reacts to a biting fish — the SAME control the fight
+        // reel uses (held), so hooking and reeling share one button on every scheme. Mirrors LMB on
+        // keyboard/mouse, where the down-edge hooks the bite and the hold reels. ---
+        if (GamepadInput.ReelPressed && currentState == FishingState.FishOnTheLine)
+        {
+            if (isLureGrabActive) ConfirmLureHook();
+            else HookFishAndStartFight();
         }
 
         // --- Release the keyboard charge (LMB up) to cast. ---
@@ -342,11 +445,13 @@ public class FishingRodController : MonoBehaviour
 
         // --- Instant reset (E key) — keyboard mirror of the RB cast reset. The reel-in arc is
         // kinematic and flies over geometry, so this doubles as the escape hatch when the lure
-        // snags behind terrain during the physics reel. ---
-        if (Input.GetKeyDown(KeyCode.E)
-            && (currentState == FishingState.WaitingForBite || currentState == FishingState.LureReeling))
+        // snags behind terrain during the physics reel. Mid-fight it cuts the line instead. ---
+        if (Input.GetKeyDown(KeyCode.E))
         {
-            ReelLineBack();
+            if (currentState == FishingState.WaitingForBite || currentState == FishingState.LureReeling)
+                ReelLineBack();
+            else if (currentState == FishingState.FightingFish)
+                CutLineDuringFight();
         }
     }
 
@@ -362,6 +467,17 @@ public class FishingRodController : MonoBehaviour
         Debug.Log("Reeling back the line.");
         currentState = FishingState.Reeling;
         StartCoroutine(ReelInBobberRoutine(null));
+    }
+
+    // Deliberately give up a fight: cut the line and let the fish go. Runs the exact same exit
+    // as the line snapping (FishFightHandler.Outcome.Escaped) — the fish is released for good,
+    // swims off, dives and fades out (HookedFishController.BeginEscape), and the cast resets
+    // through the fail path.
+    private void CutLineDuringFight()
+    {
+        Debug.Log("[FishFight] Line cut — the fish gets away.");
+        fishFight.End(activeBobber);
+        StartCoroutine(FailRoutine());
     }
 
     private InventoryUI GetInventoryUI()
@@ -389,21 +505,12 @@ public class FishingRodController : MonoBehaviour
             Debug.Log($"[FishFight] StartCharging BLOCKED — bobberInWater: {(bobberInWater != null ? "exists" : "null")}, activeBobber: {(activeBobber != null ? "exists" : "null")}");
             return;
         }
-        // Lures don't use bait — skip the bait gate entirely. Regular bobbers still require it.
-        if (!BobberInventory.IsLureEquipped
-            && BaitInventory.Instance != null && BaitInventory.Instance.SelectedBait == null)
+        // Casting with an empty hook is allowed now (a baitless cast still draws bitesWithoutBait fish,
+        // just slowly). This only drops a depleted bait selection back to "no bait"; it never pops the
+        // gear menu. Lures use no bait, so it's a no-op for them.
+        if (!BobberInventory.IsLureEquipped && BaitInventory.Instance != null)
         {
-            Debug.Log("[FishFight] StartCharging BLOCKED — no bait equipped. Opening inventory so the player can pick one.");
-            InventoryUI inv = GetInventoryUI();
-            if (inv != null)
-            {
-                if (!InventoryUI.IsInventoryOpen) inv.OpenInventory();
-            }
-            else
-            {
-                Debug.LogError("[FishFight] No InventoryUI resolvable — bait-missing prompt skipped. Should not happen after the GenericSingleton ghost-spawn fix; if you see this, the InventoryUI's GameObject is genuinely missing from the scene.");
-            }
-            return;
+            BaitInventory.Instance.EnsureBaitSelected();
         }
         currentState = FishingState.Charging;
         if (playerController != null) playerController.LockControls(true);
@@ -466,8 +573,17 @@ public class FishingRodController : MonoBehaviour
         if (!isLureGrabActive || bobber != bobberInWater) return;
         isLureGrabActive = false;
         if (playerController != null) playerController.UnlockFromFish();
-        activeBobber = null;
-        currentState = FishingState.LureReeling;
+
+        // Missing the reaction window is a true FAIL on BOTH tackle types now: the fish swims off (it
+        // already spat the tackle in FishRipple.ReleaseGrab) and the player has to recast, rather than
+        // the lure quietly dropping back to a free retry on the same cast. The only difference is a
+        // bobber also loses its bait to the fish; a lure carries none, so it just fails the cast.
+        // FailToHookFish runs the same cast-reset path (fail animation → cooldown → idle) for both.
+        if (!BobberInventory.IsLureEquipped)
+        {
+            bobber.ConsumeEquippedBait();
+        }
+        FailToHookFish();
     }
 
     // The player reacted in time — commit the grab into a real bite and start the fight. The zone
@@ -500,7 +616,6 @@ public class FishingRodController : MonoBehaviour
 
     private IEnumerator FailRoutine()
     {
-        if (minigameUI != null) minigameUI.Deactivate();
         FishingEvents.OnStopReelingDuringFight?.Invoke();
         if (playerController != null) playerController.UnlockFromFish();
         if (bobberInWater != null)
@@ -523,80 +638,36 @@ public class FishingRodController : MonoBehaviour
     private void HookFishAndStartFight()
     {
         if (fishEscapeCoroutine != null) StopCoroutine(fishEscapeCoroutine);
-        FishingEvents.OnHookFishSuccess?.Invoke(); currentState = FishingState.FightingFish; currentFightProgress = initialFightProgress;
-        if (activeBobber != null) { Rigidbody rb = activeBobber.GetComponent<Rigidbody>(); if (rb != null) { rb.isKinematic = false; activeBobber.SetStruggleActive(true); } activeBobber.SetPlayerTransform(transform); }
-        if (minigameUI != null) { minigameUI.Activate(); if (activeBobber != null) minigameUI.SetTrackingTarget(activeBobber.transform); }
-        else { Debug.LogWarning("FishingRodController: minigameUI is NULL — fish fight will auto-fill! Reassign the DirectionalFishingMinigame reference in the Inspector."); }
-        FishingEvents.OnFishFightBegin?.Invoke(activeBobber.HookedFish.preset); fishFightCoroutine = StartCoroutine(FishFightRoutine());
+        FishingEvents.OnHookFishSuccess?.Invoke();
+        currentState = FishingState.FightingFish;
+        if (activeBobber != null)
+        {
+            // The fish fight drives the bobber rigidbody directly (FishFightHandler), so it
+            // must be dynamic. The old self-swimming struggle (SetStruggleActive) stays off
+            // for the whole fight — the player steers the fish now.
+            Rigidbody rb = activeBobber.GetComponent<Rigidbody>();
+            if (rb != null) rb.isKinematic = false;
+            activeBobber.SetPlayerTransform(transform);
+        }
+        FishingEvents.OnFishFightBegin?.Invoke(activeBobber.HookedFish.preset);
+        fishFight.Begin(activeBobber, activeBobber.HookedFish.preset, transform.position,
+                        lineSlackBeforeBreak, in fightSettings);
+
+        Vector3 toBank = activeBobber.transform.position - ComputeReelTarget(activeBobber);
+        toBank.y = 0f;
+        fightStartDistance = toBank.magnitude;
     }
     private void WinFishFight()
     {
         Debug.Log($"[FishFight] WinFishFight — activeBobber: {(activeBobber != null ? "valid" : "NULL")}, inspectionHandler: {(inspectionHandler != null ? "valid" : "NULL")}");
         currentState = FishingState.Reeling;
         if (playerController != null) playerController.UnlockFromFish();
-        if (fishFightCoroutine != null) StopCoroutine(fishFightCoroutine);
-        if (activeBobber != null) activeBobber.SetStruggleActive(false);
-        if (minigameUI != null) minigameUI.Deactivate();
+        fishFight.End(activeBobber);
         caughtFishInstance = activeBobber.HookedFish;
         FishingEvents.OnFishFightEnd?.Invoke(true);
         if (activeBobber != null) activeBobber.SwapBobberForFishModel();
 
         StartCoroutine(ReelInBobberRoutine(caughtFishInstance));
-    }
-    private IEnumerator FishFightRoutine()
-    {
-        float lastProgress = currentFightProgress;
-        wasReelingLastFrame = false;
-        while (currentFightProgress > 0)
-        {
-            if (minigameUI != null)
-            {
-                if (activeBobber != null)
-                {
-                    minigameUI.SetFishDirectionFromVector(activeBobber.StruggleDirection);
-                    activeBobber.SetStruggleActive(!minigameUI.IsResting);
-                }
-                currentFightProgress = minigameUI.UpdateMinigame(currentFightProgress, maxFightProgress);
-            }
-            else { currentFightProgress += Time.deltaTime * fallbackFightProgressRate; }
-
-            bool isReelingNow = minigameUI != null ? minigameUI.IsReeling : currentFightProgress > lastProgress;
-            if (isReelingNow != wasReelingLastFrame)
-            {
-                if (isReelingNow) FishingEvents.OnStartReelingDuringFight?.Invoke();
-                else FishingEvents.OnStopReelingDuringFight?.Invoke();
-                wasReelingLastFrame = isReelingNow;
-            }
-
-            // Physically pull the bobber toward the player while reeling — but only when the bobber
-            // is still in water and not already inside the catch radius. That keeps the fish from
-            // being dragged onto shore visually and from over-shooting into the player.
-            if (isReelingNow) FishingBobberPull.PullToward(activeBobber, playerModel, reelPullSpeed, catchDistance, pullStopInset);
-
-            lastProgress = currentFightProgress;
-            FishingEvents.OnFishFightProgressUpdate?.Invoke(currentFightProgress, maxFightProgress);
-
-            // Catch fires only when both gates pass: hidden minimum reel meter is full AND the
-            // bobber is physically close enough. Close-hooked fish still need real reel time.
-            if (currentFightProgress >= maxFightProgress
-                && FishingBobberPull.IsWithinCatchRange(activeBobber, playerModel, catchDistance))
-            {
-                break;
-            }
-
-            yield return null;
-        }
-        FishingEvents.OnStopReelingDuringFight?.Invoke();
-        if (currentFightProgress >= maxFightProgress
-            && FishingBobberPull.IsWithinCatchRange(activeBobber, playerModel, catchDistance))
-        {
-            WinFishFight();
-        }
-        else
-        {
-            if (minigameUI != null) minigameUI.Deactivate();
-            StartCoroutine(FailRoutine());
-        }
     }
     private void CancelFishingAction()
     {
@@ -612,23 +683,26 @@ public class FishingRodController : MonoBehaviour
     {
         FishingEvents.OnStartReeling?.Invoke();
 
-        BobberController bobberToReelController = activeBobber != null ? activeBobber : bobberInWater;
+        // activeBobber / bobberInWater are only set once a fish is on the line or the bobber has
+        // landed. When the player resets mid-flight (cast but not yet splashed down) both are null,
+        // so fall back to FishingLine's persistent bobber — otherwise there's nothing to arc and the
+        // bobber just teleports back on the park.
+        BobberController bobberToReelController =
+            activeBobber != null ? activeBobber
+            : bobberInWater != null ? bobberInWater
+            : (fishingLine != null ? fishingLine.ActiveBobber : null);
 
-        Transform reelTarget = null;
-        if (fishToInventory != null && inspectionHandler != null)
+        // A caught fish is hoisted out of the water to HANG from the line below the rod tip
+        // (TP-style showcase) — the silhouette fish stays attached the whole way, so nothing is
+        // re-instantiated. The line's park is held off (BeginCatchHold) until the inspection
+        // confirms, otherwise OnReelingCompleted below would destroy the hanging fish.
+        bool hangCatch = fishToInventory != null && inspectionHandler != null && bobberToReelController != null;
+        if (hangCatch)
         {
-            Transform holdPoint = inspectionHandler.GetFishHoldPoint();
-            if (holdPoint != null) reelTarget = holdPoint;
+            inspectionHandler.ConfigureHang(bobberToReelController,
+                                            fishingLine != null ? fishingLine.rodTip : null);
+            if (fishingLine != null) fishingLine.BeginCatchHold();
         }
-        // Empty-line reel: arc straight back to the rod tip so the bobber lands at its dangling
-        // position. Targeting playerModel here used to drag it to the player and then the parking
-        // teleport in FishingLine snapped it to the rod — visible as a two-stage motion.
-        if (reelTarget == null && fishingLine != null && fishingLine.rodTip != null)
-        {
-            reelTarget = fishingLine.rodTip;
-        }
-        if (reelTarget == null) reelTarget = playerModel;
-        if (reelTarget == null) reelTarget = transform;
 
         if (bobberToReelController != null)
         {
@@ -637,9 +711,31 @@ public class FishingRodController : MonoBehaviour
             if (bobberRb != null) bobberRb.isKinematic = true;
 
             // Don't destroy after the arc — FishingLine parks the persistent bobber when
-            // OnReelingCompleted fires.
-            yield return FishingReelInArc.Animate(bobberToReelController.transform, reelTarget,
-                                                  reelInDuration, reelInArcHeight);
+            // OnReelingCompleted fires (or, for a hang catch, when the catch-hold ends).
+            if (hangCatch)
+            {
+                yield return FishingReelInArc.Animate(bobberToReelController.transform,
+                                                      inspectionHandler.GetHangPosition, null,
+                                                      reelInDuration, reelInArcHeight);
+            }
+            else if (fishingLine != null && fishingLine.rodTip != null)
+            {
+                // Empty-line reel: arc the bobber straight to its dangle rest POSE (the point it
+                // hangs at, in its upright rotation) rather than to the rod tip. FishingLine then
+                // parks it onto the exact same pose, so the hand-off is a no-op — it smooths into
+                // the dangle position instead of teleporting down from the rod tip.
+                yield return FishingReelInArc.Animate(bobberToReelController.transform,
+                                                      fishingLine.GetDangleRestPosition,
+                                                      fishingLine.GetDangleRestRotation,
+                                                      reelInDuration, reelInArcHeight);
+            }
+            else
+            {
+                // No line reference and no fish — fall back to the player/rod transform.
+                Transform fallback = playerModel != null ? playerModel : transform;
+                yield return FishingReelInArc.Animate(bobberToReelController.transform, fallback,
+                                                      reelInDuration, reelInArcHeight);
+            }
         }
 
         HandleReelingCompleted(fishToInventory);
@@ -659,7 +755,8 @@ public class FishingRodController : MonoBehaviour
         if (fishToInventory != null && inspectionHandler != null)
         {
             currentState = FishingState.InspectingCatch;
-            danglingBobber?.SetActive(true);
+            // danglingBobber stays hidden — the fish is hanging from the real line right now;
+            // ResetFishingState restores it once the inspection is confirmed.
             caughtFishInstance = fishToInventory;
             inspectionHandler.BeginInspection(fishToInventory, playerModel);
         }
@@ -686,8 +783,10 @@ public class FishingRodController : MonoBehaviour
         Debug.Log($"[FishFight] ResetFishingState — currentState: {currentState}, bobberInWater: {(bobberInWater != null ? "valid" : "NULL")}, activeBobber: {(activeBobber != null ? "valid" : "NULL")}");
         if (currentState == FishingState.Idle) return;
 
-        // Never leave the grab flag hanging across a reset/cancel.
+        // Never leave the grab flag hanging across a reset/cancel, and close out any fight
+        // still in flight so listeners aren't left mid reeling/struggle state.
         isLureGrabActive = false;
+        fishFight.End(activeBobber);
 
         if (playerController != null)
         {
@@ -698,14 +797,18 @@ public class FishingRodController : MonoBehaviour
 
         if (inspectionHandler != null) inspectionHandler.ForceCleanup();
 
+        // A confirmed catch ends here with the fish still hanging from the held line — release
+        // the hold so FishingLine parks the bobber (which also disposes the hanging fish visual
+        // and restores the bobber's own visuals via ResetForCast). No-op when nothing was held;
+        // the cancel path clears the hold inside FishingLine itself.
+        if (fishingLine != null) fishingLine.EndCatchHold();
+
         StopAiming();
         currentState = FishingState.Idle;
         danglingBobber?.SetActive(true);
-        fishFightCoroutine = null;
         fishEscapeCoroutine = null;
         activeBobber = null;
         bobberInWater = null;
         caughtFishInstance = null;
-        if (minigameUI != null) minigameUI.Deactivate();
     }
 }

@@ -16,6 +16,9 @@ public class FishEntryUI : MonoBehaviour
     public TextMeshProUGUI baitText;
     public TextMeshProUGUI weatherText;
 
+    [Tooltip("Optional research checklist for this page (catch/zoom dots + name-row icon). Wire it in the notebook prefab.")]
+    public ResearchChecklistUI researchChecklist;
+
     [Button]
     public void Populate(FishEncyclopediaEntry entry)
     {
@@ -70,7 +73,9 @@ public class FishEntryUI : MonoBehaviour
 
         if (baitText != null)
         {
-            if (!revealed)
+            // Bait prefs reveal once the fish has been zoom-researched OR caught (not catch-only),
+            // so the Arceus-style zoom loop unlocks them before the first catch.
+            if (!FishEncyclopediaManager.BaitRevealed(entry))
             {
                 baitText.text = "???";
             }
@@ -99,13 +104,16 @@ public class FishEntryUI : MonoBehaviour
                 if (preset.RespondsToLure)
                 {
                     if (sb.Length > 0) sb.Append(", ");
-                    sb.Append("Lure");
+                    sb.Append(preset.prefersPopper ? "Lure (Popper)" : "Lure");
                 }
                 baitText.text = sb.ToString();
             }
         }
 
         if (weatherText != null)
-            weatherText.text = revealed ? preset.preferredWeather.ToString() : "???";
+            weatherText.text = revealed ? preset.TimeOfDayLabel : "???";
+
+        if (researchChecklist != null)
+            researchChecklist.Populate(entry);
     }
 }

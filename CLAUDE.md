@@ -34,7 +34,7 @@ Assets/
 - **BobberController.cs** - Bobber physics
 - **FishingLine.cs** / **VerletRope.cs** - Line physics (Verlet integration)
 - **FishPool.cs** - Fish spawning and management
-- **DirectionalFishingMinigame.cs** - Fish-fighting mini-game UI
+- **FishFightHandler.cs** - Fish fight ("play as the fish"): tank-steer the hooked fish, reel it to the waterbank; the fish sporadically fights back by turning away. (DirectionalFishingMinigame.cs is the retired old fight, no longer referenced.)
 
 ### Encyclopedia & Inventory (`Scripts/EncyclopediaManagment/`)
 - **FishPreset.cs** - ScriptableObject defining fish species (rarity, size, price, bait/weather preferences)
@@ -71,8 +71,11 @@ Assets/
 
 - `Rarity` - Common, Uncommon, Rare, Epic, Legendary
 - `BaitType` - Worm, Insect, Minnow, Bread, Synthetic
-- `WeatherType` - Sunny, Rainy, Cloudy, Stormy, Night
 - `FishingState` - Idle, Charging, WaitingForBite, FishOnTheLine, FightingFish, Reeling, InspectingCatch, Cooldown
+
+Fish spawning is gated by time of day (not weather): each `FishPreset` has separate
+`daySpawnChance` / `nightSpawnChance` weights, and `WorldStateManager.IsNight` decides
+which applies (natural clock in Auto mode, or forced by the vendor's Night Lantern).
 
 ## Persistence
 

@@ -12,9 +12,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 58be025659510044f9e6220f64cc4c67, type: 3}
   m_Name: BasicBobber1
   m_EditorClassIdentifier: Assembly-CSharp::BobberItem
-  id: BasicBobber1
-  displayName: Basic Bobber
+  id: SlipBobber
+  displayName: Slip Bobber
   icon: {fileID: 0}
-  description:
+  description: A basic slip bobber. Tap {attract} to draw fish closer, then press
+    {hook} the moment one strikes.
   kind: 0
+  lureStyle: 0
   bobberPrefab: {fileID: 2096275447604763850, guid: 59f6e42101a98e640bd944010d32c0e1, type: 3}
+  dangleFacingYawOffset: 0

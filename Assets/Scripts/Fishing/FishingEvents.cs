@@ -17,7 +17,17 @@ public static class FishingEvents
     public static Action OnReelingCompleted;
     public static Action OnCancelFishing;
 
+    // Catch inspection ("show fish") begin/end. Distinct from OnReelingCompleted, which fires
+    // immediately BEFORE inspection starts (to release the bait UI after the reel) — so anything
+    // that must stay locked out for the whole showcase has to track these instead.
+    public static Action OnCatchInspectionStarted;
+    public static Action OnCatchInspectionEnded;
+
     // Bobber & Fish State Events
+    // Fired the moment the bobber/lure is thrown (launch release), carrying the just-launched
+    // instance. The follow camera starts its stabilized in-air ride here instead of waiting for
+    // the water landing, so the view trails the cast out rather than snapping when it splashes.
+    public static Action<BobberController> OnBobberLaunched;
     public static Action<BobberController> OnBobberLandedInWater;
     public static Action<BobberController> OnFishNibble;
     public static Action<BobberController> OnFishBite;
@@ -42,6 +52,15 @@ public static class FishingEvents
     // Fired when the player actively reels during a fish fight's calm phase.
     public static Action OnStartReelingDuringFight;
     public static Action OnStopReelingDuringFight;
+
+    // Fired when the fight phase flips between the calm "rest" (false) and an active
+    // "struggle" (true). Drives the rod-bend load and any struggle feedback.
+    public static Action<bool> OnFishStruggleStateChanged;
+
+    // Live line tension during the fish fight: 0 = the fish is at (or inside) its hook
+    // distance, 1 = all the slack is out and the line snaps (the fish escapes). Fired every
+    // fight tick by FishFightHandler; VerletRope keys its snap-warning flicker off it.
+    public static Action<float> OnLineTensionChanged;
 
     // Aim Mode Events
     public static Action OnStartAiming;

@@ -21,13 +21,16 @@ public class EncyclopediaGridSlot : MonoBehaviour, IPointerClickHandler
 
         if (iconImage != null)
         {
-            // Guard the icon: only assign a sprite that is actually present. A fishImage that is
-            // unassigned OR points at a since-deleted asset reads as Unity "fake null", and pushing
-            // that into Image.sprite hard-crashes a player build — the engine reads sprite.rect on
-            // assignment and faults on the dangling native object (NOT a catchable managed exception).
-            // Assigning real null is safe, so collapse the fake-null down to null.
-            Sprite icon = (entry != null && entry.preset != null) ? entry.preset.fishImage : null;
-            iconImage.sprite = icon != null ? icon : null;
+            // Do NOT assign entry.preset.fishImage here. The fish-icon sprite art is currently
+            // missing from the project, so that field is a dangling reference: it points at a
+            // deleted asset, which makes it "real non-null" (a != null check passes) while the
+            // backing native object is dead. UnityEngine.UI.Image's sprite setter reads the
+            // assigned sprite's .rect, and reading the rect of that dead object HARD-CRASHES the
+            // player build (a native access violation, not a catchable managed exception — so no
+            // managed guard can stop it). Removing this assignment entirely deletes the only
+            // set_sprite call in Setup, so the crash site cannot occur. The icon keeps the
+            // prefab's placeholder sprite. Re-enable once fishImage points at a valid sprite again:
+            //     iconImage.sprite = (entry != null && entry.preset != null) ? entry.preset.fishImage : null;
             iconImage.color = isCaught ? Color.white : Color.black;
         }
 

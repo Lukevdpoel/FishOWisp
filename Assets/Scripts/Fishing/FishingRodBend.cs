@@ -30,7 +30,13 @@ public class FishingRodBend : MonoBehaviour
     [SerializeField] private float biteImminentBendDeg = 4f;
     [SerializeField] private float biteBendDeg = 22f;
     [SerializeField] private float fightBendDeg = 18f;
+    [Tooltip("Extra bend added while the player is actively reeling during the fight.")]
     [SerializeField] private float reelingBoostDeg = 6f;
+    [Tooltip("Extra bend added while a struggle phase is active (the fish is fighting back).")]
+    [SerializeField] private float struggleBoostDeg = 8f;
+    [Tooltip("Extra bend at the rod's full side extreme (|direction| = 1) during the fight. Scales " +
+             "with how far the rod is pushed to a side, so cranking it over visibly loads the rod up.")]
+    [SerializeField] private float extremeBendDeg = 10f;
     [SerializeField] private float castWhipDeg = -14f;
 
     [Header("Nibble Envelope")]
@@ -54,10 +60,19 @@ public class FishingRodBend : MonoBehaviour
     [SerializeField] private float axisSmoothTime = 0.18f;
     [Tooltip("Below this cross-product magnitude (sin of the angle between rod and bobber-direction), the rod is treated as already-aligned and falls back to the default bend axis. Prevents jitter when the rod is pointing near the bobber.")]
     [SerializeField] private float axisStabilityThreshold = 0.15f;
+    [Tooltip("Stop aiming at the bobber once it's reeled within this distance (m) of the rod. Below it the rod " +
+             "bends along its default forward plane instead, so a fish reeled right up to the tip can't flip the " +
+             "bend axis and make the rod bow backward toward the camera.")]
+    [SerializeField] private float minAimDistance = 1.5f;
+    [Tooltip("Only aim at the bobber while it's in front of the rod (dot of rod-forward vs. direction-to-bobber " +
+             "above this). Once a reeled-in fish draws level with or behind the tip, the rod keeps its forward bend.")]
+    [SerializeField] private float aimForwardDotThreshold = 0.0f;
 
     private enum BendState { None, WaitingForBite, BiteImminent, Bite, Fighting }
     private BendState state = BendState.None;
     private bool isReelingDuringFight;
+    private bool isStruggling;
+    private float rodSideAmount; // |rod direction|, 0 = centered, 1 = full side extreme
 
     private BobberController activeBobber;
 
@@ -90,6 +105,8 @@ public class FishingRodBend : MonoBehaviour
         FishingEvents.OnFishFightEnd += HandleFightEnd;
         FishingEvents.OnStartReelingDuringFight += HandleReelStart;
         FishingEvents.OnStopReelingDuringFight += HandleReelStop;
+        FishingEvents.OnFishStruggleStateChanged += HandleStruggleStateChanged;
+        FishingEvents.OnRodDirectionUpdate += HandleRodDirection;
         FishingEvents.OnReelingCompleted += HandleReelingCompleted;
         FishingEvents.OnCancelFishing += HandleCancel;
         FishingEvents.OnThrowBobber += HandleThrow;
@@ -105,6 +122,8 @@ public class FishingRodBend : MonoBehaviour
         FishingEvents.OnFishFightEnd -= HandleFightEnd;
         FishingEvents.OnStartReelingDuringFight -= HandleReelStart;
         FishingEvents.OnStopReelingDuringFight -= HandleReelStop;
+        FishingEvents.OnFishStruggleStateChanged -= HandleStruggleStateChanged;
+        FishingEvents.OnRodDirectionUpdate -= HandleRodDirection;
         FishingEvents.OnReelingCompleted -= HandleReelingCompleted;
         FishingEvents.OnCancelFishing -= HandleCancel;
         FishingEvents.OnThrowBobber -= HandleThrow;
@@ -120,9 +139,11 @@ public class FishingRodBend : MonoBehaviour
     private void HandleBiteImminent(BobberController _) => state = BendState.BiteImminent;
     private void HandleFishBite(BobberController _) => state = BendState.Bite;
     private void HandleFightBegin(FishPreset _) => state = BendState.Fighting;
-    private void HandleFightEnd(bool _) { isReelingDuringFight = false; }
+    private void HandleFightEnd(bool _) { isReelingDuringFight = false; isStruggling = false; rodSideAmount = 0f; }
     private void HandleReelStart() => isReelingDuringFight = true;
     private void HandleReelStop() => isReelingDuringFight = false;
+    private void HandleStruggleStateChanged(bool struggling) => isStruggling = struggling;
+    private void HandleRodDirection(float direction) => rodSideAmount = Mathf.Abs(direction);
 
     private void HandleReelingCompleted()
     {
@@ -143,6 +164,8 @@ public class FishingRodBend : MonoBehaviour
     {
         state = BendState.None;
         isReelingDuringFight = false;
+        isStruggling = false;
+        rodSideAmount = 0f;
         activeBobber = null;
     }
 
@@ -155,7 +178,13 @@ public class FishingRodBend : MonoBehaviour
 
         float tension = 0f;
         Transform tensionReference = rodTip != null ? rodTip : (rodMid != null ? rodMid : rodStart);
-        if (activeBobber != null && tensionMaxDistance > 0.001f && tensionReference != null)
+        if (state == BendState.Fighting)
+        {
+            // Under fight load the rod stays fully bowed no matter how close the fish is reeled — a
+            // hooked fish drawn near pulls just as hard, so distance must never relax the bend.
+            tension = tensionMaxBendDeg;
+        }
+        else if (activeBobber != null && tensionMaxDistance > 0.001f && tensionReference != null)
         {
             float dist = Vector3.Distance(activeBobber.transform.position, tensionReference.position);
             tension = Mathf.Clamp01(dist / tensionMaxDistance) * tensionMaxBendDeg;
@@ -168,7 +197,12 @@ public class FishingRodBend : MonoBehaviour
             case BendState.BiteImminent: stateBend = biteImminentBendDeg; break;
             case BendState.Bite: stateBend = biteBendDeg; break;
             case BendState.Fighting:
-                stateBend = fightBendDeg + (isReelingDuringFight ? reelingBoostDeg : 0f);
+                // Reeling and struggling rarely overlap, so these add cleanly; the side-extreme term
+                // loads the rod up further the harder it's cranked to either side.
+                stateBend = fightBendDeg
+                    + (isReelingDuringFight ? reelingBoostDeg : 0f)
+                    + (isStruggling ? struggleBoostDeg : 0f)
+                    + rodSideAmount * extremeBendDeg;
                 break;
         }
 
@@ -183,9 +217,29 @@ public class FishingRodBend : MonoBehaviour
 
         Vector3 bendAxisWorld = ComputeBendAxisWorld();
 
-        ApplyBend(rodStart, startBind, total * startWeight, bendAxisWorld);
-        ApplyBend(rodMid, midBind, total * midWeight, bendAxisWorld);
-        ApplyBend(rodTip, tipBind, total * tipWeight, bendAxisWorld);
+        // The bend (and every stacked boost in `total`) is split across the three segments; deeper
+        // bones compound, so the tip normally carries the most visible curve. If a segment is left
+        // unassigned — commonly the tip — fold its weight onto the last assigned bone so the rod
+        // still bends through its full intended range. Without this the tip's share is silently
+        // dropped, making the whole bend (reeling + struggle + side-extreme included) read as weak.
+        float effStartWeight = startWeight;
+        float effMidWeight = midWeight;
+        float effTipWeight = tipWeight;
+        if (rodTip == null)
+        {
+            if (rodMid != null) effMidWeight += tipWeight;
+            else if (rodStart != null) effStartWeight += tipWeight;
+            effTipWeight = 0f;
+        }
+        if (rodMid == null && rodStart != null)
+        {
+            effStartWeight += effMidWeight;
+            effMidWeight = 0f;
+        }
+
+        ApplyBend(rodStart, startBind, total * effStartWeight, bendAxisWorld);
+        ApplyBend(rodMid, midBind, total * effMidWeight, bendAxisWorld);
+        ApplyBend(rodTip, tipBind, total * effTipWeight, bendAxisWorld);
     }
 
     private Vector3 ComputeBendAxisWorld()
@@ -204,12 +258,20 @@ public class FishingRodBend : MonoBehaviour
         {
             Vector3 rodAlong = alongRef.right;
             Vector3 toBobber = activeBobber.transform.position - alongRef.position;
-            if (toBobber.sqrMagnitude > 0.0001f)
+            float dist = toBobber.magnitude;
+            // Only steer the bend toward the bobber while it's far enough out AND still in front of the
+            // rod. A fish reeled right up to (or past) the tip would otherwise flip the aim direction and
+            // bow the rod backward toward the camera; inside the threshold we keep the default forward bend.
+            if (dist > minAimDistance)
             {
-                Vector3 cross = Vector3.Cross(rodAlong, toBobber.normalized);
-                if (cross.magnitude >= axisStabilityThreshold)
+                Vector3 dir = toBobber / dist;
+                if (Vector3.Dot(rodAlong, dir) > aimForwardDotThreshold)
                 {
-                    targetAxis = cross.normalized;
+                    Vector3 cross = Vector3.Cross(rodAlong, dir);
+                    if (cross.magnitude >= axisStabilityThreshold)
+                    {
+                        targetAxis = cross.normalized;
+                    }
                 }
             }
         }

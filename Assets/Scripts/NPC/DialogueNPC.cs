@@ -17,6 +17,13 @@ public class DialogueNPC : MonoBehaviour
 
     void Update()
     {
+        // Talking waits until any charge jump has fully landed (hint hidden too).
+        if (PlayerController.IsPlayerJumping) return;
+
+        // Tell the HUD prompt bar an interact is available (not while already talking).
+        if (playerInZone && DialogueManager.Instance != null && !DialogueManager.Instance.IsDialogueActive())
+            InteractHint.Ping();
+
         // 1. Check if Player is close AND presses E (or X on a gamepad)
         if (playerInZone && (Input.GetKeyDown(KeyCode.E) || GamepadInput.InteractPressed))
         {

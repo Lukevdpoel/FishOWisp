@@ -141,6 +141,15 @@ public class DialogueManager : GenericSingleton<DialogueManager>
 
     public void StartDialogue(Dialogue dialogue, Transform speaker)
     {
+        // Guard against an empty/unassigned dialogue — DisplayLine indexes lines[0] blind, so a
+        // Dialogue with no lines (e.g. a freshly created asset, or a signpost with no pages) would
+        // otherwise throw IndexOutOfRange from the open-animation callback.
+        if (dialogue == null || dialogue.lines == null || dialogue.lines.Length == 0)
+        {
+            Debug.LogWarning("DialogueManager.StartDialogue: dialogue has no lines — ignoring.", speaker);
+            return;
+        }
+
         currentDialogue = dialogue;
         currentSpeaker = speaker;
         currentLineIndex = 0;

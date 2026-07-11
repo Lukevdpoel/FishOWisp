@@ -1,0 +1,46 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afe3ccf2c6be7e5408b954fc8a0e283b, type: 3}
+  m_Name: ElectricEel_Scriptable
+  m_EditorClassIdentifier: 
+  fishName: Electric Eel
+  description: These guys can barely see with their eyes, so they use small electric
+    pulses to find their way underwater
+  fishImage: {fileID: 0}
+  fishPrefab: {fileID: 2446820558738034998, guid: 57f990e9826c7644cb410a8ec60df5e6, type: 3}
+  sizeClass: 2
+  isLegendary: 0
+  minLengthCm: 90
+  maxLengthCm: 250
+  daySpawnChance: 0
+  nightSpawnChance: 36.3
+  catchProbability: 0.604
+  attractedTo: 1
+  awarenessRadius: 7
+  awarenessConeAngle: 360
+  schoolsTogether: 0
+  prey:
+  - {fileID: 11400000, guid: c6b7cc6730100944c84da1c444c8306a, type: 2}
+  - {fileID: 11400000, guid: 8a7be413503e5e34e863a04c64ffffa9, type: 2}
+  swimFrequency: 0.74
+  swimBodyWaves: 1.8
+  swimWaveAmplitude: 0.1
+  swimSideAmplitude: 0.01
+  swimPivotAmount: 0.03
+  swimMaskStart: 0.05
+  fightPullDistance: 1
+  basePrice: 10
+  pricePerCm: 0
+  preferredBaits:
+  - {fileID: 11400000, guid: 11ccbd758765b2a4a8e806319dce81c0, type: 2}
+  bitesWithoutBait: 0
+  prefersPopper: 0

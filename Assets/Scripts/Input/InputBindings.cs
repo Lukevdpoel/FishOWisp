@@ -31,8 +31,9 @@ public class GamepadBindings
 
     [Header("World / Menus")]
     public GamepadControl jump = GamepadControl.ButtonNorth;
-    [Tooltip("Interact with the world, hook a biting fish, commit a charged cast, and confirm/" +
-             "advance menus & dialogue — all the same button.")]
+    [Tooltip("Interact with the world, commit a charged cast, and confirm/advance menus & " +
+             "dialogue — all the same button. (Reacting to a biting fish lives on 'reel' so it " +
+             "shares a button with reeling.)")]
     public GamepadControl interact = GamepadControl.ButtonSouth;
     [Tooltip("Cancel / close menus; also advances/skips dialogue.")]
     public GamepadControl cancel = GamepadControl.ButtonEast;
@@ -52,7 +53,8 @@ public class GamepadBindings
     public GamepadControl aim = GamepadControl.LeftShoulder;
     [Tooltip("Tap to attract fish toward a waiting bobber.")]
     public GamepadControl attract = GamepadControl.RightTrigger;
-    [Tooltip("Hold to crank the lure in and to reel during the fish fight.")]
+    [Tooltip("Hold to crank the lure in and to reel during the fish fight; a fresh press also " +
+             "reacts to a biting fish (hooking shares this button with reeling).")]
     public GamepadControl reel = GamepadControl.RightTrigger;
 }
 
@@ -78,9 +80,23 @@ public class InputBindings : ScriptableObject
              "match Xbox; change these to give PlayStation players a different layout.")]
     public GamepadBindings playStation = new GamepadBindings();
 
-    /// <summary>The gamepad table for the brand currently connected (PlayStation vs Xbox/other).</summary>
+    [Tooltip("Layout used while a Nintendo Switch Pro Controller is connected. Defaults match " +
+             "Xbox. Heads-up: Unity maps Switch face buttons by physical POSITION, so on a Pro " +
+             "Controller ButtonEast is the 'A' (confirm) button and ButtonSouth is 'B' — the " +
+             "opposite of the Nintendo labels. For the Nintendo-standard layout set " +
+             "interact = ButtonEast and cancel = ButtonSouth here.")]
+    public GamepadBindings nintendo = new GamepadBindings();
+
+    /// <summary>The gamepad table for the brand currently connected (PlayStation / Nintendo / Xbox-or-other).</summary>
     public GamepadBindings ForKind(GamepadKind kind)
-        => kind == GamepadKind.PlayStation ? playStation : xbox;
+    {
+        switch (kind)
+        {
+            case GamepadKind.PlayStation: return playStation;
+            case GamepadKind.Nintendo: return nintendo;
+            default: return xbox;
+        }
+    }
 }
 
 /// <summary>

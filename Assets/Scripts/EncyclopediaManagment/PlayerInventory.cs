@@ -98,8 +98,17 @@ public class PlayerInventory : GenericSingleton<PlayerInventory>
 
     private void SaveInventory()
     {
-        string json = JsonUtility.ToJson(new InventoryDataWrapper(currentCurrency, caughtFishes), true);
-        File.WriteAllText(SavePath, json);
+        // Persist caught fish by fishName, NOT by object reference. JsonUtility writes a
+        // UnityEngine.Object as {"instanceID": N}, and instance IDs are reassigned every run, so in a
+        // player build they resolve to unrelated objects (baits/lures/bobbers) — the same bug that
+        // poisoned the encyclopedia. See FishEncyclopediaManager.SaveEncyclopedia.
+        var data = new InventorySaveData { currency = currentCurrency };
+        foreach (var f in caughtFishes)
+        {
+            if (f == null || f.preset == null) continue;
+            data.fishes.Add(new CaughtFishRecord { fishName = f.preset.fishName, lengthCm = f.lengthCm });
+        }
+        File.WriteAllText(SavePath, JsonUtility.ToJson(data, true));
     }
 
     private void LoadInventory()
@@ -108,13 +117,21 @@ public class PlayerInventory : GenericSingleton<PlayerInventory>
 
         try
         {
-            string json = File.ReadAllText(SavePath);
-            InventoryDataWrapper wrapper = JsonUtility.FromJson<InventoryDataWrapper>(json);
-            if (wrapper != null)
+            InventorySaveData data = JsonUtility.FromJson<InventorySaveData>(File.ReadAllText(SavePath));
+            if (data == null) return;
+
+            currentCurrency = data.currency;
+            caughtFishes = new List<CaughtFish>();
+            if (data.fishes == null) return;
+
+            foreach (var rec in data.fishes)
             {
-                currentCurrency = wrapper.currency;
-                caughtFishes = wrapper.fishes ?? new List<CaughtFish>();
-                caughtFishes.RemoveAll(f => f == null || f.preset == null);
+                // Re-link to a real FishPreset by stable name. Unknown/legacy records (no fishName)
+                // are dropped so a build can never resurrect them as bait/lure garbage.
+                FishPreset preset = FishEncyclopediaManager.Instance != null
+                    ? FishEncyclopediaManager.Instance.GetPresetByName(rec.fishName) : null;
+                if (preset == null) continue;
+                caughtFishes.Add(new CaughtFish(preset) { lengthCm = rec.lengthCm });
             }
         }
         catch (Exception e)
@@ -124,15 +141,16 @@ public class PlayerInventory : GenericSingleton<PlayerInventory>
     }
 
     [Serializable]
-    private class InventoryDataWrapper
+    private class InventorySaveData
     {
         public int currency;
-        public List<CaughtFish> fishes;
+        public List<CaughtFishRecord> fishes = new List<CaughtFishRecord>();
+    }
 
-        public InventoryDataWrapper(int currency, List<CaughtFish> fishes)
-        {
-            this.currency = currency;
-            this.fishes = fishes;
-        }
+    [Serializable]
+    private class CaughtFishRecord
+    {
+        public string fishName;
+        public float lengthCm;
     }
 }

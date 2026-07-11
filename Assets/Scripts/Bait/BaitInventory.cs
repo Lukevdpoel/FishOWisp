@@ -15,6 +15,12 @@ public class BaitInventory : GenericSingleton<BaitInventory>
     [Tooltip("The bait currently equipped on the hook. Null = no bait selected.")]
     [SerializeField] private BaitItem selectedBait;
 
+    [Tooltip("Fallback bait auto-equipped whenever a regular bobber would otherwise have an empty " +
+             "hook (startup, switching back from a lure, or casting with no bait). Use an infinite " +
+             "bait (isAlwaysAvailable) so the hook is never empty. If unset, the first available " +
+             "infinite bait is used.")]
+    [SerializeField] private BaitItem defaultBait;
+
     [Tooltip("Bait granted automatically on a fresh save (no bait.json yet) so a new player starts stocked.")]
     [SerializeField] private List<StartingBait> startingBaits = new List<StartingBait>();
 
@@ -37,18 +43,34 @@ public class BaitInventory : GenericSingleton<BaitInventory>
         OnSelectedBaitChanged?.Invoke(selectedBait);
     }
 
-    // True if the fish preset accepts whatever bait the player currently has equipped.
-    // Null bait or empty preference list both behave as "any bait accepted" so the game
-    // remains playable before a bait-selection UI exists, and so fish without configured
-    // preferences don't get silently filtered out.
+    // True if the fish preset will engage the hook given the currently-equipped bait.
+    //   - No bait (empty hook): only species flagged FishPreset.bitesWithoutBait engage (and even
+    //     they're far less eager — see FishingZone.noBaitInterestMultiplier). Empty hook is a valid,
+    //     infinite default now, so this is the gate that keeps most fish off a baitless hook.
+    //   - A bait equipped: an empty preferred-baits list means "any bait"; otherwise the equipped
+    //     bait must be in the species' preferred list.
     public static bool PresetAcceptsSelectedBait(FishPreset preset)
     {
         if (preset == null) return false;
         BaitItem equipped = Instance != null ? Instance.SelectedBait : null;
-        if (equipped == null) return true;
+        if (equipped == null) return preset.bitesWithoutBait;
         var prefs = preset.preferredBaits;
         if (prefs == null || prefs.Count == 0) return true;
         return prefs.Contains(equipped);
+    }
+
+    // True when a regular bobber has an EMPTY hook (no bait selected, not a lure) AND this species
+    // won't engage a baitless hook. Used to keep such fish from even hovering around the bobber —
+    // the visual gather should match the bite gate (PresetAcceptsSelectedBait returns the same for
+    // the empty-hook case). A bait IS selected? Never rejects here: wrong-bait fish still gather
+    // visually by design (only the bite/lead promotion in FishingZone is gated by the bait list).
+    public static bool EmptyHookRejects(FishPreset preset)
+    {
+        if (preset == null) return false;
+        if (BobberInventory.IsLureEquipped) return false;
+        BaitItem equipped = Instance != null ? Instance.SelectedBait : null;
+        if (equipped != null) return false;
+        return !preset.bitesWithoutBait;
     }
 
     private string SavePath => Path.Combine(Application.persistentDataPath, "bait.json");
@@ -56,7 +78,41 @@ public class BaitInventory : GenericSingleton<BaitInventory>
     private void Start()
     {
         if (!LoadBait()) GrantStartingBaits();
+        EnsureBaitSelected();   // drop a depleted selection to "no bait" (a valid empty-hook default)
         OnBaitChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Keep the equipped bait valid for a regular bobber. "No bait" (an empty hook) is itself a valid,
+    /// infinite default now, so this no longer forces a fallback bait — it only drops a now-unusable
+    /// selection (a finite bait that ran out / was shelved) back to null. No-op when a lure is equipped.
+    /// </summary>
+    public void EnsureBaitSelected()
+    {
+        if (BobberInventory.IsLureEquipped) return;
+        if (selectedBait != null && !IsUsable(selectedBait))
+        {
+            selectedBait = null;
+            OnSelectedBaitChanged?.Invoke(null);
+        }
+    }
+
+    private bool IsUsable(BaitItem bait)
+    {
+        if (bait == null || !bait.isAvailable) return false;
+        return bait.isAlwaysAvailable || GetCount(bait) > 0;
+    }
+
+    // The configured defaultBait if usable, else any infinite bait (so the fallback can't run dry),
+    // else the first bait actually in stock.
+    private BaitItem PickDefaultBait()
+    {
+        if (IsUsable(defaultBait)) return defaultBait;
+        foreach (BaitItem b in registeredBaits)
+            if (b != null && b.isAvailable && b.isAlwaysAvailable) return b;
+        foreach (BaitItem b in registeredBaits)
+            if (IsUsable(b)) return b;
+        return null;
     }
 
     // Fresh save: stock the configured starting bait so the player can fish right away.

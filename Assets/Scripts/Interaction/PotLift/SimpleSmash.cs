@@ -76,8 +76,8 @@ public class SimpleSmash : MonoBehaviour
         // 1. Clean list
         potsInRange.RemoveAll(item => item == null);
 
-        // 2. Hide pointer if busy
-        if (isBusy || playerController.areControlsLocked)
+        // 2. Hide pointer if busy (or mid-jump — smashing waits until the jump fully lands)
+        if (isBusy || playerController.areControlsLocked || playerController.IsJumping)
         {
             if (activePointerInstance) activePointerInstance.SetActive(false);
             return;
@@ -95,6 +95,9 @@ public class SimpleSmash : MonoBehaviour
 
         // 4. Update Pointer Visuals (With Wiggle!)
         UpdatePointer();
+
+        // Tell the HUD prompt bar an interact is available (busy/locked already returned above).
+        if (currentBestPot != null) InteractHint.Ping();
 
         // 5. Input
         if ((Input.GetKeyDown(KeyCode.E) || GamepadInput.InteractPressed) && currentBestPot != null)

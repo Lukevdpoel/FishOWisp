@@ -15,7 +15,7 @@ public class FishVendor : MonoBehaviour
     public List<BaitOffer> baitOffers = new List<BaitOffer>();
 
     [Header("Time-of-Day Shop")]
-    [Tooltip("Buyable permanent time-of-day overrides. Each entry sets the world to Day or Night until another is bought.")]
+    [Tooltip("Buyable time-of-day skips. Each entry fast forwards the clock to the start of Day or Night, then time keeps flowing (not a permanent lock).")]
     public List<TimeOfDayOffer> timeOfDayOffers = new List<TimeOfDayOffer>();
 
     [Header("Interaction")]
@@ -33,7 +33,6 @@ public class FishVendor : MonoBehaviour
     public static FishVendor CurrentShoppingVendor { get; private set; }
 
     private Transform playerTransform;
-    private InventoryUI cachedInventoryUI;
     private bool playerResolveAttempted;
 
     [Serializable]
@@ -51,25 +50,29 @@ public class FishVendor : MonoBehaviour
         [Tooltip("Optional icon shown to the left of the row.")]
         public Sprite icon;
         [Min(0)] public int price = 200;
-        [Tooltip("Which permanent override this entry sets when bought.")]
+        [Tooltip("Which time of day this entry skips the clock to when bought. ForcedNight = skip to the start of night, ForcedDay = skip to the start of day. (No longer a permanent lock.)")]
         public WorldStateManager.TimeMode mode = WorldStateManager.TimeMode.ForcedNight;
     }
 
     private void Start()
     {
         ResolvePlayerTransform();
-        cachedInventoryUI = FindFirstObjectByType<InventoryUI>();
     }
 
     private void Update()
     {
+        // Opening the shop waits until any charge jump has fully landed (hint hidden too).
+        if (PlayerController.IsPlayerJumping) return;
+
+        // Tell the HUD prompt bar an interact is available (same gate as the press below).
+        if (CurrentShoppingVendor == null && IsPlayerInRange()) InteractHint.Ping();
+
         if (Input.GetKeyDown(interactKey) || GamepadInput.InteractPressed)
         {
-            if (CurrentShoppingVendor == this)
-            {
-                CloseShop();
-            }
-            else if (CurrentShoppingVendor == null && IsPlayerInRange())
+            // Opening only. While the shop is open, ShopController owns all input (closing is its
+            // B/Esc back-out), so the vendor stays out of the way and the same A/Interact button
+            // can be used to buy items without also toggling the shop shut.
+            if (CurrentShoppingVendor == null && IsPlayerInRange())
             {
                 OpenShop();
             }
@@ -107,29 +110,32 @@ public class FishVendor : MonoBehaviour
 
     public void OpenShop()
     {
+        if (CurrentShoppingVendor != null) return;
         CurrentShoppingVendor = this;
         OnCurrentShoppingVendorChanged?.Invoke();
 
-        InventoryUI inv = GetInventoryUI();
-        if (inv != null && !InventoryUI.IsInventoryOpen) inv.OpenInventory();
+        // The 3D shop drives everything now — the inventory is NOT borrowed (that's what used to
+        // leak the bait/tackle selector arrows into the shop).
+        if (ShopController.Instance != null) ShopController.Instance.BeginConversation(this);
+        else Debug.LogWarning("[FishVendor] No ShopController in scene; cannot open the 3D shop.");
     }
 
     public void CloseShop()
     {
         if (CurrentShoppingVendor != this) return;
-        CurrentShoppingVendor = null;
-        OnCurrentShoppingVendorChanged?.Invoke();
-
-        InventoryUI inv = GetInventoryUI();
-        if (inv != null && InventoryUI.IsInventoryOpen) inv.CloseInventory();
+        if (ShopController.Instance != null && ShopController.Instance.IsOpen)
+            ShopController.Instance.CloseShop(); // tears down + clears the static via ClearShoppingVendor
+        else
+            ClearShoppingVendor();
     }
 
-    private InventoryUI GetInventoryUI()
+    // Clears the active-shopping-vendor static without routing back through ShopController (which is
+    // what calls this during its own teardown). Use CloseShop() for the normal "close the shop" entry.
+    public static void ClearShoppingVendor()
     {
-        // Re-resolve only if the cached ref was destroyed (e.g. scene reload). Avoids
-        // a fresh FindFirstObjectByType on every shop open/close.
-        if (cachedInventoryUI == null) cachedInventoryUI = FindFirstObjectByType<InventoryUI>();
-        return cachedInventoryUI;
+        if (CurrentShoppingVendor == null) return;
+        CurrentShoppingVendor = null;
+        OnCurrentShoppingVendorChanged?.Invoke();
     }
 
     public void SellFishToVendor(CaughtFish fish)
@@ -173,17 +179,16 @@ public class FishVendor : MonoBehaviour
         if (PlayerInventory.Instance == null) return false;
 
         WorldStateManager world = WorldStateManager.Instance;
-        if (world == null)
+        if (world == null || GameTimeManager.Instance == null)
         {
-            Debug.LogWarning("[FishVendor] No WorldStateManager available; cannot apply time override.");
+            Debug.LogWarning("[FishVendor] No WorldStateManager/GameTimeManager available; cannot skip time of day.");
             return false;
         }
 
-        if (world.CurrentTimeMode == offer.mode)
-        {
-            Debug.Log($"{offer.displayName} already active.");
-            return false;
-        }
+        // The offer's mode doubles as a day/night selector: ForcedNight skips to the start of
+        // night, anything else skips to the start of day. The skip is a one-time clock jump,
+        // so re-buying the same time of day simply resets the clock to that period's start.
+        bool toNight = offer.mode == WorldStateManager.TimeMode.ForcedNight;
 
         if (!PlayerInventory.Instance.TrySpendCurrency(offer.price))
         {
@@ -191,11 +196,11 @@ public class FishVendor : MonoBehaviour
             return false;
         }
 
-        world.SetTimeMode(offer.mode);
+        world.SkipToTimeOfDay(toNight);
 
         if (buyParticles != null) buyParticles.Play();
         OnVendorInventoryChanged?.Invoke();
-        Debug.Log($"Bought {offer.displayName} for {offer.price} coins. Time mode: {offer.mode}");
+        Debug.Log($"Bought {offer.displayName} for {offer.price} coins. Skipped to {(toNight ? "night" : "day")}.");
         return true;
     }
 }

@@ -20,20 +20,19 @@ public class FishingZone : MonoBehaviour
     [Tooltip("Maximum seconds before a new fish spawns.")]
     public float respawnTimeMax = 30f;
 
-    [Header("Bobber Splash Scare")]
-    [Tooltip("Fish within this radius of the bobber landing spot get scared.")]
-    public float splashScareRadius = 2f;
-
-    [Header("Lure Reel Scare")]
-    [Tooltip("While the player cranks the reel on a lure, fish within this radius of it get " +
-             "scared continuously — the retrieve is loud. Set ≤ 0 to disable.")]
-    public float lureReelScareRadius = 2.5f;
-
     [Header("Multi-Fish Attract")]
     [Tooltip("Maximum number of follower fish that join the lead fish on each attract call. Set 0 to disable followers.")]
     public int maxFollowers = 4;
     [Tooltip("Optional radius cap (in world units) for how far away a fish can be and still join as a follower. Set ≤ 0 to ignore distance and just take the maxFollowers closest wandering fish in the zone.")]
     public float attractCallRadius = 0f;
+    [Tooltip("Bait-side equivalent of the lure brain's Max Hover Fish below: caps how many fish may be " +
+             "self-attracted (curious/hovering) around a regular bobber AT ONCE, enforced every frame — " +
+             "not just after a lead is already chosen (which is all Max Followers above governs). The " +
+             "nearest this-many stay eligible; everyone else is told to keep clear, so a bobber cast near " +
+             "a school never gathers more than this many interested fish waiting to take a turn. Since " +
+             "candidates for Max Followers are drawn from this same pool, keeping this at or below Max " +
+             "Followers makes it the effective ceiling. Set 0 to leave hovering uncapped (old behavior).")]
+    public int maxBaitHoverFish = 2;
 
     [Header("TP Lure Brain")]
     [Tooltip("Twilight-Princess-style attraction/bite logic for the lure path. Bobber (bait) fishing is unaffected. See LureBiteBrain for the TP mapping.")]
@@ -54,11 +53,14 @@ public class FishingZone : MonoBehaviour
         patienceMax = 5.5f,
         boredCooldown = 8f,
         postMissCooldown = 1.5f,
+        responseCooldown = 2f,
         baseBiteChance = 0.15f,
         movingBiteChance = 0.3f,
         nightChanceMultiplier = 1.5f,
-        rainChanceMultiplier = 1.75f,
         neutralCatchProbability = 0.5f,
+        biteCommitChance = 0.2f,   // mostly tease dashes (~80%); a committed bite is the rarer payoff
+        popperPreferenceRadiusMultiplier = 1.5f,
+        popperPreferenceBiteMultiplier = 2f,
     };
 
     [Header("Auto-Nibble Timer (Passive Fishing)")]
@@ -68,6 +70,10 @@ public class FishingZone : MonoBehaviour
     public float autoNibbleMax = 12f;
     [Tooltip("Seconds to wait between retries if the timer fires but no fish has approached the bobber yet.")]
     public float autoNibbleRetryDelay = 1.5f;
+    [Tooltip("With NO bait equipped (empty hook), multiply the auto-nibble delay by this — the few " +
+             "species that bite baitless (FishPreset.bitesWithoutBait) still come, just far less eagerly. " +
+             "1 = same as baited, higher = slower/rarer.")]
+    public float noBaitInterestMultiplier = 2.5f;
 
     [Header("Water Detection")]
     [Tooltip("Tag used to find the water collider for surface height.")]
@@ -97,6 +103,10 @@ public class FishingZone : MonoBehaviour
     private List<FishRipple> followerFish = new List<FishRipple>();
     private float respawnTimer;
     private List<float> attractTimestamps = new List<float>();
+
+    // Rebuilt every tick by EnforceBaitHoverCap — the fish currently allowed to be self-attracted
+    // to a regular bobber. Mirrors LureBiteBrain's hoverSet for the bait path.
+    private readonly List<FishRipple> baitHoverSet = new List<FishRipple>();
 
     // True while the player is cranking the reel on a lure (OnLureReelChanged).
     private bool isLureReelActive = false;
@@ -163,6 +173,7 @@ public class FishingZone : MonoBehaviour
         FishingEvents.OnLureTugged += HandleLureTugged;
         FishingEvents.OnBobberLandedInWater += HandleBobberLanded;
         FishingEvents.OnHookLureGrab += HandleHookLureGrab;
+        FishingEvents.OnBiteImminent += HandleBiteImminent;
     }
 
     private void OnDisable()
@@ -175,6 +186,7 @@ public class FishingZone : MonoBehaviour
         FishingEvents.OnLureTugged -= HandleLureTugged;
         FishingEvents.OnBobberLandedInWater -= HandleBobberLanded;
         FishingEvents.OnHookLureGrab -= HandleHookLureGrab;
+        FishingEvents.OnBiteImminent -= HandleBiteImminent;
         isLureReelActive = false;
     }
 
@@ -193,35 +205,50 @@ public class FishingZone : MonoBehaviour
     {
         CleanupNullFish();
 
-        // A cranking lure is loud — continuously spook anything that gets close. Fish already
-        // fleeing are skipped so their flee timers aren't reset every frame; if they circle
-        // back while the crank is still going, they get scared again. Suspended once a fish is
-        // gripping the lure (isCatchingFish) so the crank can't scare off its own bite.
-        if (isLureReelActive && lureReelScareRadius > 0f && currentBobber != null && !isCatchingFish)
+        // Bait-side hover cap: unlike the lure brain (which only runs while a lure is equipped),
+        // regular bobber self-attraction had no continuous cap at all — every matching wandering
+        // fish in range/cone could go Attracted the instant the bobber landed. Enforced every
+        // frame so it also holds BEFORE any lead is chosen, not just after (that's Max Followers).
+        // Suspended while a fish is being caught/fought (isCatchingFish): the hover cap would
+        // otherwise clear avoidance on the nearest fish every frame, undoing the bite's
+        // SetOtherFishAvoidance(true) and letting the school notice/investigate the dragged
+        // bobber mid-fight. During a catch every other fish stays told to keep clear.
+        if (currentBobber != null && !BobberInventory.IsLureEquipped && !isCatchingFish)
         {
-            Vector3 lurePos = currentBobber.transform.position;
-            for (int i = 0; i < activeFish.Count; i++)
-            {
-                if (activeFish[i] == null) continue;
-                if (activeFish[i].CurrentState == FishRipple.FishState.Scared) continue;
-                if (HorizontalDistance(activeFish[i].transform.position, lurePos) < lureReelScareRadius)
-                {
-                    activeFish[i].Scare();
-                }
-            }
+            EnforceBaitHoverCap();
         }
 
-        // Check if currently attracted fish was scared or otherwise reset
+        // (The lure crank used to continuously scare nearby fish here — removed: fish now only
+        // scare when they're already interested and the player resets the cast, or on an attract
+        // that abuses a fish already holding interest. isLureReelActive still feeds the brain.)
+
+        // Check if currently attracted fish was scared or otherwise reset. Striking/Grabbing are
+        // the bobber-bite dash-and-carry — the lead is mid-bite, so keep it (clearing here would
+        // drop the grab in progress and let the auto-nibble timer promote a second fish during the
+        // carry).
         if (currentlyAttractedFish != null)
         {
             if (currentlyAttractedFish.CurrentState != FishRipple.FishState.Attracted
-                && currentlyAttractedFish.CurrentState != FishRipple.FishState.Nibbling)
+                && currentlyAttractedFish.CurrentState != FishRipple.FishState.Nibbling
+                && currentlyAttractedFish.CurrentState != FishRipple.FishState.Striking
+                && currentlyAttractedFish.CurrentState != FishRipple.FishState.Grabbing)
             {
                 currentlyAttractedFish = null;
                 ScatterFollowers();
                 SetOtherFishAvoidance(false);
                 ResetAutoNibbleTimer();
             }
+        }
+
+        // The nibbling lead has teased the bobber enough and is ready to commit. Launch the bite
+        // through the SAME grab callbacks the lure uses, so a bobber bite gives the identical
+        // dash-grab-and-carry with the react-while-the-fish-holds-it window (HandleLureGrabStart →
+        // OnLureGrabbed window; react → HandleHookLureGrab; miss → HandleLureGrabReleased). Bait
+        // path only — lures drive their bites through lureBrain.
+        if (!BobberInventory.IsLureEquipped && !isCatchingFish
+            && currentlyAttractedFish != null && currentlyAttractedFish.NibbleReadyToBite)
+        {
+            currentlyAttractedFish.StartBobberBiteStrike(HandleLureGrabStart, HandleLureGrabReleased);
         }
 
         CleanupFollowers();
@@ -232,7 +259,7 @@ public class FishingZone : MonoBehaviour
         if (BobberInventory.IsLureEquipped && currentBobber != null && !isCatchingFish
             && currentBobber.IsInWater)
         {
-            lureBrain.Tick(Time.deltaTime, activeFish, currentBobber, isLureReelActive, in lureBrainSettings);
+            lureBrain.Tick(Time.deltaTime, activeFish, currentBobber, isLureReelActive, BobberInventory.IsPopperEquipped, in lureBrainSettings);
         }
 
         // Respawn fish over time
@@ -287,6 +314,14 @@ public class FishingZone : MonoBehaviour
         if (currentBobber != null)
             ripple.SetBobberTransform(currentBobber.transform);
 
+        // A fish that spawns while a catch is in progress (the caught fish's replacement, or a
+        // predator-despawn replacement mid-fight) must keep clear of the bobber like the rest of
+        // the frozen-out school — EnforceBaitHoverCap is suspended during a catch and won't set
+        // this for us, so an un-flagged newcomer would otherwise self-attract and pop its
+        // notice/investigate indicators at the dragged bobber mid-fight.
+        if (isCatchingFish)
+            ripple.SetAvoidBobber(true);
+
         ripple.OnDespawnStarted += HandleFishDespawnStarted;
 
         activeFish.Add(ripple);
@@ -303,39 +338,60 @@ public class FishingZone : MonoBehaviour
         SpawnOneFish();
     }
 
-    // Strict gating: a fish only spawns when its preferredWeather matches the current
-    // active fishing weather. WorldStateManager reports Night while ForcedNight is
-    // active, otherwise Sunny — so Night-only fish appear only after the player buys
-    // the Night time-of-day option at the vendor.
+    // Day/night gating: each fish has a separate spawn weight for day and night. A fish
+    // only competes when its weight for the current time of day is non-zero. Night falls
+    // naturally on the in-game clock, or instantly via the vendor's Night Lantern.
     private FishPreset PickEligibleFish()
     {
-        WeatherType active = WorldStateManager.Instance != null
-            ? WorldStateManager.Instance.GetActiveFishingWeather()
-            : WeatherType.Sunny;
+        bool isNight = WorldStateManager.Instance != null && WorldStateManager.Instance.IsNight;
+
+        // Active fish feed bends the spawn roll: a SummonSpecies feed forces its target species
+        // (overriding day/night gating — that's the point of summoning it), and a RepelPredators
+        // feed drops every predator out of the eligible set so none can spawn while it lasts.
+        FishFeedController feed = FishFeedController.Instance;
+        if (feed != null && feed.SummonActive) return feed.SummonTarget;
+        bool repelPredators = feed != null && feed.RepelPredatorsActive;
 
         List<FishPreset> eligible = new List<FishPreset>();
         float totalWeight = 0f;
         for (int i = 0; i < fishPool.availableFish.Count; i++)
         {
             FishPreset f = fishPool.availableFish[i];
-            // spawnChance 0 = never spawns; excluded up front so the weighted roll below can
-            // never land on it (a roll of exactly 0 would otherwise pick a zero-weight fish).
-            if (f != null && f.preferredWeather == active && f.spawnChance > 0f)
+            if (f == null) continue;
+            if (repelPredators && f.IsPredator) continue;
+            // Weight 0 = never spawns at this time of day; excluded up front so the weighted
+            // roll below can never land on it (a roll of exactly 0 would otherwise pick it).
+            float weight = f.GetSpawnWeight(isNight);
+            if (weight > 0f)
             {
                 eligible.Add(f);
-                totalWeight += f.spawnChance;
+                totalWeight += weight;
             }
         }
         if (eligible.Count == 0) return null;
 
-        // Weighted roll: each fish's share of the spawn is spawnChance / totalWeight.
+        // Weighted roll: each fish's share of the spawn is its weight / totalWeight.
         float roll = Random.Range(0f, totalWeight);
         for (int i = 0; i < eligible.Count; i++)
         {
-            roll -= eligible[i].spawnChance;
+            roll -= eligible[i].GetSpawnWeight(isNight);
             if (roll <= 0f) return eligible[i];
         }
         return eligible[eligible.Count - 1];
+    }
+
+    // Scare off every predator currently in the water — used by a RepelPredators fish feed the
+    // moment it's activated. Non-predators and already-scared fish are left alone.
+    public void ScarePredators()
+    {
+        for (int i = 0; i < activeFish.Count; i++)
+        {
+            FishRipple f = activeFish[i];
+            if (f == null || f.preset == null) continue;
+            if (!f.preset.IsPredator) continue;
+            if (f.CurrentState == FishRipple.FishState.Scared) continue;
+            f.Scare();
+        }
     }
 
     private void ResetRespawnTimer()
@@ -393,23 +449,10 @@ public class FishingZone : MonoBehaviour
 
         // Splashdown: counts as lure movement, and a lure landing directly on a fish
         // (within directHitRadius) makes that fish strike instantly.
+        // (Landing near fish no longer scares them — a splash close by is a dinner bell, not a
+        // threat. The only scares left are reset-with-interest and attract-abuse, per design.)
         if (BobberInventory.IsLureEquipped)
             lureBrain.OnSplashdown(in lureBrainSettings, activeFish, splashPos);
-
-        for (int i = 0; i < activeFish.Count; i++)
-        {
-            if (activeFish[i] == null) continue;
-            // A committed biter (dashing in or already gripping) keeps going — the splash is its
-            // dinner bell, not a scare.
-            if (activeFish[i].CurrentState == FishRipple.FishState.Striking
-                || activeFish[i].CurrentState == FishRipple.FishState.Grabbing) continue;
-
-            float dist = HorizontalDistance(activeFish[i].transform.position, splashPos);
-            if (dist < splashScareRadius)
-            {
-                activeFish[i].Scare();
-            }
-        }
     }
 
     private bool ContainsPoint(Vector3 point)
@@ -434,6 +477,13 @@ public class FishingZone : MonoBehaviour
     {
         if (other.TryGetComponent<BobberController>(out var bobber) && bobber == currentBobber)
         {
+            // A committed bite is being fought/reeled — the fight legitimately drags the bobber
+            // out of the zone (FishingBobberPull). Clearing here would null bobberTransform and
+            // lift the pond's lifetime/predator freeze mid-fight, so a wandering fish despawns or
+            // gets hunted while the player is still fighting. Leave the freeze in place; the catch
+            // resolves through HandleReelIn (OnStartReeling / OnCancelFishing), which clears cleanly.
+            if (isCatchingFish) return;
+
             Debug.Log($"Bobber exited pool: {fishPool.poolName}");
             ClearBobber();
         }
@@ -517,7 +567,10 @@ public class FishingZone : MonoBehaviour
             if (lead != null)
             {
                 lead.SetFollower(false);
-                lead.AttractToBobber();
+                // Too-close scare only applies to a fish ALREADY holding interest — calling in a
+                // wandering fish that happens to sit near the bobber must not spook it (it just
+                // declines to attract this frame inside AttractToBobber).
+                lead.AttractToBobber(lead.CurrentState == FishRipple.FishState.Attracted);
                 if (lead.CurrentState == FishRipple.FishState.Attracted)
                 {
                     currentlyAttractedFish = lead;
@@ -531,7 +584,8 @@ public class FishingZone : MonoBehaviour
                     {
                         FishRipple follower = candidates[i];
                         follower.SetFollower(true);
-                        follower.AttractToBobber();
+                        // Same rule as the lead: no spooking a fish that wasn't interested yet.
+                        follower.AttractToBobber(follower.CurrentState == FishRipple.FishState.Attracted);
                         if (follower.CurrentState == FishRipple.FishState.Attracted)
                         {
                             followerFish.Add(follower);
@@ -539,7 +593,7 @@ public class FishingZone : MonoBehaviour
                         }
                         else
                         {
-                            // AttractToBobber may have scared a too-close fish — clear follower flag.
+                            // Didn't take (too close / declined) — clear the follower flag.
                             follower.SetFollower(false);
                         }
                     }
@@ -562,12 +616,17 @@ public class FishingZone : MonoBehaviour
     {
         if (currentBobber == null) return;
 
-        Vector3 bobberPos = currentBobber.transform.position;
         for (int i = 0; i < activeFish.Count; i++)
         {
             if (activeFish[i] == null) continue;
-            float dist = HorizontalDistance(activeFish[i].transform.position, bobberPos);
-            if (dist < splashScareRadius || activeFish[i].CurrentState == FishRipple.FishState.Nibbling
+            // A fish that just let go of a missed bite is already coasting away on its release
+            // follow-through — leave it be so it swims off calmly like the lure's spat fish,
+            // rather than re-scaring it into a frantic flee (or an in-place jitter) right where
+            // the bobber was. This is the bobber-miss path's own escaping fish.
+            if (activeFish[i].IsRecoveringFromGrab) continue;
+            // Only fish already INTERESTED in the tackle spook when it's yanked away — a reset
+            // near an oblivious wanderer no longer scares it (the old proximity clause is gone).
+            if (activeFish[i].CurrentState == FishRipple.FishState.Nibbling
                 || activeFish[i].CurrentState == FishRipple.FishState.Attracted
                 || activeFish[i].CurrentState == FishRipple.FishState.Striking
                 || activeFish[i].CurrentState == FishRipple.FishState.Grabbing)
@@ -576,13 +635,24 @@ public class FishingZone : MonoBehaviour
             }
         }
 
-        lureBrain.ResetState(activeFish);
-        currentlyAttractedFish = null;
-        grabbingFish = null;
-        ScatterFollowers();
-        SetOtherFishAvoidance(false);
-        autoNibbleTimer = -1f;
-        isCatchingFish = false;
+        // Reeling in is the authoritative "fishing ended" signal. Tear the bobber link down here
+        // (currentBobber = null, bobberTransform/avoidance cleared on every fish) rather than
+        // leaning on OnTriggerExit — during a fight the bobber already left the trigger and won't
+        // fire another exit, so without this the pond's lifetime/predator freeze would never lift.
+        ClearBobber();
+    }
+
+    // The final nibble is about to become the bite (fires ~biteDelay before HookFish). The
+    // nibbling fish still exists here — record the heading of its bite dash on the bobber, so
+    // the hooked silhouette that replaces it spawns mid-follow-through instead of snapping to
+    // a fresh direction. (By OnFishBite the visual is already spawned — this must run first.)
+    private void HandleBiteImminent(BobberController bobber)
+    {
+        if (bobber != currentBobber || currentlyAttractedFish == null) return;
+        Vector3 fwd = currentlyAttractedFish.transform.forward;
+        fwd.y = 0f;
+        if (fwd.sqrMagnitude > 0.001f)
+            bobber.SetStrikeHeading(Mathf.Atan2(fwd.x, fwd.z) * Mathf.Rad2Deg);
     }
 
     private void HandleFishBite(BobberController bobber)
@@ -660,8 +730,20 @@ public class FishingZone : MonoBehaviour
         if (!grabbingFish.ConfirmGrab()) return;
 
         FishPreset preset = grabbingFish.preset;
+
+        // Record the direction the grabber was carrying the lure in, so the hooked silhouette
+        // that replaces it spawns mid-follow-through (same hand-off as the bobber path's
+        // bite-imminent capture).
+        Vector3 grabFwd = grabbingFish.transform.forward;
+        grabFwd.y = 0f;
+        if (grabFwd.sqrMagnitude > 0.001f)
+            currentBobber.SetStrikeHeading(Mathf.Atan2(grabFwd.x, grabFwd.z) * Mathf.Rad2Deg);
+
         RemoveFish(grabbingFish);
         grabbingFish = null;
+        // A bobber bite makes the nibbling lead the grabber, so clear that reference too — it's
+        // about to be the hooked fish. (Already null on the lure path.)
+        currentlyAttractedFish = null;
         // The caught fish's replacement — same population cycle as the lifetime despawn.
         SpawnOneFish();
         lureBrain.ResetState(activeFish);
@@ -695,6 +777,62 @@ public class FishingZone : MonoBehaviour
                 activeFish[i].SetAvoidBobber(false);
                 activeFish[i].ClearBobberTransform();
             }
+        }
+    }
+
+    // Bait-side equivalent of LureBiteBrain.EnforceHoverCap: caps how many fish may be self-attracted
+    // (Attracted) or already working the bobber (Nibbling) at once, enforced every frame rather than
+    // only at the moment a lead/followers get promoted. Nearest fish win a slot, tiered so a fish
+    // already interested (or already biting) never loses its spot to a newcomer of the same
+    // distance; everyone left out is told to keep clear (SetAvoidBobber), which also blocks
+    // FishRipple.UpdateWandering's passive self-attract check from ever letting them in.
+    private void EnforceBaitHoverCap()
+    {
+        if (maxBaitHoverFish <= 0) return; // 0 = leave hovering uncapped (old behavior)
+
+        Vector3 bobberPos = currentBobber.transform.position;
+        baitHoverSet.Clear();
+        FillBaitHoverTier(bobberPos, FishRipple.FishState.Nibbling);
+        FillBaitHoverTier(bobberPos, FishRipple.FishState.Attracted);
+        FillBaitHoverTier(bobberPos, FishRipple.FishState.Wandering);
+
+        for (int i = 0; i < activeFish.Count; i++)
+        {
+            FishRipple fish = activeFish[i];
+            if (fish == null) continue;
+            FishRipple.FishState st = fish.CurrentState;
+            // Scared/despawning fish are mid-exit; Striking/Grabbing is the committed bite
+            // dash-and-carry (only ever one fish at a time on the bait path) — none of these
+            // should be told to avoid the bobber they're already leaving or biting.
+            if (st == FishRipple.FishState.Scared || st == FishRipple.FishState.Despawning
+                || st == FishRipple.FishState.Striking || st == FishRipple.FishState.Grabbing) continue;
+
+            fish.SetAvoidBobber(!baitHoverSet.Contains(fish));
+        }
+    }
+
+    // Fills the hover set with the nearest fish currently in tierState, up to maxBaitHoverFish.
+    private void FillBaitHoverTier(Vector3 bobberPos, FishRipple.FishState tierState)
+    {
+        while (baitHoverSet.Count < maxBaitHoverFish)
+        {
+            FishRipple best = null;
+            float bestDist = float.MaxValue;
+            for (int i = 0; i < activeFish.Count; i++)
+            {
+                FishRipple fish = activeFish[i];
+                if (fish == null || baitHoverSet.Contains(fish)) continue;
+                if (fish.CurrentState != tierState) continue;
+
+                float d = HorizontalDistance(fish.transform.position, bobberPos);
+                if (d < bestDist)
+                {
+                    bestDist = d;
+                    best = fish;
+                }
+            }
+            if (best == null) return;
+            baitHoverSet.Add(best);
         }
     }
 
@@ -766,8 +904,17 @@ public class FishingZone : MonoBehaviour
             autoNibbleTimer = -1f;
             return;
         }
-        autoNibbleTimer = Random.Range(autoNibbleMin, autoNibbleMax);
+        float delay = Random.Range(autoNibbleMin, autoNibbleMax);
+        if (NoBaitEquipped()) delay *= Mathf.Max(1f, noBaitInterestMultiplier);
+        autoNibbleTimer = delay;
     }
+
+    // No bait on a regular bobber = an empty hook. Only FishPreset.bitesWithoutBait species engage it
+    // (gated in MatchesEquippedTackleAndBait), and the multiplier above makes them slow about it.
+    private static bool NoBaitEquipped()
+        => !BobberInventory.IsLureEquipped
+           && BaitInventory.Instance != null
+           && BaitInventory.Instance.SelectedBait == null;
 
     private void UpdateAutoNibbleTimer()
     {

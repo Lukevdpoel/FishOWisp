@@ -32,6 +32,12 @@ public class CameraTrigger : MonoBehaviour
     {
         if (playerInZone)
         {
+            // Toggling waits until any charge jump has fully landed (hint hidden too).
+            if (currentPlayer != null && currentPlayer.IsJumping) return;
+
+            // Tell the HUD prompt bar an interact is available (toggles the zone camera both ways).
+            InteractHint.Ping();
+
             if (Input.GetKeyDown(interactKey) || GamepadInput.InteractPressed)
             {
                 ToggleCamera();

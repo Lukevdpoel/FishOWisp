@@ -45,9 +45,13 @@ public class FishingLine : MonoBehaviour
 
 
     private VerletRope verletRope;
-    private LineRenderer lineRenderer;
     private BobberController activeBobber;
     private Rigidbody activeBobberRb;
+
+    // The single persistent bobber/lure instance — valid while dangling, in flight, and in water.
+    // The rod uses this to arc the bobber home when the player resets mid-flight, before it has a
+    // landed/hooked reference of its own.
+    public BobberController ActiveBobber => activeBobber;
     private Rigidbody anchorRigidbody;
     private Transform anchorTransform;
     private ConfigurableJoint activeJoint;
@@ -57,7 +61,6 @@ public class FishingLine : MonoBehaviour
     void Awake()
     {
         verletRope = GetComponent<VerletRope>();
-        lineRenderer = GetComponent<LineRenderer>();
         verletRope.DeactivateRope();
         EnsureAnchorRigidbody();
     }
@@ -125,29 +128,40 @@ public class FishingLine : MonoBehaviour
             $"[FishingLine DIAG] rodTip={rodTipStr} | anchor(tf)={anchorTStr} local={anchorLocalStr} parent={anchorParentStr} | anchor(rb)={anchorRbStr} | bobber={bobberStr} | rodTip→anchor={rodToAnchor:F3} anchor→bobber={anchorToBobber:F3}");
     }
 
+    // Latest normalized (0..1) charge from the cast bar, cached so the launch can scale the flight
+    // spiral / rope coil to how hard the throw was charged. The final charge frame lands here just
+    // before OnThrowBobber fires on release.
+    private float lastChargeNormalized = 1f;
+
     private void OnEnable()
     {
         FishingEvents.OnThrowBobber += LaunchBobber;
-        FishingEvents.OnCancelFishing += ReturnBobberToRod;
+        FishingEvents.OnCancelFishing += HandleCancelFishing;
         FishingEvents.OnReelingCompleted += ReturnBobberToRod;
+        FishingEvents.OnChargeProgressNormalized += CacheChargeNormalized;
         PlayerController.BallJumpVisibilityChanged += OnBallJumpVisibilityChanged;
     }
 
     private void OnDisable()
     {
         FishingEvents.OnThrowBobber -= LaunchBobber;
-        FishingEvents.OnCancelFishing -= ReturnBobberToRod;
+        FishingEvents.OnCancelFishing -= HandleCancelFishing;
         FishingEvents.OnReelingCompleted -= ReturnBobberToRod;
+        FishingEvents.OnChargeProgressNormalized -= CacheChargeNormalized;
         PlayerController.BallJumpVisibilityChanged -= OnBallJumpVisibilityChanged;
     }
+
+    private void CacheChargeNormalized(float normalized) => lastChargeNormalized = Mathf.Clamp01(normalized);
 
     // Hide the line + spawned bobber while the player morphs into / flies as the ball, and show
     // them again when the morph-out begins on the bounce (PlayerController decides the timing).
     // Rendering is toggled; physics/joints stay live so the bobber is right back on the rod. Fishing
     // can't begin mid-jump (needs grounded, unlocked controls), so the only bobber here is the dangling one.
+    // The line hides through VerletRope (not lineRenderer directly) because its snap flicker
+    // rewrites lineRenderer.enabled every LateUpdate and would undo a direct toggle.
     private void OnBallJumpVisibilityChanged(bool hidden)
     {
-        if (lineRenderer != null) lineRenderer.enabled = !hidden;
+        if (verletRope != null) verletRope.SetExternallyHidden(hidden);
         if (activeBobber != null)
             foreach (var r in activeBobber.GetComponentsInChildren<Renderer>(true))
                 r.enabled = !hidden;
@@ -303,6 +317,13 @@ public class FishingLine : MonoBehaviour
         activeJoint.enableCollision = false;
     }
 
+    // World-space rest POSE the dangling bobber settles into. The reel-in arc reads these so it
+    // can land the bobber exactly where it hangs (and in its upright rotation), making the park
+    // hand-off a no-op — no teleport/snap from the rod tip down to the dangle point. Both track
+    // the rod tip live, so they stay correct while the player walks during the reel.
+    public Vector3 GetDangleRestPosition() => DangleRestPosition();
+    public Quaternion GetDangleRestRotation() => DangleRestRotation(activeBobber);
+
     // Where the dangling bobber settles: its joint limits the centre to dangleLength from the
     // anchor, and gravity pulls it straight down. Spawn/park here so it starts at rest instead
     // of dropping into place. Doesn't have to be exact — the joint settles any small residual.
@@ -400,17 +421,62 @@ public class FishingLine : MonoBehaviour
         activeBobber.BeginFlight();
         isDangling = false;
 
+        // Hand the just-launched bobber to the follow camera now, so it rides the cast out from
+        // the throw instead of snapping to the bobber only once it splashes down.
+        FishingEvents.OnBobberLaunched?.Invoke(activeBobber);
+
         SetBobberCollidersEnabled(true);
 
         Vector3 launchDirection = Quaternion.AngleAxis(-launchAngle, Vector3.Cross(Vector3.up, direction)) * direction;
-        rb.AddForce(launchDirection * force, ForceMode.VelocityChange);
-        activeBobber.ApplyAirTumbleTorque();
+        Vector3 launchVelocity = launchDirection * force;
+
+        // How hard this throw was charged (0..1), used to scale the flight spiral and rope coil so a
+        // weak flick doesn't produce a full spring.
+        float chargeNorm = lastChargeNormalized;
+        activeBobber.SetCastCharge(chargeNorm);
+
+        if (activeBobber.SpiralDrivesFlight)
+        {
+            // The bobber steers itself along a ballistic guide for the corkscrew, so hand it the
+            // intended launch velocity instead of throwing it with an impulse. A physics impulse
+            // here would stack on top of the guide's own velocity for one frame.
+            activeBobber.SetCastLaunchVelocity(launchVelocity);
+        }
+        else
+        {
+            rb.AddForce(launchVelocity, ForceMode.VelocityChange);
+            activeBobber.ApplyAirTumbleTorque();
+        }
 
         verletRope.SetupRope(rodTip, activeBobber.LineAttachPoint);
+        verletRope.BeginFlightCoil(chargeNorm);
+    }
+
+    // True while a caught fish is hanging from the line for the catch inspection. Parking the
+    // bobber on OnReelingCompleted would restore its visuals and destroy the hanging fish (both
+    // live in BobberController.ResetForCast), so the park is held off until the inspection
+    // finishes and FishingRodController calls EndCatchHold.
+    private bool catchHoldActive;
+
+    public void BeginCatchHold() => catchHoldActive = true;
+
+    public void EndCatchHold()
+    {
+        if (!catchHoldActive) return;
+        catchHoldActive = false;
+        ParkBobberAtAnchor();
     }
 
     private void ReturnBobberToRod()
     {
+        if (catchHoldActive) return;
+        ParkBobberAtAnchor();
+    }
+
+    // A cancel always parks, even mid-inspection — clear the hold first so it can't block.
+    private void HandleCancelFishing()
+    {
+        catchHoldActive = false;
         ParkBobberAtAnchor();
     }
 

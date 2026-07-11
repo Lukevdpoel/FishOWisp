@@ -54,7 +54,12 @@ public class BountyBoard : MonoBehaviour
         }
         // ----------------------------------------------
 
-        if (playerInZone && !isViewingBoard && (Input.GetKeyDown(KeyCode.E) || GamepadInput.InteractPressed))
+        // Tell the HUD prompt bar an interact is available while in range with the board closed.
+        // Opening waits until any charge jump has fully landed (closing below stays available).
+        bool jumpBlocked = PlayerController.IsPlayerJumping;
+        if (playerInZone && !isViewingBoard && !jumpBlocked) InteractHint.Ping();
+
+        if (playerInZone && !isViewingBoard && !jumpBlocked && (Input.GetKeyDown(KeyCode.E) || GamepadInput.InteractPressed))
         {
             OpenBoard();
         }

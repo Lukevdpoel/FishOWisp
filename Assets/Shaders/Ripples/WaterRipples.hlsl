@@ -1,3 +1,6 @@
+// RETIRED — safe to delete. Never wired into any shader graph. Water ripples now run
+// through the wave-sim render texture (Hidden/WaterRippleSim + WaterRippleSimRenderer);
+// its C# half, Scripts/Effects/WaterRippleEmitter.cs, is equally dead.
 #ifndef WATER_RIPPLES_INCLUDED
 #define WATER_RIPPLES_INCLUDED
 

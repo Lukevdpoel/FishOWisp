@@ -115,6 +115,10 @@ Material:
     - _RefractionSpeed_1: 1
     - _RefractionStrength: 0.2
     - _RefractionTiling: 0.71
+    - _RippleFoamFull: 0.2
+    - _RippleFoamStart: 0.15
+    - _RippleNormalStrength: 27.2
+    - _RippleRefractionStrength: 0.5
     - _Samples: 125
     - _Smoothness: 1
     - _SoftFoamDistanceFromShore: 7.57
@@ -127,6 +131,7 @@ Material:
     - _Color: {r: 0.08788697, g: 0.23584884, b: 0.21612054, a: 1}
     - _FoamColor: {r: 1, g: 1, b: 1, a: 1}
     - _Foam_Color: {r: 1, g: 1, b: 1, a: 0}
+    - _RippleFoamColor: {r: 1.0592737, g: 1.0592737, b: 1.0592737, a: 1}
     - _SoftFoamColor: {r: 1, g: 1, b: 1, a: 0.4627451}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

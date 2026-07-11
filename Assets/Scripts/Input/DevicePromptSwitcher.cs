@@ -11,11 +11,15 @@ public class DevicePromptSwitcher : MonoBehaviour
     [Tooltip("Shown while the player is on keyboard/mouse (e.g. the 'E' icon).")]
     public GameObject keyboardPrompt;
     [Tooltip("Shown while the player is on an Xbox-style controller (e.g. an 'X' button icon). " +
-             "Also the fallback for PlayStation pads when no PlayStation variant is assigned.")]
+             "Also the fallback for PlayStation/Nintendo pads when no brand variant is assigned.")]
     public GameObject gamepadPrompt;
     [Tooltip("Optional: shown instead of the gamepad prompt while a PlayStation pad is active " +
              "(e.g. a 'Square' icon). Leave empty to reuse the gamepad prompt for both brands.")]
     public GameObject playstationPrompt;
+    [Tooltip("Optional: shown instead of the gamepad prompt while a Nintendo Switch Pro " +
+             "Controller is active (e.g. a 'Y' button icon). Leave empty to reuse the gamepad " +
+             "prompt for this brand.")]
+    public GameObject nintendoPrompt;
 
     private void OnEnable()
     {
@@ -31,12 +35,13 @@ public class DevicePromptSwitcher : MonoBehaviour
     private void Apply(ActiveInputDevice device)
     {
         bool onKeyboard = device == ActiveInputDevice.KeyboardMouse;
-        bool onPlayStation = !onKeyboard
-            && GamepadInput.ActiveGamepadKind == GamepadKind.PlayStation
-            && playstationPrompt != null;
+        GamepadKind kind = GamepadInput.ActiveGamepadKind;
+        bool onPlayStation = !onKeyboard && kind == GamepadKind.PlayStation && playstationPrompt != null;
+        bool onNintendo = !onKeyboard && kind == GamepadKind.Nintendo && nintendoPrompt != null;
 
         if (keyboardPrompt != null) keyboardPrompt.SetActive(onKeyboard);
-        if (gamepadPrompt != null) gamepadPrompt.SetActive(!onKeyboard && !onPlayStation);
+        if (gamepadPrompt != null) gamepadPrompt.SetActive(!onKeyboard && !onPlayStation && !onNintendo);
         if (playstationPrompt != null) playstationPrompt.SetActive(onPlayStation);
+        if (nintendoPrompt != null) nintendoPrompt.SetActive(onNintendo);
     }
 }

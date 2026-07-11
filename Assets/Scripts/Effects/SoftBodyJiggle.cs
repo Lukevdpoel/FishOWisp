@@ -33,16 +33,22 @@ public class SoftBodyJiggle : MonoBehaviour
     [Header("Simulation")]
     [Tooltip("Fixed simulation rate (Hz). The sim always advances in steps of 1/this regardless of framerate, so the wobble feels identical at 30, 60 or 144 FPS and a lag spike can't destabilise it. 60 is a good match for most targets.")]
     public float simulationRate = 60f;
-    [Tooltip("Max fixed steps run in a single frame. Caps catch-up after a lag spike so a stutter can't fire a burst of steps (or a feedback spiral) — the sim just advances a little less that frame and stays stable.")]
-    [Range(1, 16)] public int maxSubSteps = 4;
+    [Tooltip("Max fixed steps run in a single frame. This is a last-resort spiral-of-death guard, NOT a normal-case cap: it sets the lowest framerate the sim still tracks in real time at = simulationRate / maxSubSteps (e.g. 60Hz / 8 = 7.5 FPS). Below that the sim drops time and runs in slow-motion, which desyncs the wobble from the body and looks broken on fast transients like the bounce — so keep this high enough that it never engages at framerates you actually ship at. Steps are cheap on this mesh; don't starve it.")]
+    [Range(1, 16)] public int maxSubSteps = 8;
 
     [Header("Sprint Damping")]
     [Tooltip("Scale the jiggle down while the player sprints (auto-reads PlayerController.IsSprinting from a parent). Running drives bigger accelerations, so this tames the extra wobble without touching the walk feel.")]
     public bool dampenWhileSprinting = true;
     [Tooltip("Wobble amount while sprinting (1 = no reduction, 0 = fully still). Only the visible amplitude is scaled — the sim itself is unchanged.")]
     [Range(0f, 1f)] public float sprintIntensity = 0.6f;
-    [Tooltip("Seconds to blend between full and reduced wobble as sprint starts/stops, so it doesn't pop.")]
+    [Tooltip("Seconds to blend between full and reduced wobble as sprint starts/stops, so it doesn't pop. Also used as the blend time for the airborne damping below.")]
     public float sprintBlendTime = 0.15f;
+
+    [Header("Air Damping")]
+    [Tooltip("Scale the jiggle down while the player is airborne (jump flight / falling; NOT while charging on the ground). The launch already elongates the body along its velocity — taming the secondary surface wobble midair keeps the eye on that forward pull instead of the rippling.")]
+    public bool dampenWhileAirborne = true;
+    [Tooltip("Wobble amount while airborne (1 = no reduction, 0 = fully still). Only the visible amplitude is scaled — the sim itself is unchanged, so the landing wobble is unaffected.")]
+    [Range(0f, 1f)] public float airIntensity = 0.35f;
 
     [Header("Limits & Safety")]
     [Tooltip("Max distance (world units) a vertex may sit from its rest position. Bounds the wobble and stops a frame hitch from blowing the mesh apart.")]
@@ -67,6 +73,37 @@ public class SoftBodyJiggle : MonoBehaviour
     public float anchorRadius = 0.15f;
     [Tooltip("Local-space distance over which a pinned vertex blends back up to full jiggle.")]
     public float anchorFalloff = 0.25f;
+
+    [Header("Ground Conform")]
+    // While the player charges a jump the body squashes flat and — because the squash preserves volume —
+    // WIDENS. A rigid wide disc can't follow a curved surface: over a rounded rock its rim juts out past
+    // where the ground falls away and hangs in the air. This drapes the render mesh over the ground
+    // beneath it each frame: a small grid of downward rays samples the ground height under the footprint,
+    // then every vertex is shifted in world-Y toward that height (referenced to the height under the
+    // footprint centre, so flat ground = no change). The rim tucks down to hug convex bumps and settles
+    // into dips instead of floating. Cost is the ray grid + a per-vertex bilinear lookup, and the whole
+    // pass only runs while charging (auto-read from the parent PlayerController), so normal play pays nothing.
+    [Tooltip("Drape the mesh over the ground surface while the player charges a jump, so the flattened/widened body follows curves instead of hanging flat over the edge of a rounded surface.")]
+    public bool conformToGround = true;
+    [Tooltip("Which collider layers the drape responds to — pick your ground/terrain layer(s) here. The player's own colliders are always skipped automatically. Left empty (Nothing), the conform is inactive; set at least one layer to enable it.")]
+    public LayerMask conformGroundMask = 0;
+    [Tooltip("Resolution of the square ray grid cast under the footprint each frame (N×N rays). 3-5 is plenty for smooth curves; higher tracks bumpier ground at more rays.")]
+    [Range(2, 8)] public int conformResolution = 4;
+    [Tooltip("Overall drape amount. 1 = fully follow the ground contour, 0 = off (stays flat). Dial down for a subtler conform.")]
+    [Range(0f, 1f)] public float conformStrength = 1f;
+    [Tooltip("Furthest a vertex may be pulled DOWN to follow ground that falls away under it (world units). Bounds the drape so a vertex overhanging a ledge can't be yanked far down and tear the mesh.")]
+    public float conformMaxDrop = 0.35f;
+    [Tooltip("Furthest a vertex may be pushed UP to follow ground that rises under it (world units).")]
+    public float conformMaxRise = 0.25f;
+    [Tooltip("Extra world-space padding around the mesh footprint when placing the ray grid, so the rim still samples ground just beyond the silhouette.")]
+    public float conformPadding = 0.05f;
+    [Tooltip("How quickly the drape follows changes in the ground beneath the body (per second). Turning during the charge swings the footprint over new ground; this eases every vertex's height toward its new target instead of snapping it there in one frame. Lower = softer and laggier, higher = snappier; very high approximates the old instant behaviour.")]
+    public float conformEaseSpeed = 10f;
+    [Tooltip("How much of the drape reaches the TOP of the body (1 = the top folds with the ground exactly like the base does, 0 = the top stays rigid and only the base falls into place). Vertices blend smoothly from full drape at the base up to this at the crown, so the underside hugs the surface while the upper body only softly follows.")]
+    [Range(0f, 1f)] public float conformTopAmount = 0.35f;
+    // NOTE: this pass only BENDS the body mesh to the ground's curvature. Dropping the whole body onto the
+    // surface (the hover fix) is done one level up in PlayerSquashStretch (keep-base-planted on squashRoot),
+    // so the separate limb meshes drop together with the body instead of being left behind by a body-only warp.
 
     private MeshFilter meshFilter;
     private MeshRenderer meshRenderer;
@@ -96,11 +133,26 @@ public class SoftBodyJiggle : MonoBehaviour
     private float currentIntensity = 1f; // smoothed wobble amplitude scale (1 = full, sprintIntensity while running)
     private bool initialized;
 
+    // --- Ground conform ---
+    private float[] conformGridH;        // ground height per grid cell (row-major z*N+x), NaN-filled misses replaced
+    private int conformGridN;            // grid resolution used this frame
+    private float conformMinX, conformMinZ, conformInvCellX, conformInvCellZ; // world->grid mapping
+    private float conformRefY;           // ground height under the footprint centre — the contour drape zero point
+    private bool conformActiveThisFrame; // grid sampled and ground found this frame
+    private float[] conformOffset;       // smoothed drape height per UNIQUE vertex — the memory that makes ground changes ease in instead of snapping
+    private bool conformOffsetLive;      // any offsets nonzero (lets the ease-out loop stop once fully settled)
+    private float[] conformHeight01;     // per-unique-vertex normalized height in the rest mesh (0 = base, 1 = crown), drives the top falloff
+    private Transform playerRoot;        // conform rays skip any collider under this (the player itself)
+    private static readonly RaycastHit[] conformHitBuffer = new RaycastHit[8];
+
     void Awake()
     {
         meshFilter = GetComponent<MeshFilter>();
         meshRenderer = GetComponent<MeshRenderer>();
         sprintSource = GetComponentInParent<PlayerController>();
+        // Conform rays start above the flattened body and travel down THROUGH the player's own colliders
+        // to reach the ground; remember the player root so those self-hits can be skipped.
+        playerRoot = sprintSource != null ? sprintSource.transform : transform.root;
 
         Mesh source = meshFilter.sharedMesh;
         if (source == null)
@@ -152,6 +204,7 @@ public class SoftBodyJiggle : MonoBehaviour
     void LateUpdate()
     {
         if (!initialized) return;
+        conformActiveThisFrame = false; // recomputed below; stays off unless charging over ground
         // Freeze with the game (pause / notebook), matching PlayerController.LateUpdate's guard.
         if (Time.timeScale == 0f || Time.deltaTime <= 0.0001f) return;
 
@@ -173,9 +226,21 @@ public class SoftBodyJiggle : MonoBehaviour
         }
         lastPosition = transform.position;
 
-        // Ease the wobble amplitude toward its sprint/normal target so the change blends in smoothly.
-        float targetIntensity = (dampenWhileSprinting && sprintSource != null && sprintSource.IsSprinting)
-            ? sprintIntensity : 1f;
+        // Sample the ground under the flattened footprint ONCE per frame (independent of how many fixed
+        // sim sub-steps run below), so WriteBack can drape the mesh onto it. Only while charging — the
+        // one time the body is squashed wide enough to overhang a curved surface — so it's free otherwise.
+        if (conformToGround && conformGroundMask.value != 0 && sprintSource != null && sprintSource.IsChargingJump)
+            SampleGroundGrid();
+
+        // Ease the wobble amplitude toward its target so the change blends in smoothly. Airborne damping
+        // outranks sprint damping (you can't sprint midair); charging is deliberately NOT airborne — the
+        // grounded flatten keeps its full wobble, only the flight is calmed so the velocity stretch leads.
+        float targetIntensity = 1f;
+        if (dampenWhileAirborne && sprintSource != null
+            && !sprintSource.IsGrounded && !sprintSource.IsChargingJump)
+            targetIntensity = airIntensity;
+        else if (dampenWhileSprinting && sprintSource != null && sprintSource.IsSprinting)
+            targetIntensity = sprintIntensity;
         float blendRate = sprintBlendTime > 0f ? Time.deltaTime / sprintBlendTime : 1f;
         currentIntensity = Mathf.MoveTowards(currentIntensity, targetIntensity, blendRate);
 
@@ -268,10 +333,52 @@ public class SoftBodyJiggle : MonoBehaviour
     private void WriteBack(float alpha)
     {
         bool full = currentIntensity >= 0.999f;
+
+        // Ground conform, with per-vertex memory: each unique vertex's drape height EASES toward the height
+        // the ground currently asks for, instead of snapping there in one frame. Turning during the charge
+        // swings the footprint over new ground and re-targets every vertex at once — without the ease that
+        // read as an instant, unpolished pop. The whole-body drop onto the surface is handled at the
+        // transform level in PlayerSquashStretch; this only bends the body to the ground's curvature.
+        if (conformActiveThisFrame)
+        {
+            float k = Mathf.Clamp01(conformEaseSpeed * Time.deltaTime);
+            for (int u = 0; u < cur.Length; u++)
+            {
+                Vector3 w = Vector3.Lerp(prev[u], cur[u], alpha);
+                float target = Mathf.Clamp(
+                    (SampleGroundHeight(w.x, w.z) - conformRefY) * conformStrength,
+                    -conformMaxDrop, conformMaxRise);
+                // Vertical falloff: the base takes the full drape so it falls into place on the surface,
+                // higher vertices take progressively less (down to conformTopAmount at the crown) so the
+                // top half squashes along softly instead of folding with every bump the underside hugs.
+                target *= Mathf.Lerp(1f, conformTopAmount, Mathf.SmoothStep(0f, 1f, conformHeight01[u]));
+                conformOffset[u] = Mathf.Lerp(conformOffset[u], target, k);
+            }
+            conformOffsetLive = true;
+        }
+        else if (conformOffsetLive)
+        {
+            // Conform just ended (charge released/cancelled with the body still visible) — ease the drape
+            // back out to flat with the same response, so the exit doesn't pop either.
+            float k = Mathf.Clamp01(conformEaseSpeed * Time.deltaTime);
+            bool any = false;
+            for (int u = 0; u < cur.Length; u++)
+            {
+                float v = Mathf.Lerp(conformOffset[u], 0f, k);
+                if (Mathf.Abs(v) < 1e-4f) v = 0f; else any = true;
+                conformOffset[u] = v;
+            }
+            conformOffsetLive = any;
+        }
+
         for (int i = 0; i < renderVerts.Length; i++)
         {
             int u = fullToUnique[i];
-            Vector3 deformedLocal = transform.InverseTransformPoint(Vector3.Lerp(prev[u], cur[u], alpha));
+            Vector3 world = Vector3.Lerp(prev[u], cur[u], alpha);
+            // A pure render-space warp on top of the jiggle, so the sim stays stable and unaware of it.
+            if (conformOffsetLive)
+                world.y += conformOffset[u];
+            Vector3 deformedLocal = transform.InverseTransformPoint(world);
             // Sprint damping: blend the deformation back toward the rest shape to shrink the visible
             // wobble amplitude, leaving the simulation itself untouched.
             renderVerts[i] = full ? deformedLocal : Vector3.Lerp(restLocalFull[i], deformedLocal, currentIntensity);
@@ -280,6 +387,106 @@ public class SoftBodyJiggle : MonoBehaviour
         workingMesh.SetVertices(renderVerts);
         if (recalculateNormals) workingMesh.RecalculateNormals();
         workingMesh.RecalculateBounds();
+    }
+
+    // Casts the N×N downward ray grid over the mesh's current world footprint and stores the ground
+    // heights for bilinear lookup in WriteBack. Sets conformActiveThisFrame only if at least one ray
+    // found ground (else there's nothing to drape onto — e.g. charging out over a ledge). Runs once per
+    // frame while charging; every array here is reused so the pass allocates nothing after warm-up.
+    private void SampleGroundGrid()
+    {
+        if (meshRenderer == null) return;
+
+        int n = Mathf.Max(2, conformResolution);
+        if (conformGridH == null || conformGridH.Length != n * n)
+            conformGridH = new float[n * n];
+        conformGridN = n;
+
+        Bounds b = meshRenderer.bounds;
+        float minX = b.min.x - conformPadding;
+        float minZ = b.min.z - conformPadding;
+        float spanX = Mathf.Max(1e-4f, (b.max.x + conformPadding) - minX);
+        float spanZ = Mathf.Max(1e-4f, (b.max.z + conformPadding) - minZ);
+        conformMinX = minX;
+        conformMinZ = minZ;
+        conformInvCellX = (n - 1) / spanX;
+        conformInvCellZ = (n - 1) / spanZ;
+
+        // Start each ray above the body and reach below its base far enough to still catch ground the
+        // drape is allowed to pull down onto.
+        float rayTop = b.max.y + 0.5f;
+        float rayLen = (rayTop - b.min.y) + conformMaxDrop + 0.5f;
+
+        float sum = 0f;
+        int hits = 0;
+        for (int iz = 0; iz < n; iz++)
+        {
+            float z = minZ + spanZ * (iz / (float)(n - 1));
+            for (int ix = 0; ix < n; ix++)
+            {
+                float x = minX + spanX * (ix / (float)(n - 1));
+                if (RaycastGround(x, rayTop, z, rayLen, out float h))
+                {
+                    conformGridH[iz * n + ix] = h;
+                    sum += h;
+                    hits++;
+                }
+                else
+                {
+                    conformGridH[iz * n + ix] = float.NaN;
+                }
+            }
+        }
+
+        if (hits == 0) return; // no ground under the footprint — leave conform off this frame
+
+        // Fill missed cells with the average hit so the bilinear lookup never reads a NaN.
+        float avg = sum / hits;
+        for (int i = 0; i < conformGridH.Length; i++)
+            if (float.IsNaN(conformGridH[i])) conformGridH[i] = avg;
+
+        conformRefY = SampleGroundHeight(b.center.x, b.center.z);
+        conformActiveThisFrame = true;
+    }
+
+    // Nearest ground hit under (x,z), skipping the player's own colliders. The ray travels down from
+    // above the body, so among the non-player hits the highest (max y) is the surface it rests on.
+    private bool RaycastGround(float x, float topY, float z, float length, out float height)
+    {
+        height = 0f;
+        int count = Physics.RaycastNonAlloc(
+            new Vector3(x, topY, z), Vector3.down, conformHitBuffer, length,
+            conformGroundMask, QueryTriggerInteraction.Ignore);
+
+        float best = float.NegativeInfinity;
+        bool found = false;
+        for (int i = 0; i < count; i++)
+        {
+            Collider col = conformHitBuffer[i].collider;
+            if (col == null) continue;
+            if (playerRoot != null && col.transform.IsChildOf(playerRoot)) continue; // skip self
+            float y = conformHitBuffer[i].point.y;
+            if (y > best) { best = y; found = true; }
+        }
+        if (found) height = best;
+        return found;
+    }
+
+    // Bilinear ground height at world (x,z) from the sampled grid.
+    private float SampleGroundHeight(float x, float z)
+    {
+        int n = conformGridN;
+        if (conformGridH == null || n < 2) return conformRefY;
+
+        float fx = Mathf.Clamp((x - conformMinX) * conformInvCellX, 0f, n - 1.0001f);
+        float fz = Mathf.Clamp((z - conformMinZ) * conformInvCellZ, 0f, n - 1.0001f);
+        int x0 = (int)fx, z0 = (int)fz;
+        int x1 = Mathf.Min(x0 + 1, n - 1), z1 = Mathf.Min(z0 + 1, n - 1);
+        float tx = fx - x0, tz = fz - z0;
+
+        float top = Mathf.Lerp(conformGridH[z0 * n + x0], conformGridH[z0 * n + x1], tx);
+        float bot = Mathf.Lerp(conformGridH[z1 * n + x0], conformGridH[z1 * n + x1], tx);
+        return Mathf.Lerp(top, bot, tz);
     }
 
     private void ResetToRest()
@@ -291,6 +498,11 @@ public class SoftBodyJiggle : MonoBehaviour
             prev[i] = w;
         }
         accumulator = 0f;   // drop unspent time so re-enabling doesn't burst a batch of steps
+        // Drop any lingering drape too — the body is hidden/teleporting, so easing it out is meaningless
+        // and stale offsets must not reapply when it reappears somewhere else.
+        if (conformOffset != null)
+            for (int i = 0; i < conformOffset.Length; i++) conformOffset[i] = 0f;
+        conformOffsetLive = false;
         if (workingMesh != null) workingMesh.SetVertices(restLocalFull);
     }
 
@@ -346,6 +558,22 @@ public class SoftBodyJiggle : MonoBehaviour
         cur = new Vector3[uniqueRest.Length];
         prev = new Vector3[uniqueRest.Length];
         restWorldCache = new Vector3[uniqueRest.Length];
+        conformOffset = new float[uniqueRest.Length];
+
+        // Normalized rest height per vertex (0 = base, 1 = crown), for the drape's vertical falloff.
+        // Relative position within the body is scale-independent, so the squash doesn't invalidate it.
+        conformHeight01 = new float[uniqueRest.Length];
+        float minY = float.PositiveInfinity, maxY = float.NegativeInfinity;
+        for (int i = 0; i < uniqueRest.Length; i++)
+        {
+            float y = uniqueRest[i].y;
+            if (y < minY) minY = y;
+            if (y > maxY) maxY = y;
+        }
+        float invSpan = 1f / Mathf.Max(1e-4f, maxY - minY);
+        for (int i = 0; i < uniqueRest.Length; i++)
+            conformHeight01[i] = (uniqueRest[i].y - minY) * invSpan;
+
         ComputeWeights();
     }
 

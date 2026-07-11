@@ -2,7 +2,8 @@ using System;
 
 namespace UnityEngine.Rendering.Universal
 {
-    [Serializable, VolumeComponentMenuForRenderPipeline("GapperGames/Screen Space Reflections", typeof(UniversalRenderPipeline))]
+    [Serializable, VolumeComponentMenu("GapperGames/Screen Space Reflections")]
+    [SupportedOnRenderPipeline(typeof(UniversalRenderPipelineAsset))]
     public sealed partial class ScreenSpaceReflections : VolumeComponent, IPostProcessComponent
     {
         public BoolParameter enabled = new BoolParameter(false);

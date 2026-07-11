@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: afe3ccf2c6be7e5408b954fc8a0e283b, type: 3}
+  m_Name: Sunfish_Scriptable
+  m_EditorClassIdentifier: 
+  fishName: Sunfish
+  description: These fish love to bask on the surface to warm up after a cold, deep
+    dive.
+  fishImage: {fileID: 0}
+  fishPrefab: {fileID: 426751445241193401, guid: 0c8ad981fa2ac9046b39baf3652f0f37, type: 3}
+  sizeClass: 4
+  isLegendary: 1
+  minLengthCm: 45
+  maxLengthCm: 120
+  daySpawnChance: 2.2
+  nightSpawnChance: 3
+  catchProbability: 0.604
+  attractedTo: 0
+  awarenessRadius: 7
+  awarenessConeAngle: 120
+  schoolsTogether: 0
+  prey: []
+  swimFrequency: 0.52
+  swimBodyWaves: 0.65
+  swimWaveAmplitude: 0.01
+  swimSideAmplitude: 0.0033
+  swimPivotAmount: 0.014
+  swimMaskStart: 0.592
+  fightPullDistance: 2
+  basePrice: 10
+  pricePerCm: 0
+  preferredBaits:
+  - {fileID: 11400000, guid: 11ccbd758765b2a4a8e806319dce81c0, type: 2}
+  bitesWithoutBait: 0
+  prefersPopper: 0

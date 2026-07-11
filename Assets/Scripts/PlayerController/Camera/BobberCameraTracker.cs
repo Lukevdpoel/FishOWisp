@@ -28,6 +28,19 @@ public class BobberCameraTracker
     private Pose returnFromPose;
     private float returnT;
 
+    // Stabilized position the camera orbits around. Since the follow now begins at the throw,
+    // orbiting the bobber's raw transform would chase the fast flight arc and read as jittery.
+    // SmoothDamp-ing toward the live position keeps the airborne ride steady and straight, then
+    // converges exactly onto the bobber once it lands and holds still. Seeded on BeginFollow.
+    private Vector3 smoothedFollowPos;
+    private Vector3 followPosVelocity;
+    private bool hasSmoothedPos;
+
+    // Smoothed collision-pullback distance for the orbit pose, so the camera eases in/out when it
+    // hits or clears geometry instead of popping. Mirrors the player pose's SmoothDamp'd distance.
+    private float smoothedOrbitDistance;
+    private float orbitDistanceVelocity;
+
     public bool HasBobberCameraPose => hasBobberCameraPose;
     public float BlendValue => bobberCameraBlend;
     public float BlendTarget => bobberCameraBlendTarget;
@@ -40,13 +53,17 @@ public class BobberCameraTracker
     // by the bobber side or is mid-return). Read by the spine before applying mouse input.
     public bool BobberCameraDominant => bobberCameraBlend > 0.01f || isReturningToPlayer;
 
-    public void OnBobberLanded(BobberController b)
+    // Start following the given bobber. Called at throw time now (was: on water landing), so the
+    // camera trails the whole cast. hasSmoothedPos is reset so ComputePose seeds the stabilized
+    // orbit point at the bobber's launch position rather than snapping from a stale value.
+    public void BeginFollow(BobberController b)
     {
         if (b == null) return;
         isReturningToPlayer = false;
         bobberFollowController = b;
         bobberFollowTarget = b.transform;
         bobberCameraBlendTarget = 1f;
+        hasSmoothedPos = false;
     }
 
     // Empty-line reel: stop tracking the bobber and fade the camera back to the player.
@@ -110,18 +127,46 @@ public class BobberCameraTracker
     public bool ComputePose(Transform playerModel, Transform cameraTransform,
                             float smoothXAngle, float smoothYAngle,
                             float bobberFollowHeight, float bobberFollowDistance,
-                            bool bobberOrbitWithMouse, float bobberCameraWaterClearance)
+                            bool bobberOrbitWithMouse, float bobberCameraWaterClearance,
+                            float followPositionSmoothTime,
+                            LayerMask collisionLayers, float collisionRadius, float collisionDampTime)
     {
         if (bobberFollowTarget == null) return false;
 
-        Vector3 bobberPos = bobberFollowTarget.position;
+        // Stabilize the orbit point: ease toward the bobber's live position instead of tracking it
+        // exactly, so the fast flight arc doesn't jerk the camera. Seed on the first frame of a
+        // follow so it starts locked to the launch position, then damps toward the bobber.
+        Vector3 rawFollowPos = bobberFollowTarget.position;
+        if (!hasSmoothedPos)
+        {
+            smoothedFollowPos = rawFollowPos;
+            followPosVelocity = Vector3.zero;
+            smoothedOrbitDistance = bobberFollowDistance;
+            orbitDistanceVelocity = 0f;
+            hasSmoothedPos = true;
+        }
+        smoothedFollowPos = Vector3.SmoothDamp(smoothedFollowPos, rawFollowPos,
+            ref followPosVelocity, Mathf.Max(0f, followPositionSmoothTime));
+
+        Vector3 bobberPos = smoothedFollowPos;
         Vector3 bobberPivot = bobberPos + Vector3.up * bobberFollowHeight;
 
         if (bobberOrbitWithMouse)
         {
             Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f);
             Vector3 cameraDirection = -(rotation * Vector3.forward);
-            Vector3 orbitPos = bobberPivot + cameraDirection * bobberFollowDistance;
+
+            // Camera collision, same as the player orbit pose: pull the camera in if geometry sits
+            // between the bobber pivot and the orbit position, so it doesn't clip through terrain or
+            // props while following the bobber. Smoothed so it eases in/out instead of popping.
+            float targetDistance = bobberFollowDistance;
+            if (Physics.SphereCast(bobberPivot, collisionRadius, cameraDirection, out RaycastHit hit,
+                                   bobberFollowDistance, collisionLayers))
+                targetDistance = hit.distance;
+            smoothedOrbitDistance = Mathf.SmoothDamp(smoothedOrbitDistance, targetDistance,
+                ref orbitDistanceVelocity, Mathf.Max(0f, collisionDampTime));
+
+            Vector3 orbitPos = bobberPivot + cameraDirection * smoothedOrbitDistance;
 
             // Don't dip below the water plane. Lift and re-aim at the pivot if we would.
             if (bobberFollowController != null && bobberFollowController.IsInWater)

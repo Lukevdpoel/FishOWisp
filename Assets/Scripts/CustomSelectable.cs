@@ -13,15 +13,17 @@ public class CustomSelectable : Selectable, ISelectHandler,IDeselectHandler
         customUIElements = GetComponentsInChildren<CustomUIElement>().ToList();
     }
 
-    public void OnDeselect(BaseEventData eventData)
+    public override void OnDeselect(BaseEventData eventData)
     {
+        base.OnDeselect(eventData);
         foreach (var customElement in customUIElements)
         {
             customElement.OnDeselect(eventData);
         }
     }
-    public void OnSelect(BaseEventData eventData)
+    public override void OnSelect(BaseEventData eventData)
     {
+        base.OnSelect(eventData);
         foreach (var customElement in customUIElements)
         {
             customElement.OnSelect(eventData);

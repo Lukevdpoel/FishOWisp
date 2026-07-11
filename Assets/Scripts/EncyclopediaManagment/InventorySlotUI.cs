@@ -31,7 +31,12 @@ public class InventorySlotUI : MonoBehaviour, IPointerEnterHandler, IPointerExit
         if (iconImage != null && fish.preset != null)
         {
             iconImage.gameObject.SetActive(true);
-            iconImage.sprite = fish.preset.fishImage;
+            // Do NOT assign fish.preset.fishImage — see EncyclopediaGridSlot.Setup for the full
+            // explanation. The fish-icon art is missing project-wide, so fishImage is a dangling
+            // (real non-null) reference; Image.sprite's setter reads the sprite's .rect, which
+            // hard-crashes the player on the dead native object. The slot keeps its placeholder
+            // sprite. Re-enable once fishImage points at a valid sprite again:
+            //     iconImage.sprite = fish.preset.fishImage;
         }
 
         Deselect();

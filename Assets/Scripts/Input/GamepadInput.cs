@@ -19,15 +19,14 @@ using UnityEngine.InputSystem.Controls;
 ///   Right stick          - orbit camera / steer the aim while charging a cast /
 ///                          rotate the fish model while the notebook is open
 ///   A / Cross            - interact (NPCs, doors, vendor, pots, bounty board); cast the
-///                          held charge; hook a biting fish; confirm/advance dialogue;
-///                          finish catch inspection
+///                          held charge; confirm/advance dialogue; finish catch inspection
 ///   B / Circle           - cancel / close menus; advance/skip dialogue
 ///   X / Square           - (unused)
 ///   Y / Triangle         - jump
-///   RT / R2              - hold to charge a cast (throw force tracks trigger pressure live;
-///                          press A to cast at the dialed charge, let go to cancel); tap to
-///                          attract fish while a bobber waits; hold to crank the lure in and
-///                          to reel during the fish fight
+///   RT / R2              - hold to charge a cast (force time-ramps; release to cast at the
+///                          current charge, mirroring mouse/keyboard); tap to attract fish while
+///                          a bobber waits; press to react to a biting fish; hold to crank the
+///                          lure in and to reel during the fish fight
 ///   RB / R1              - reset a cast already in the water; flips a page forward
 ///                          while the notebook is open
 ///   LB / L1              - hold to aim (mirrors right mouse button); flips a page
@@ -39,7 +38,7 @@ using UnityEngine.InputSystem.Controls;
 /// </summary>
 public enum ActiveInputDevice { KeyboardMouse, Gamepad }
 
-public enum GamepadKind { None, Xbox, PlayStation }
+public enum GamepadKind { None, Xbox, PlayStation, Nintendo }
 
 public static class GamepadInput
 {
@@ -58,8 +57,9 @@ public static class GamepadInput
     /// <summary>
     /// Brand of the pad the player last used. Defaults to Xbox so prompt art has a sane
     /// fallback before any controller input arrives; flips to PlayStation when a DualShock/
-    /// DualSense is the active device. Bindings are identical either way — this only exists
-    /// so prompt icons can show Cross instead of A.
+    /// DualSense is the active device, or to Nintendo for a Switch Pro Controller. Each brand
+    /// has its own bindings table so layouts can differ — this also lets prompt icons show the
+    /// right glyph (Cross / A button) for the active pad.
     /// </summary>
     public static GamepadKind ActiveGamepadKind { get; private set; } = GamepadKind.Xbox;
 
@@ -70,11 +70,26 @@ public static class GamepadInput
         {
             Gamepad pad = Pad;
             if (pad == null) return GamepadKind.None;
-            return pad is UnityEngine.InputSystem.DualShock.DualShockGamepad
-                ? GamepadKind.PlayStation
-                : GamepadKind.Xbox;
+            if (pad is UnityEngine.InputSystem.DualShock.DualShockGamepad)
+                return GamepadKind.PlayStation;
+            // Switch Pro Controllers (and most Switch-style third-party pads) register as
+            // SwitchProControllerHID. NOTE: Unity maps their face buttons by physical POSITION,
+            // so buttonEast is the 'A'/confirm button and buttonSouth is 'B' — mirrored vs. the
+            // Nintendo labels. The dedicated nintendo table exists to account for that.
+            if (pad is UnityEngine.InputSystem.Switch.SwitchProControllerHID)
+                return GamepadKind.Nintendo;
+            return GamepadKind.Xbox;
         }
     }
+
+    /// <summary>
+    /// True when the connected pad's shoulder triggers are digital (on/off) rather than
+    /// pressure-sensitive — the Switch Pro Controller's ZL/ZR have no analog travel and read
+    /// only 0 or 1. Casting no longer depends on this (every pad now time-ramps the charge and
+    /// casts on release), but it's kept for anything that needs to know a pad can't report
+    /// partial trigger pulls.
+    /// </summary>
+    public static bool HasDigitalTriggers => CurrentGamepadKind == GamepadKind.Nintendo;
 
     /// <summary>Fired once per switch, with the device the player just moved to. Also fires
     /// when the pad brand changes mid-session (e.g. Xbox pad swapped for a DualSense).</summary>
@@ -127,6 +142,32 @@ public static class GamepadInput
     // The table for the brand of the connected pad, so PlayStation and Xbox layouts can differ.
     private static GamepadBindings Table => Bindings.ForKind(CurrentGamepadKind);
 
+    /// <summary>
+    /// The bound gamepad control for a prompt verb on the ACTIVE brand's table (so it tracks any
+    /// remap). Returns <see cref="GamepadControl.None"/> for verbs that don't sit on a rebindable
+    /// control (cycle = d-pad / stick). Used by <see cref="ButtonPrompts"/> to draw on-device hints;
+    /// resolved off ActiveGamepadKind so the control and its rendered label stay brand-consistent.
+    /// </summary>
+    public static GamepadControl ControlFor(PromptVerb v)
+    {
+        GamepadBindings t = Bindings.ForKind(ActiveGamepadKind);
+        switch (v)
+        {
+            case PromptVerb.Cast: return t.throwCharge;
+            case PromptVerb.Reel: return t.reel;
+            case PromptVerb.Attract: return t.attract;
+            case PromptVerb.Aim: return t.aim;
+            case PromptVerb.ResetCast: return t.resetCast;
+            case PromptVerb.Hook: return t.reel;   // react-to-bite shares the reel button (RT)
+            case PromptVerb.Confirm: return t.interact;   // finish catch inspection (A)
+            case PromptVerb.Interact: return t.interact;
+            case PromptVerb.Inventory: return t.inventoryToggle;
+            case PromptVerb.Notebook: return t.notebookToggle;
+            case PromptVerb.Jump: return t.jump;
+            default: return GamepadControl.None; // Walk / CycleLeftRight live on the sticks & d-pad
+        }
+    }
+
     // Map a bound control to the live ButtonControl on the current pad. ButtonControl derives
     // from AxisControl, so ReadValue() yields the analog pull for triggers and 0/1 for buttons.
     private static ButtonControl Resolve(GamepadControl c)
@@ -172,18 +213,19 @@ public static class GamepadInput
     public static bool JumpHeld => HeldButton(Table.jump);
 
     // --- UI / world verbs ---
-    // Interact and confirm share one control: touching the world, hooking a biting fish, casting
-    // a charged throw, and confirming/advancing menus and dialogue are all the same button.
+    // Interact and confirm share one control: touching the world, casting a charged throw, and
+    // confirming/advancing menus and dialogue are all the same button. (Reacting to a biting fish
+    // moved onto the reel control — see ReelPressed — so hooking and reeling share one button.)
     public static bool InteractPressed => Pressed(Table.interact);
     public static bool ConfirmPressed => Pressed(Table.interact);
     public static bool CancelPressed => Pressed(Table.cancel);
 
     // --- Fishing ---
-    // Throw lives on the throwCharge control: holding it charges, and its analog pull IS the
-    // charge, so RodCasting maps the pressure straight to throw force (live, up or down). Press
-    // interact while still holding to cast at the dialed charge (see ConfirmPressed); letting go
-    // fully cancels. ThrowHeld brackets the charge against the shared press point;
-    // ThrowChargeAnalog is the raw 0..1 pull (only meaningful when bound to a trigger).
+    // Throw lives on the throwCharge control: holding it past the press point charges, and
+    // RELEASING it casts at the time-ramped force (FishingRodController), exactly like LMB on
+    // mouse/keyboard. ThrowHeld brackets the held state against the shared press point;
+    // ThrowChargeAnalog exposes the raw 0..1 pull for anything that wants it (the cast no longer
+    // uses trigger pressure).
     public static bool ThrowHeld => Analog(Table.throwCharge) > TriggerPressPoint;
     public static float ThrowChargeAnalog => Analog(Table.throwCharge);
     public static bool ResetCastPressed => Pressed(Table.resetCast);
@@ -194,6 +236,10 @@ public static class GamepadInput
     // Held cranks the lure in (lure flow) and reels during the fish fight.
     public static bool LureReelHeld => Analog(Table.reel) > TriggerPressPoint;
     public static bool ReelHeld => Analog(Table.reel) > TriggerPressPoint;
+    // Press edge of the reel control — used to react to a biting fish, so hooking the bite shares
+    // the SAME button as reeling (default RT). Mirrors keyboard/mouse, where LMB's down-edge hooks
+    // the bite and holding LMB reels.
+    public static bool ReelPressed => Pressed(Table.reel);
 
     // --- Notebook / Inventory ---
     public static bool NotebookTogglePressed => Pressed(Table.notebookToggle);

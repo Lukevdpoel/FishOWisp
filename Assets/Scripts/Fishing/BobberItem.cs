@@ -2,6 +2,12 @@ using UnityEngine;
 
 public enum BobberKind { Bobber, Lure }
 
+// Sub-type for lures. Standard = the plain TP-style reel mimic. Popper = a noisy surface lure
+// whose front chatters up and down on the water (see BobberController popper bounce / splash),
+// and which popper-preferring fish (FishPreset.prefersPopper) notice and strike more readily.
+// Ignored for BobberKind.Bobber.
+public enum LureStyle { Standard, Popper }
+
 [CreateAssetMenu(fileName = "BobberItem", menuName = "FishOWisp/Bobber Item", order = 1)]
 public class BobberItem : ScriptableObject
 {
@@ -19,6 +25,11 @@ public class BobberItem : ScriptableObject
     [Tooltip("Bobber = passive cast / wait / nibble / bite (requires bait). " +
              "Lure = active Twilight-Princess-style reel mimic, no bait, scare-bar driven attraction.")]
     public BobberKind kind = BobberKind.Bobber;
+
+    [Tooltip("Only used when Kind = Lure. Standard = plain reel lure. Popper = surface lure that " +
+             "chatters/splashes on the water and that popper-preferring fish (FishPreset.prefersPopper) " +
+             "are extra drawn to. The visual chatter is also tuned per-prefab via the lure reel settings.")]
+    public LureStyle lureStyle = LureStyle.Standard;
 
     [Header("Prefab")]
     [Tooltip("The bobber prefab used both for dangling from the rod and for casting. Must have a BobberController on the root.")]

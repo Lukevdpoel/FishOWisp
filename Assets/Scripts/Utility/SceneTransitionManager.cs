@@ -16,11 +16,27 @@ public class SceneTransitionManager : GenericSingleton<SceneTransitionManager>
 
     private bool isTransitioning = false;
 
+    // True from the moment a load starts until the new scene has faded back in. SceneTriggers read
+    // this so a trigger the player is teleported onto during the inbound spawn (the spawn point may
+    // sit on the entrance collider) doesn't latch itself dead by firing a refused LoadScene.
+    public bool IsTransitioning => isTransitioning;
+
     // Internal variable to remember where we are going
     private string currentSpawnID;
 
     protected override void Awake()
     {
+        // A SceneTransitionManager from a previous scene already persists. Every scene bakes in a
+        // Managers prefab (which nests this manager), so returning to any scene spawns a fresh copy;
+        // quietly yield to the original so the transition system carries over. Done before base.Awake
+        // so we skip GenericSingleton's stray-duplicate error on every scene change. Mirrors the
+        // guard in GameTimeManager / WorldStateManager.
+        if (Application.isPlaying && Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         base.Awake();
         if (Instance == this)
         {
@@ -114,6 +130,9 @@ public class SceneTransitionManager : GenericSingleton<SceneTransitionManager>
     public void LoadScene(string sceneName, string spawnID = "")
     {
         if (isTransitioning) return;
+
+        // Remember where we're headed so a relaunch boots back into this scene (see SceneMemory / BootLoader).
+        SceneMemory.Save(sceneName);
 
         currentSpawnID = spawnID;
         isTransitioning = true;

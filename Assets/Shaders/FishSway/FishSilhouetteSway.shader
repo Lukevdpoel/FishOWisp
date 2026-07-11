@@ -40,6 +40,14 @@ Shader "FishOWisp/Fish Silhouette Sway"
         _ChainVerticalAmount("Chain Vertical Amount (leap arch)", Range(0, 1)) = 0
         _BendAmount("Turn Bend (x body length, no-chain fallback)", Float) = 0
         _BendTail("Turn Bend Tail Lag (no-chain fallback)", Float) = 0
+
+        // Spawn-in / swim-off dissolve. The fish stays OPAQUE and clips pixels with an ordered
+        // dither instead of alpha-blending: the pond water renders at queue 3000 and fakes its
+        // transparency by sampling the camera opaque texture, so a swimming fish is only visible
+        // BECAUSE it's in that opaque texture (queue Geometry). An alpha fade drops it out of the
+        // texture and pops a transparent ghost onto the surface — the dither keeps it opaque so it
+        // dissolves cleanly underneath the water. 1 = fully visible, 0 = gone. Script-driven.
+        _FadeAmount("Fade Amount (dither dissolve)", Range(0, 1)) = 1
     }
 
     SubShader
@@ -76,7 +84,29 @@ Shader "FishOWisp/Fish Silhouette Sway"
             float _ChainVerticalAmount;
             float _BendAmount;
             float _BendTail;
+            float _FadeAmount;
         CBUFFER_END
+
+        // Ordered 4x4 Bayer dither used by every pass to dissolve the silhouette while keeping it
+        // opaque. Clipping (not blending) means the fish stays in the camera opaque texture the
+        // water samples, so it fades underneath the surface instead of ghosting on top of it.
+        // Thresholds are (M + 0.5) / 16 so the pattern never fully clips at fade == 1 nor fully
+        // survives at fade == 0. The same screen-space decision runs in the colour pass and the
+        // depth/depth-normals prepasses, so depth priming (ZTest Equal) stays consistent.
+        static const float _FishDitherBayer[16] =
+        {
+             0.5/16,  8.5/16,  2.5/16, 10.5/16,
+            12.5/16,  4.5/16, 14.5/16,  6.5/16,
+             3.5/16, 11.5/16,  1.5/16,  9.5/16,
+            15.5/16,  7.5/16, 13.5/16,  5.5/16
+        };
+
+        void FishFadeClip(float2 positionCS, float fade)
+        {
+            if (fade >= 1.0) return;
+            int2 p = (int2)fmod(positionCS, 4.0);
+            clip(fade - _FishDitherBayer[p.y * 4 + p.x]);
+        }
 
         // Trailing-chain spine points in object space, set per fish through a
         // MaterialPropertyBlock (arrays can't live in the SRP-batcher cbuffer; the MPB
@@ -151,6 +181,63 @@ Shader "FishOWisp/Fish Silhouette Sway"
 
             half4 UnlitFrag(Varyings input) : SV_Target
             {
+                FishFadeClip(input.positionCS.xy, _FadeAmount);
+                return _BaseColor;
+            }
+            ENDHLSL
+        }
+
+        // "Lift over floor" pass — a screen-masked copy of the colour pass that draws the
+        // silhouette ON TOP of the pond floor so the seafloor mesh never clips into it. A Render
+        // Objects feature runs this AFTER the opaque pass, once PondFishMask.shader has stamped
+        // stencil bit 64 over the visible pond water (hills cut themselves out of that stamp, so
+        // they still occlude fish):
+        //   ZTest Always   -> ignore the seafloor's depth; the floor can't clip the fish
+        //   Stencil == 64  -> but only where water is actually visible, never over the hills
+        // The fish keep their normal opaque render too (this only OVERDRAWS inside the mask), so a
+        // fish that leaves the water — no water behind it, bit unset — simply falls back to normal
+        // depth sorting with nothing extra. Same SwayPositionOS + dither as the colour pass, so the
+        // silhouette and any spawn/despawn dissolve stay identical. ZWrite Off: we don't disturb
+        // the depth buffer (the water's depth fade reads the prepass depth, captured earlier).
+        Pass
+        {
+            Name "FishOverFloor"
+            Tags { "LightMode" = "FishOverFloor" }
+            ZWrite Off
+            ZTest Always
+            Cull Back
+
+            Stencil
+            {
+                Ref 64
+                ReadMask 64
+                Comp Equal
+            }
+
+            HLSLPROGRAM
+            #pragma vertex UnlitVert
+            #pragma fragment UnlitFrag
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+            };
+
+            Varyings UnlitVert(Attributes input)
+            {
+                Varyings output;
+                output.positionCS = TransformObjectToHClip(SwayPositionOS(input.positionOS.xyz));
+                return output;
+            }
+
+            half4 UnlitFrag(Varyings input) : SV_Target
+            {
+                FishFadeClip(input.positionCS.xy, _FadeAmount);
                 return _BaseColor;
             }
             ENDHLSL
@@ -188,6 +275,7 @@ Shader "FishOWisp/Fish Silhouette Sway"
 
             half DepthOnlyFrag(Varyings input) : SV_Target
             {
+                FishFadeClip(input.positionCS.xy, _FadeAmount);
                 return input.positionCS.z;
             }
             ENDHLSL
@@ -229,6 +317,7 @@ Shader "FishOWisp/Fish Silhouette Sway"
 
             half4 DepthNormalsFrag(Varyings input) : SV_Target
             {
+                FishFadeClip(input.positionCS.xy, _FadeAmount);
                 return half4(normalize(input.normalWS), 0);
             }
             ENDHLSL

@@ -28,6 +28,9 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     public bool IsFightingFish { get; private set; }
     public bool IsCasting { get; private set; }
     public bool IsAiming { get; private set; }
+    // True from the start of a reel-in until it completes (the catch arc, auto-reel, etc.). Used to
+    // keep the cursor locked through the whole fishing loop, including the post-catch reel arc.
+    public bool IsReeling { get; private set; }
     public Transform ActiveBobberTransform { get; private set; }
     public bool IsBountyBoardActive { get; private set; }
     public Transform ActiveBountyBoard { get; private set; }
@@ -68,6 +71,8 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         FishingEvents.OnCancelFishing += StopFightingAnimation;
         FishingEvents.OnFishFightEnd += OnFishFightEnd;
         FishingEvents.OnStartReeling += HandleSuccessfulCatchAnimation;
+        FishingEvents.OnStartReeling += SetReelingTrue;
+        FishingEvents.OnReelingCompleted += SetReelingFalse;
         FishingEvents.OnStartCharging += OnCastStart;
         FishingEvents.OnCancelCharging += OnCastEnd;
         FishingEvents.OnCancelFishing += OnCastEnd;
@@ -96,6 +101,8 @@ public class PlayerFishingAnimHandler : MonoBehaviour
         FishingEvents.OnCancelFishing -= StopFightingAnimation;
         FishingEvents.OnFishFightEnd -= OnFishFightEnd;
         FishingEvents.OnStartReeling -= HandleSuccessfulCatchAnimation;
+        FishingEvents.OnStartReeling -= SetReelingTrue;
+        FishingEvents.OnReelingCompleted -= SetReelingFalse;
         FishingEvents.OnStartCharging -= OnCastStart;
         FishingEvents.OnCancelCharging -= OnCastEnd;
         FishingEvents.OnCancelFishing -= OnCastEnd;
@@ -117,7 +124,10 @@ public class PlayerFishingAnimHandler : MonoBehaviour
 
     private void OnCastStart() => IsCasting = true;
     private void OnCastEnd() { IsCasting = false; IsFightingFish = false; }
-    private void OnFishingCanceled() { SetWaitingForBite(false); ClearStaleTriggers(); }
+    private void OnFishingCanceled() { SetWaitingForBite(false); IsReeling = false; ClearStaleTriggers(); }
+
+    private void SetReelingTrue() => IsReeling = true;
+    private void SetReelingFalse() => IsReeling = false;
 
     // Charge cancelled (let go of RT mid-charge): the StartCharging windup otherwise lingers in
     // its state until the exit-time transition fires, so force the default locomotion pose for an
