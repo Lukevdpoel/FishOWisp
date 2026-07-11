@@ -217,6 +217,30 @@ public class PlayerCameraController : MonoBehaviour
     [Tooltip("Seconds the fish lock must be held before the FOV zoom STARTS, so it doesn't fire while the camera is still swinging into the track (which looks abrupt). The pivot/angle move happens first, then the FOV eases in.")]
     public float aimTrackFovDelay = 0.45f;
 
+    [Header("Cast Aim Camera")]
+    [Tooltip("How fast (per second) the camera yaw turns to stay behind the player while aiming a cast — the model itself is turning toward the marker, so the view swings horizontally with the aim.")]
+    [SerializeField] private float castAimYawFollowSpeed = 5f;
+    [Tooltip("Marker distance (m) at/beyond which no extra look-down is added while aiming a cast.")]
+    [SerializeField] private float castAimLiftFarDistance = 7f;
+    [Tooltip("Marker distance (m) at which the full close-marker look-down is reached.")]
+    [SerializeField] private float castAimLiftNearDistance = 2.5f;
+    [Tooltip("Extra look-down pitch (deg) as the marker nears the player, raising the camera over the model so a reticle right in front of the player isn't hidden behind them. This is the ONLY vertical camera motion during a cast aim.")]
+    [SerializeField] private float castAimClosePitch = 22f;
+    [Tooltip("SmoothDamp time (s) for the close-marker lift easing in/out.")]
+    [SerializeField] private float castAimLiftSmoothTime = 0.35f;
+    [Tooltip("Sideways shift (m) of the orbit pivot while aiming a cast — positive frames the player toward the LEFT of the screen (over-the-right-shoulder view), keeping the reticle clear of the player model. Eases in/out with the same smoothing as the close-marker lift.")]
+    [SerializeField] private float castAimShoulderOffset = 1.6f;
+    [Tooltip("Seconds after a throw over which look input ramps back to full strength. The whip gesture's follow-through (mouse/stick still moving as the cast fires) would otherwise yank the freshly unlocked orbit camera.")]
+    [SerializeField] private float postThrowLookRecoverTime = 0.7f;
+
+    // The cast-aim controller on this player; the camera reads IsAiming + the marker point from it.
+    private RodCasting rodCasting;
+    private float currentCastAimPitchLift;
+    private float castAimPitchLiftVel;
+    private float currentCastAimShoulder;
+    private float castAimShoulderVel;
+    private float lastThrowTime = -999f;
+
     // Set by FishResearchScanner while the player is aiming and locked onto a fish: the aim camera
     // gently turns to keep this fish framed until aim is released (then cleared with null).
     private Transform aimTrackTarget;
@@ -231,6 +255,13 @@ public class PlayerCameraController : MonoBehaviour
 
     private void OnEnable()
     {
+        if (rodCasting == null)
+        {
+            Transform root = transform.root != null ? transform.root : transform;
+            rodCasting = root.GetComponentInChildren<RodCasting>(includeInactive: true);
+            if (rodCasting == null) rodCasting = FindFirstObjectByType<RodCasting>(FindObjectsInactive.Include);
+        }
+
         FishingEvents.OnFishNibble += HandleFishNibble;
         FishingEvents.OnFishBite += HandleFishBite;
         FishingEvents.OnHookFishSuccess += HandleBiteRelease;
@@ -284,7 +315,13 @@ public class PlayerCameraController : MonoBehaviour
         }
     }
     private void HandleChargeEnded() { reactionTracker.ClearChargeProgress(); }
-    private void HandleChargeReleased(Vector3 dir, float force) { reactionTracker.ClearChargeProgress(); }
+    private void HandleChargeReleased(Vector3 dir, float force)
+    {
+        reactionTracker.ClearChargeProgress();
+        // Start the post-throw look-input ramp: the whip's follow-through is still in the
+        // player's hand this exact frame.
+        lastThrowTime = Time.time;
+    }
     private bool hasLoggedChargeEvent;
 
     private void HandleFishNibble(BobberController b) { reactionTracker.OnNibble(nibblePitchHoldTime); }
@@ -528,6 +565,7 @@ public class PlayerCameraController : MonoBehaviour
         // mouse must still orbit — the bobber pose is built from these same angles, so this is
         // what lets the player rotate around the bobber exactly like around the player.
         bool bobberCameraDominant = bobberTracker.BobberCameraDominant;
+        bool castAiming = rodCasting != null && rodCasting.IsAiming;
 
         if (isDialogueCamera || isBoardCamera)
         {
@@ -560,6 +598,14 @@ public class PlayerCameraController : MonoBehaviour
                 cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, aimTrackMaxPitch);
             }
         }
+        else if (castAiming)
+        {
+            // Aiming a cast: the model is turning toward the marker (RodCasting), so following its
+            // yaw swings the view horizontally with the aim. Pitch is deliberately untouched — the
+            // only vertical motion while aiming is the close-marker lift added below.
+            cameraXAngle = Mathf.LerpAngle(cameraXAngle, input.playerModel.eulerAngles.y,
+                                           Time.deltaTime * castAimYawFollowSpeed);
+        }
         // Orbit input also stays live through the fish fight while the bobber rig owns the
         // view: steering is on A/D + left stick there, so mouse / right stick are free to
         // rotate around the fish (the rig's pose already handles terrain collision and the
@@ -572,11 +618,16 @@ public class PlayerCameraController : MonoBehaviour
             // camera doesn't fight the one-shot return lerp.
             if (!bobberTracker.IsReturningToPlayer)
             {
+                // Right after a throw the whip gesture's follow-through is still on the mouse/
+                // stick — ramp look input back in instead of letting that motion yank the view.
+                float lookScale = postThrowLookRecoverTime <= 0f ? 1f
+                    : Mathf.Clamp01((Time.time - lastThrowTime) / postThrowLookRecoverTime);
+
                 float mouseX = Input.GetAxis("Mouse X") * cameraSpeed * Time.deltaTime;
                 float mouseY = Input.GetAxis("Mouse Y") * cameraSpeed * Time.deltaTime;
                 Vector2 stickLook = GamepadInput.Look;
-                cameraXAngle += mouseX + stickLook.x * gamepadLookSpeedX * Time.deltaTime;
-                cameraYAngle -= mouseY + stickLook.y * gamepadLookSpeedY * Time.deltaTime;
+                cameraXAngle += (mouseX + stickLook.x * gamepadLookSpeedX * Time.deltaTime) * lookScale;
+                cameraYAngle -= (mouseY + stickLook.y * gamepadLookSpeedY * Time.deltaTime) * lookScale;
                 cameraYAngle = Mathf.Clamp(cameraYAngle, cameraYClamp.x, cameraYClamp.y);
 
                 ApplyManualZoom(bobberCameraDominant);
@@ -597,8 +648,25 @@ public class PlayerCameraController : MonoBehaviour
         float chargeProgress = reactionTracker.ChargeProgress;
         float chargePitchOffset = -chargePitchUpAngle * chargeProgress;
 
+        // Close-marker lift: as the cast reticle comes in toward the player's feet, ease extra
+        // look-down pitch in so the camera rises over the model instead of letting the player
+        // body hide the reticle. Eases back out when the marker moves away or the aim ends.
+        float liftTarget = 0f;
+        if (castAiming)
+        {
+            Vector3 toMarker = rodCasting.AimMarkerPoint - input.playerModel.position;
+            toMarker.y = 0f;
+            liftTarget = castAimClosePitch
+                       * Mathf.InverseLerp(castAimLiftFarDistance, castAimLiftNearDistance, toMarker.magnitude);
+        }
+        currentCastAimPitchLift = Mathf.SmoothDamp(currentCastAimPitchLift, liftTarget,
+                                                   ref castAimPitchLiftVel, castAimLiftSmoothTime);
+        currentCastAimShoulder = Mathf.SmoothDamp(currentCastAimShoulder,
+                                                  castAiming ? castAimShoulderOffset : 0f,
+                                                  ref castAimShoulderVel, castAimLiftSmoothTime);
+
         smoothXAngle = Mathf.SmoothDampAngle(smoothXAngle, cameraXAngle, ref xVel, cameraSmoothTime);
-        smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle + reactionTracker.CurrentNibblePitchOffset + chargePitchOffset, ref yVel, cameraSmoothTime);
+        smoothYAngle = Mathf.SmoothDampAngle(smoothYAngle, cameraYAngle + reactionTracker.CurrentNibblePitchOffset + chargePitchOffset + currentCastAimPitchLift, ref yVel, cameraSmoothTime);
 
         Quaternion rotation = Quaternion.Euler(smoothYAngle, smoothXAngle, 0f);
         Vector3 cameraDirection = -(rotation * Vector3.forward);
@@ -617,6 +685,10 @@ public class PlayerCameraController : MonoBehaviour
             // pivotHeight plus the eased tracking lift — raises the orbit centre over the player's
             // head while tracking a fish so the player no longer sits between the camera and the fish.
             targetPivot = basePos + Vector3.up * (pivotHeight + currentAimTrackLift);
+            // Over-shoulder shift while aiming a cast: sliding the orbit pivot to the camera's
+            // right frames the player off-centre left, so the reticle line-of-sight clears the
+            // model. The eased scalar (computed above) takes it in and out smoothly.
+            targetPivot += rotation * Vector3.right * currentCastAimShoulder;
             currentPivotPosition = targetPivot;
             pivotVelocity = Vector3.zero;
         }

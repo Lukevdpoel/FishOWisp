@@ -19,6 +19,12 @@ public class NoteMenu : MonoBehaviour
     public RenderTexture captureRT;
     [Tooltip("Material on the backdrop quad using the Custom/BackdropKuwahara shader. Its _Intensity is animated 0→1.")]
     public Material backdropMaterial;
+
+    [Header("Notebook Camera (perf)")]
+    [Tooltip("The extra camera that renders the 3D book (NotebookCamera in the Player prefab). An enabled camera pays culling + render-graph record every frame even with nothing to draw, so NoteMenu keeps it off unless the notebook or the gear menu is on screen. Auto-found by name if left empty.")]
+    public Camera notebookCamera;
+    [Tooltip("Untick to leave the notebook camera permanently on (pre-optimization behavior).")]
+    public bool manageNotebookCamera = true;
     [Tooltip("Shader property name for the Kuwahara fade-in amount on the backdrop material.")]
     public string intensityProperty = "_Intensity";
     public float kuwaharaFadeDuration = 0.5f;
@@ -51,8 +57,6 @@ public class NoteMenu : MonoBehaviour
 
     private BackdropQuadFit backdropQuadFit;
 
-    private string debugInfo = "NoteMenu: waiting...";
-
     void Awake()
     {
         isOpenAnimHash = Animator.StringToHash("IsOpen");
@@ -79,8 +83,27 @@ public class NoteMenu : MonoBehaviour
         {
             backdropQuadFit = backdropCamera.GetComponentInChildren<BackdropQuadFit>(includeInactive: true);
         }
+    }
 
-        debugInfo = "NoteMenu: Awake() ran";
+    void Start()
+    {
+        // The NotebookCamera lives in the Player prefab, so a serialized cross-prefab reference
+        // isn't possible — resolve it by name once both prefabs exist in the scene.
+        if (notebookCamera == null)
+        {
+            GameObject go = GameObject.Find("NotebookCamera");
+            if (go != null) notebookCamera = go.GetComponent<Camera>();
+        }
+        ApplyNotebookCameraState();
+    }
+
+    // The book camera only needs to run while a book-driven menu is on screen. The inventory
+    // (gear menu) is included so this can't hide UI it shares with the notebook.
+    private void ApplyNotebookCameraState()
+    {
+        if (!manageNotebookCamera || notebookCamera == null) return;
+        bool needed = isNoteOpen || InventoryUI.IsInventoryOpen;
+        if (notebookCamera.enabled != needed) notebookCamera.enabled = needed;
     }
 
     void OnEnable()
@@ -123,10 +146,9 @@ public class NoteMenu : MonoBehaviour
 
     void Update()
     {
-        if (Keyboard.current == null)
-            debugInfo = "NoteMenu: Keyboard.current is NULL";
-        else
-            debugInfo = "NoteMenu: Keyboard OK, isOpen=" + isNoteOpen + ", tab=" + Keyboard.current.tabKey.isPressed;
+        // Polled (not just set in Open/Close) so the camera also follows the gear menu opening
+        // and closing, which happens outside this script.
+        ApplyNotebookCameraState();
 
         // Don't let the notebook open during the title flythrough / camera handoff — the player
         // isn't in control of the world yet. The fishing scripts are gated by MainMenuController
@@ -167,6 +189,8 @@ public class NoteMenu : MonoBehaviour
 
         isNoteOpen = true;
         IsNotebookOpen = true;
+        // Same frame, not next Update's poll — the book must render on the very frame it opens.
+        ApplyNotebookCameraState();
 
         // Open the UI first so the notebook always appears even if the backdrop step throws.
         // Previously EnterBackdrop ran first and any exception (e.g. URP camera-stack hiccup,
@@ -204,6 +228,7 @@ public class NoteMenu : MonoBehaviour
     {
         isNoteOpen = false;
         IsNotebookOpen = false;
+        ApplyNotebookCameraState();
 
         if (noteAnimator != null) noteAnimator.SetBool(isOpenAnimHash, false);
 
@@ -349,8 +374,4 @@ public class NoteMenu : MonoBehaviour
         onComplete?.Invoke();
     }
 
-    void OnGUI()
-    {
-        GUI.Label(new Rect(10, 10, 500, 30), debugInfo);
-    }
 }

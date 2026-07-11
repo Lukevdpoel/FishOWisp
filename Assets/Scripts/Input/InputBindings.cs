@@ -44,8 +44,11 @@ public class GamepadBindings
     public GamepadControl pagePrev = GamepadControl.LeftShoulder;
 
     [Header("Fishing")]
-    [Tooltip("Hold to charge a cast (force tracks the analog pull); commit with interact, let go " +
-             "to cancel. Best bound to a trigger so charge pressure works.")]
+    [Tooltip("Hold to aim the cast marker (left stick steers it); release to put the rod away. " +
+             "The throw itself is the whip gesture on the right stick while this is held.")]
+    public GamepadControl castAim = GamepadControl.LeftTrigger;
+    [Tooltip("LEGACY (unused): the old hold-to-charge cast control. Casting now lives on castAim " +
+             "+ the right-stick whip. Kept so existing binding assets keep deserializing cleanly.")]
     public GamepadControl throwCharge = GamepadControl.RightTrigger;
     [Tooltip("Reset a cast already in the water (bobber or lure).")]
     public GamepadControl resetCast = GamepadControl.RightShoulder;

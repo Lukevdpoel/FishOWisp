@@ -13,20 +13,23 @@ using UnityEngine.InputSystem.Controls;
 /// defaults below apply, so the game runs unchanged until you create one.
 ///
 /// Default mapping (Xbox / PS5):
-///   Left stick           - walk (deflection scales speed); steer the lure
+///   Left stick           - walk (deflection scales speed); steer the lure; steer the cast
+///                          marker while aiming
 ///   Left stick click     - hold to run; release to drop back to a walk (hold-to-sprint,
 ///                          mirrors keyboard Shift)
-///   Right stick          - orbit camera / steer the aim while charging a cast /
-///                          rotate the fish model while the notebook is open
-///   A / Cross            - interact (NPCs, doors, vendor, pots, bounty board); cast the
-///                          held charge; confirm/advance dialogue; finish catch inspection
+///   Right stick          - orbit camera / the whip gesture while aiming (push out, snap back
+///                          the opposite way to throw) / rotate the fish model while the
+///                          notebook is open
+///   A / Cross            - interact (NPCs, doors, vendor, pots, bounty board);
+///                          confirm/advance dialogue; finish catch inspection
 ///   B / Circle           - cancel / close menus; advance/skip dialogue
 ///   X / Square           - (unused)
 ///   Y / Triangle         - jump
-///   RT / R2              - hold to charge a cast (force time-ramps; release to cast at the
-///                          current charge, mirroring mouse/keyboard); tap to attract fish while
-///                          a bobber waits; press to react to a biting fish; hold to crank the
-///                          lure in and to reel during the fish fight
+///   LT / L2              - hold to aim the cast marker; release without a whip to put the
+///                          rod away (mirrors holding LMB on mouse/keyboard)
+///   RT / R2              - tap to attract fish while a bobber waits; press to react to a
+///                          biting fish; hold to crank the lure in and to reel during the
+///                          fish fight
 ///   RB / R1              - reset a cast already in the water; flips a page forward
 ///                          while the notebook is open
 ///   LB / L1              - hold to aim (mirrors right mouse button); flips a page
@@ -153,7 +156,7 @@ public static class GamepadInput
         GamepadBindings t = Bindings.ForKind(ActiveGamepadKind);
         switch (v)
         {
-            case PromptVerb.Cast: return t.throwCharge;
+            case PromptVerb.Cast: return t.castAim;
             case PromptVerb.Reel: return t.reel;
             case PromptVerb.Attract: return t.attract;
             case PromptVerb.Aim: return t.aim;
@@ -221,13 +224,11 @@ public static class GamepadInput
     public static bool CancelPressed => Pressed(Table.cancel);
 
     // --- Fishing ---
-    // Throw lives on the throwCharge control: holding it past the press point charges, and
-    // RELEASING it casts at the time-ramped force (FishingRodController), exactly like LMB on
-    // mouse/keyboard. ThrowHeld brackets the held state against the shared press point;
-    // ThrowChargeAnalog exposes the raw 0..1 pull for anything that wants it (the cast no longer
-    // uses trigger pressure).
-    public static bool ThrowHeld => Analog(Table.throwCharge) > TriggerPressPoint;
-    public static float ThrowChargeAnalog => Analog(Table.throwCharge);
+    // Casting lives on the castAim control (default LT): holding it past the press point drops
+    // the aim marker (LEFT stick steers it), and the throw is the whip gesture on the RIGHT
+    // stick — push it out and snap it back the opposite way while this is held. Releasing
+    // without a whip abandons the aim. Mirrors holding LMB on mouse/keyboard.
+    public static bool CastAimHeld => Analog(Table.castAim) > TriggerPressPoint;
     public static bool ResetCastPressed => Pressed(Table.resetCast);
     public static bool AimPressed => Pressed(Table.aim);
     public static bool AimReleased => ReleasedButton(Table.aim);

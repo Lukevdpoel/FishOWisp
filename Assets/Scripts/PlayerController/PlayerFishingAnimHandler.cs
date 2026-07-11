@@ -7,6 +7,17 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     [SerializeField] private PlayerController playerController;
 
     [Header("Fishing Animations")]
+    [Tooltip("Play the authored StartCharging windup and Throw clips on cast. OFF now that the " +
+             "whip cast poses the arms/rod procedurally (ProceduralCastArms) — the body stays in " +
+             "locomotion/idle underneath. NOTE with this off: if the waiting-for-bite pose is only " +
+             "reachable through the Throw state in the Animator, add a Locomotion/AnyState " +
+             "transition on IsWaitingForBite so the wait pose still engages after a cast.")]
+    [SerializeField] private bool playCastAnimations = false;
+    [Tooltip("Animator BOOL set true while the whip cast is being aimed: transition into the " +
+             "two-handed rod-hold state on it (and back out on false). ProceduralCastArms then " +
+             "rotates the arms' parent pivot on top of that held pose. Leave empty to disable " +
+             "until the state exists in the Animator.")]
+    [SerializeField] private string holdRodBoolParam = "IsHoldingRod";
     [SerializeField] private string startChargingAnim = "StartCharging";
     [SerializeField] private string throwAnim = "Throw";
     [SerializeField] private string reelInAnim = "ReelIn";
@@ -35,6 +46,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     public bool IsBountyBoardActive { get; private set; }
     public Transform ActiveBountyBoard { get; private set; }
 
+    private int hashHoldRod;
     private int hashStartCharging;
     private int hashThrow;
     private int hashReelIn;
@@ -49,6 +61,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     private void Awake()
     {
         hashLocomotion = Animator.StringToHash(defaultLocomotionState);
+        hashHoldRod = string.IsNullOrEmpty(holdRodBoolParam) ? 0 : Animator.StringToHash(holdRodBoolParam);
         hashStartCharging = Animator.StringToHash(startChargingAnim);
         hashThrow = Animator.StringToHash(throwAnim);
         hashReelIn = Animator.StringToHash(reelInAnim);
@@ -124,7 +137,7 @@ public class PlayerFishingAnimHandler : MonoBehaviour
 
     private void OnCastStart() => IsCasting = true;
     private void OnCastEnd() { IsCasting = false; IsFightingFish = false; }
-    private void OnFishingCanceled() { SetWaitingForBite(false); IsReeling = false; ClearStaleTriggers(); }
+    private void OnFishingCanceled() { SetWaitingForBite(false); IsReeling = false; SetHoldRod(false); ClearStaleTriggers(); }
 
     private void SetReelingTrue() => IsReeling = true;
     private void SetReelingFalse() => IsReeling = false;
@@ -136,10 +149,12 @@ public class PlayerFishingAnimHandler : MonoBehaviour
     private void SnapToDefaultPose()
     {
         IsCasting = false;
+        SetHoldRod(false);
         if (animator == null) return;
         animator.ResetTrigger(hashStartCharging);
         animator.ResetTrigger(hashThrow);
-        animator.CrossFadeInFixedTime(hashLocomotion, cancelTransitionDuration, 0);
+        // With the cast clips disabled the animator never left locomotion — nothing to snap out of.
+        if (playCastAnimations) animator.CrossFadeInFixedTime(hashLocomotion, cancelTransitionDuration, 0);
     }
 
     // Triggers latch forever if no transition consumes them, and a latched ReelIn hijacks the
@@ -168,10 +183,33 @@ public class PlayerFishingAnimHandler : MonoBehaviour
 
     private void SetWaitingForBite(bool value) { if (animator) animator.SetBool(hashIsWaitingForBite, value); }
 
-    private void PlayStartChargingAnim() { if (animator) animator.SetTrigger(hashStartCharging); }
+    // Hold-rod state gate. Checked once against the animator's real parameter list so a missing
+    // (not-yet-authored) bool disables the feature silently instead of spamming warnings.
+    private bool holdRodChecked;
+    private bool holdRodAvailable;
+
+    private void SetHoldRod(bool holding)
+    {
+        if (animator == null || hashHoldRod == 0) return;
+        if (!holdRodChecked)
+        {
+            holdRodChecked = true;
+            foreach (var p in animator.parameters)
+                if (p.nameHash == hashHoldRod && p.type == AnimatorControllerParameterType.Bool)
+                { holdRodAvailable = true; break; }
+        }
+        if (holdRodAvailable) animator.SetBool(hashHoldRod, holding);
+    }
+
+    private void PlayStartChargingAnim()
+    {
+        SetHoldRod(true);
+        if (animator && playCastAnimations) animator.SetTrigger(hashStartCharging);
+    }
     // ResetTrigger(ReelIn) first: the Throw state exits instantly into Reel when ReelIn is set,
-    // so a stale ReelIn would swallow the entire throw animation.
-    private void PlayThrowAnim(Vector3 direction, float force) { if (animator) { animator.ResetTrigger(hashReelIn); animator.SetTrigger(hashThrow); } }
+    // so a stale ReelIn would swallow the entire throw animation. The stale-trigger sweep runs
+    // even when cast clips are disabled — a latched ReelIn must never survive into the next cast.
+    private void PlayThrowAnim(Vector3 direction, float force) { SetHoldRod(false); if (animator) { animator.ResetTrigger(hashReelIn); if (playCastAnimations) animator.SetTrigger(hashThrow); } }
     private void PlayReelInAnim() { SetWaitingForBite(false); if (animator) animator.SetTrigger(hashReelIn); }
     private void PlayAttractAnim() { if (animator) animator.SetTrigger(hashAttract); }
     private void PlayBiteReactionAnim(BobberController b) { SetWaitingForBite(false); if (animator) animator.SetTrigger(hashBiteReaction); }

@@ -116,9 +116,9 @@ public class FishingRodController : MonoBehaviour
     private CaughtFish caughtFishInstance = null;
     private PlayerController playerController;
     private bool isAiming;
-    // Tracks the RT pressure-charge bracket frame-to-frame so we can detect the press edge
-    // (start charging) and the release edge (cast) without a separate Input System press point.
-    private bool throwHeldLast;
+    // Tracks the LT cast-aim bracket frame-to-frame so we can detect the press edge (start
+    // aiming) and the release edge (abandon the aim) without a separate Input System press point.
+    private bool castAimHeldLast;
     private Vector3 castOriginPosition;
     private float castStartTime;
 
@@ -336,10 +336,13 @@ public class FishingRodController : MonoBehaviour
 
         // The notebook owns the mouse while open (and the game does NOT pause — there is no
         // PauseManager in any scene). Without this gate, LMB starts charging and the no-bait
-        // path pops the inventory over the notebook.
+        // path pops the inventory over the notebook. A cast being aimed can't survive the
+        // notebook taking the mouse either — abandon it cleanly instead of leaving the marker
+        // aiming underneath.
         if (NoteMenu.IsNotebookOpen)
         {
             StopAiming();
+            AbandonCharge();
             return;
         }
 
@@ -381,22 +384,22 @@ public class FishingRodController : MonoBehaviour
             }
         }
 
-        // --- RT: hold to charge, release to cast — identical on every pad brand and a mirror of
-        // mouse/keyboard (LMB). The throw force time-ramps while held (RodCasting), so letting go
-        // casts at whatever charge the bar has reached; there is no separate "press A to cast"
-        // step. Only armed from Idle/Charging so RT keeps its post-cast meanings (attract, lure
-        // crank, fight reel) without cross-firing here. ---
-        bool throwHeld = GamepadInput.ThrowHeld;
-        if (currentState == FishingState.Idle && throwHeld && !throwHeldLast)
+        // --- LT: hold to aim the cast marker, release to put the rod away — a mirror of holding
+        // LMB on mouse/keyboard. The throw itself is the whip gesture (RodCasting): while the aim
+        // button is held, yanking the right stick / mouse out and snapping it back the opposite
+        // way fires the cast; releasing the aim button without a whip just abandons the aim (no
+        // cooldown, nothing thrown). Only armed from Idle/Charging so the trigger keeps its
+        // post-cast meanings without cross-firing here. ---
+        bool castAimHeld = GamepadInput.CastAimHeld;
+        if (currentState == FishingState.Idle && castAimHeld && !castAimHeldLast)
         {
             StartCharging();
         }
-        else if (currentState == FishingState.Charging && throwHeldLast && !throwHeld)
+        else if (currentState == FishingState.Charging && castAimHeldLast && !castAimHeld)
         {
-            // Released the trigger — commit the throw at the time-ramped charge (mirrors LMB up).
-            FishingEvents.OnCancelCharging?.Invoke();
+            AbandonCharge();
         }
-        throwHeldLast = throwHeld;
+        castAimHeldLast = castAimHeld;
 
         // --- RB: reset a cast already in the water (bobber or lure alike), or cut the line
         // mid-fight to give up the fish. ---
@@ -414,14 +417,12 @@ public class FishingRodController : MonoBehaviour
             FishingEvents.OnAttractFish?.Invoke();
         }
 
-        // --- A: cast the held charge or confirm/finish catch inspection. ---
+        // --- A: confirm/finish catch inspection. (Casting is no longer on A — the whip gesture
+        // throws while aiming.) ---
         if (GamepadInput.ConfirmPressed)
         {
             switch (currentState)
             {
-                case FishingState.Charging:
-                    FishingEvents.OnCancelCharging?.Invoke();  // commit the throw at the current charge
-                    break;
                 case FishingState.InspectingCatch:
                     TryFinishInspection();
                     break;
@@ -437,10 +438,11 @@ public class FishingRodController : MonoBehaviour
             else HookFishAndStartFight();
         }
 
-        // --- Release the keyboard charge (LMB up) to cast. ---
+        // --- Releasing the aim button (LMB up) without a whip abandons the aim — nothing is
+        // thrown; the whip gesture inside RodCasting is the only way to actually cast. ---
         if (Input.GetKeyUp(KeyCode.Mouse0) && currentState == FishingState.Charging)
         {
-            FishingEvents.OnCancelCharging?.Invoke();
+            AbandonCharge();
         }
 
         // --- Instant reset (E key) — keyboard mirror of the RB cast reset. The reel-in arc is
@@ -460,6 +462,18 @@ public class FishingRodController : MonoBehaviour
         if (!isAiming) return;
         isAiming = false;
         FishingEvents.OnStopAiming?.Invoke();
+    }
+
+    // The aim button was released without a whip: no cast, no cooldown — everything just returns
+    // to idle. OnCancelCharging retires the marker/camera charge reaction; OnChargeCanceled snaps
+    // the animator out of the windup and releases anything (inventory) locked for the charge.
+    private void AbandonCharge()
+    {
+        if (currentState != FishingState.Charging) return;
+        currentState = FishingState.Idle;
+        FishingEvents.OnCancelCharging?.Invoke();
+        FishingEvents.OnChargeCanceled?.Invoke();
+        if (playerController != null) playerController.LockControls(false);
     }
 
     private void ReelLineBack()

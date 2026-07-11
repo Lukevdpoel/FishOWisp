@@ -192,10 +192,13 @@ public class VerletFoliage : MonoBehaviour
     // positions, edge target lengths, and each pusher's resolved capsule. Reused by every sub-step.
     private void PrepareFrame()
     {
+        // One cached matrix instead of a native TransformPoint call per vertex — same math,
+        // and on a large mesh this loop is most of the component's frame cost.
+        Matrix4x4 l2w = transform.localToWorldMatrix;
         for (int i = 0; i < cur.Length; i++)
-            restWorldCache[i] = transform.TransformPoint(uniqueRest[i]);
+            restWorldCache[i] = l2w.MultiplyPoint3x4(uniqueRest[i]);
         for (int e = 0; e < edgeA.Length; e++)
-            edgeTargetLen[e] = transform.TransformVector(edgeRestDelta[e]).magnitude;
+            edgeTargetLen[e] = l2w.MultiplyVector(edgeRestDelta[e]).magnitude;
 
         pushP0.Clear();
         pushP1.Clear();
@@ -324,10 +327,11 @@ public class VerletFoliage : MonoBehaviour
     // alpha (0..1) is the leftover-time fraction between the last two completed sim steps.
     private void WriteBack(float alpha)
     {
+        Matrix4x4 w2l = transform.worldToLocalMatrix;
         for (int i = 0; i < renderVerts.Length; i++)
         {
             int u = fullToUnique[i];
-            renderVerts[i] = transform.InverseTransformPoint(Vector3.Lerp(prev[u], cur[u], alpha));
+            renderVerts[i] = w2l.MultiplyPoint3x4(Vector3.Lerp(prev[u], cur[u], alpha));
         }
 
         workingMesh.SetVertices(renderVerts);
@@ -337,9 +341,10 @@ public class VerletFoliage : MonoBehaviour
 
     private void ResetToRest()
     {
+        Matrix4x4 l2w = transform.localToWorldMatrix;
         for (int i = 0; i < uniqueRest.Length; i++)
         {
-            Vector3 w = transform.TransformPoint(uniqueRest[i]);
+            Vector3 w = l2w.MultiplyPoint3x4(uniqueRest[i]);
             cur[i] = w;
             prev[i] = w;
         }

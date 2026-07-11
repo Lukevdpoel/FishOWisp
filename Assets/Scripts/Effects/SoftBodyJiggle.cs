@@ -268,10 +268,13 @@ public class SoftBodyJiggle : MonoBehaviour
     // edge target lengths. Resolved once here, then reused by every fixed sub-step this frame.
     private void PrepareFrame()
     {
+        // One cached matrix instead of a native TransformPoint call per vertex — same math,
+        // and these per-vertex loops are most of the component's frame cost.
+        Matrix4x4 l2w = transform.localToWorldMatrix;
         for (int i = 0; i < cur.Length; i++)
-            restWorldCache[i] = transform.TransformPoint(uniqueRest[i]);
+            restWorldCache[i] = l2w.MultiplyPoint3x4(uniqueRest[i]);
         for (int e = 0; e < edgeA.Length; e++)
-            edgeTargetLen[e] = transform.TransformVector(edgeRestDelta[e]).magnitude;
+            edgeTargetLen[e] = l2w.MultiplyVector(edgeRestDelta[e]).magnitude;
     }
 
     // One fixed-timestep Verlet step. stiffness/damping are per-step, so a fixed step rate keeps the
@@ -371,6 +374,7 @@ public class SoftBodyJiggle : MonoBehaviour
             conformOffsetLive = any;
         }
 
+        Matrix4x4 w2l = transform.worldToLocalMatrix;
         for (int i = 0; i < renderVerts.Length; i++)
         {
             int u = fullToUnique[i];
@@ -378,7 +382,7 @@ public class SoftBodyJiggle : MonoBehaviour
             // A pure render-space warp on top of the jiggle, so the sim stays stable and unaware of it.
             if (conformOffsetLive)
                 world.y += conformOffset[u];
-            Vector3 deformedLocal = transform.InverseTransformPoint(world);
+            Vector3 deformedLocal = w2l.MultiplyPoint3x4(world);
             // Sprint damping: blend the deformation back toward the rest shape to shrink the visible
             // wobble amplitude, leaving the simulation itself untouched.
             renderVerts[i] = full ? deformedLocal : Vector3.Lerp(restLocalFull[i], deformedLocal, currentIntensity);
@@ -491,9 +495,10 @@ public class SoftBodyJiggle : MonoBehaviour
 
     private void ResetToRest()
     {
+        Matrix4x4 l2w = transform.localToWorldMatrix;
         for (int i = 0; i < uniqueRest.Length; i++)
         {
-            Vector3 w = transform.TransformPoint(uniqueRest[i]);
+            Vector3 w = l2w.MultiplyPoint3x4(uniqueRest[i]);
             cur[i] = w;
             prev[i] = w;
         }

@@ -145,7 +145,7 @@ public class FishingPromptBar : MonoBehaviour
         switch (state)
         {
             case State.Idle:
-                Add(list, PromptVerb.Cast, "Cast");
+                AddHold(list, PromptVerb.Cast, "Aim Cast");
                 Add(list, PromptVerb.Aim, "Inspect");
                 Add(list, PromptVerb.Jump, "Jump");
                 if (interact) Add(list, PromptVerb.Interact, "Interact");
@@ -153,8 +153,11 @@ public class FishingPromptBar : MonoBehaviour
                 Add(list, PromptVerb.Notebook, "Notebook");
                 break;
 
+            // Aiming: WASD / left stick steer the marker; the throw is the whip gesture on the
+            // mouse / right stick (pull out, snap back the other way), not a button.
             case State.Charging:
-                Add(list, PromptVerb.Cast, "Release to Cast");
+                AddRaw(list, "WASD", "Left Stick", "Move Marker");
+                AddRaw(list, "Whip Mouse", "Whip Right Stick", "Cast");
                 break;
 
             // Bobber waiting for a bite.
