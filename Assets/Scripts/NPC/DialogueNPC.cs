@@ -25,7 +25,7 @@ public class DialogueNPC : MonoBehaviour
             InteractHint.Ping();
 
         // 1. Check if Player is close AND presses E (or X on a gamepad)
-        if (playerInZone && (Input.GetKeyDown(KeyCode.E) || GamepadInput.InteractPressed))
+        if (playerInZone && (KeyInput.InteractPressed || GamepadInput.InteractPressed))
         {
             // 2. Check if we are already talking
             if (DialogueManager.Instance != null && !DialogueManager.Instance.IsDialogueActive())

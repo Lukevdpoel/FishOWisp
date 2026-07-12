@@ -72,8 +72,8 @@ public class GamepadBindings
 [CreateAssetMenu(fileName = "InputBindings", menuName = "FishOWisp/Input Bindings")]
 public class InputBindings : ScriptableObject
 {
-    [Tooltip("Keyboard & mouse bindings. NOTE: not yet wired to the game's keyboard reads — this " +
-             "table is here so the screen is complete; the keyboard pass will route reads through it.")]
+    [Tooltip("Keyboard & mouse bindings. All keyboard/mouse gameplay reads go through this table " +
+             "(via KeyInput), so remapping here works the same as the gamepad tables below.")]
     public KeyboardMouseBindings keyboardMouse = new KeyboardMouseBindings();
 
     [Tooltip("Layout used while an Xbox-style pad is connected.")]
@@ -103,20 +103,47 @@ public class InputBindings : ScriptableObject
 }
 
 /// <summary>
-/// Keyboard & mouse table. Present so the bindings screen shows all three devices; the scattered
-/// keyboard reads across the gameplay scripts are migrated onto this in a follow-up pass, so
-/// changing these does nothing yet.
+/// Keyboard & mouse action→key table, the mirror of <see cref="GamepadBindings"/>. All gameplay
+/// keyboard/mouse reads go through <see cref="KeyInput"/>, which resolves against this table, so
+/// remapping here actually changes the game (and ButtonPrompts labels follow automatically).
+/// KeyCode covers mouse buttons too (Mouse0..Mouse6), which is how the fishing verbs sit on the
+/// mouse by default. Movement (WASD/arrows via the Horizontal/Vertical axes), camera orbit, and
+/// menu-list navigation are not rebindable — same policy as the sticks/d-pad on gamepad.
 /// </summary>
 [Serializable]
 public class KeyboardMouseBindings
 {
-    [Header("Not yet wired — coming in the keyboard pass")]
-    public KeyCode interact = KeyCode.E;
-    public KeyCode jump = KeyCode.Space;
+    [Header("Movement")]
+    [Tooltip("Hold to run while moving; release to drop back to a walk.")]
     public KeyCode sprint = KeyCode.LeftShift;
+    public KeyCode jump = KeyCode.Space;
+
+    [Header("World / Menus")]
+    [Tooltip("Interact with the world (NPCs, doors, vendor, pots, bounty board) and " +
+             "confirm/advance dialogue.")]
+    public KeyCode interact = KeyCode.E;
+    [Tooltip("Cancel / close menus (shop, bounty board).")]
     public KeyCode cancel = KeyCode.Escape;
-    public KeyCode lineReset = KeyCode.E;
     public KeyCode notebookToggle = KeyCode.Tab;
+    [Tooltip("Hold to keep the gear/loadout menu open; release closes it.")]
+    public KeyCode inventoryToggle = KeyCode.B;
+    [Tooltip("Flip the notebook forward / backward while it is open. (E and Q also flip, fixed.)")]
     public KeyCode pageNext = KeyCode.RightArrow;
     public KeyCode pagePrev = KeyCode.LeftArrow;
+
+    [Header("Fishing")]
+    [Tooltip("Hold to aim the cast (the whip gesture throws); release without a whip to put the " +
+             "rod away. Default Left Mouse.")]
+    public KeyCode castAim = KeyCode.Mouse0;
+    [Tooltip("Hold to crank the lure in and to reel during the fish fight; a fresh press also " +
+             "hooks a biting fish. Default Left Mouse.")]
+    public KeyCode reel = KeyCode.Mouse0;
+    [Tooltip("Tap to attract fish toward a waiting bobber. Default Left Mouse.")]
+    public KeyCode attract = KeyCode.Mouse0;
+    [Tooltip("Confirm / finish the catch inspection. Default Left Mouse.")]
+    public KeyCode confirm = KeyCode.Mouse0;
+    [Tooltip("Hold to aim (mirrors the gamepad aim shoulder).")]
+    public KeyCode aim = KeyCode.Mouse1;
+    [Tooltip("Reset a cast already in the water; cuts the line mid-fight.")]
+    public KeyCode lineReset = KeyCode.E;
 }

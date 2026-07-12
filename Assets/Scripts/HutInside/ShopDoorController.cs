@@ -44,7 +44,7 @@ public class ShopDoorController : MonoBehaviour
     [SerializeField] private float glideDuration = 0.35f;
 
     [Header("Interaction")]
-    [SerializeField] private KeyCode interactKey = KeyCode.E;
+    // The interact key lives on the InputBindings asset (keyboardMouse.interact) — read via KeyInput.
     [SerializeField] private Sprite promptIcon;
 
     [Header("Exit Trigger (optional)")]
@@ -107,7 +107,7 @@ public class ShopDoorController : MonoBehaviour
         // Tell the HUD prompt bar an interact is available at the door.
         if (canEnter || canExit) InteractHint.Ping();
 
-        bool interactPressed = Input.GetKeyDown(interactKey) || GamepadInput.InteractPressed;
+        bool interactPressed = KeyInput.InteractPressed || GamepadInput.InteractPressed;
         if (canEnter && interactPressed) StartCoroutine(EnterSequence());
         else if (canExit && interactPressed) StartCoroutine(ExitSequence());
     }

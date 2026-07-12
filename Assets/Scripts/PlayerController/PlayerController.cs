@@ -35,7 +35,7 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private string jumpAnimTrigger = "Jump";
 
     [Header("Charge Jump")]
-    [SerializeField] private KeyCode chargeJumpKey = KeyCode.Space;
+    // The jump key lives on the InputBindings asset (keyboardMouse.jump) — read via KeyInput.
     [SerializeField] private float maxChargeTime = 1.0f;
     [SerializeField] private float minLaunchCharge = 0.15f;
     [SerializeField] private AnimationCurve forwardByCharge = new AnimationCurve(new Keyframe(0f, 4f), new Keyframe(1f, 12f));
@@ -586,7 +586,7 @@ public class PlayerController : MonoBehaviour
         // control held to turn walking into running, release it to drop back to a walk.
         // (No need to gate on inputDisabled — GetMoveDirection already zeroes input then.)
         isSprinting = hasMovementInput
-                      && (Input.GetKey(KeyCode.LeftShift) || GamepadInput.SprintHeld);
+                      && (KeyInput.SprintHeld || GamepadInput.SprintHeld);
 
         float currentSpeed = (isSprinting ? sprintSpeed : walkSpeed) * Mathf.Clamp01(inputMagnitude);
         Vector3 desiredHorizontal = moveDirection * currentSpeed;
@@ -817,7 +817,7 @@ public class PlayerController : MonoBehaviour
         // arms, and it only clears once the jump button is fully up afterwards.
         if (inputDisabled)
             jumpBlockedUntilRelease = true;
-        else if (jumpBlockedUntilRelease && !Input.GetKey(chargeJumpKey) && !GamepadInput.JumpHeld)
+        else if (jumpBlockedUntilRelease && !KeyInput.JumpHeld && !GamepadInput.JumpHeld)
             jumpBlockedUntilRelease = false;
 
         Vector3 modelForward = playerModel ? playerModel.forward : transform.forward;
@@ -831,7 +831,6 @@ public class PlayerController : MonoBehaviour
     {
         return new ChargeJumpController.JumpConfig
         {
-            chargeJumpKey = chargeJumpKey,
             maxChargeTime = maxChargeTime,
             minLaunchCharge = minLaunchCharge,
             forwardByCharge = forwardByCharge,

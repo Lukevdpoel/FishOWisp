@@ -15,7 +15,6 @@ public class ChargeJumpController
 
     public struct JumpConfig
     {
-        public KeyCode chargeJumpKey;
         public float maxChargeTime;
         public float minLaunchCharge;
         public AnimationCurve forwardByCharge;
@@ -143,7 +142,7 @@ public class ChargeJumpController
         // Buffer in-air jump presses for chaining. Recording the time lets a press shortly BEFORE the
         // landing bounce still chain (checked at touchdown in the Launched case); presses AFTER the
         // bounce are handled live in the Bounced case.
-        bool jumpPressed = !inputDisabled && (Input.GetKeyDown(cfg.chargeJumpKey) || GamepadInput.JumpPressed);
+        bool jumpPressed = !inputDisabled && (KeyInput.JumpPressed || GamepadInput.JumpPressed);
         if (jumpPressed && (phase == JumpPhase.Launched || phase == JumpPhase.Bounced))
             lastJumpPressTime = Time.time;
 
@@ -151,7 +150,7 @@ public class ChargeJumpController
         {
             case JumpPhase.None:
                 if (!inputDisabled && characterController.isGrounded
-                    && (Input.GetKeyDown(cfg.chargeJumpKey) || GamepadInput.JumpPressed))
+                    && (KeyInput.JumpPressed || GamepadInput.JumpPressed))
                 {
                     // Morph into the ball as the charge begins: BallMorphIn plays then holds on its last
                     // frame (it no longer auto-advances to BallForm — that waits for BallToForm on release).
@@ -165,7 +164,7 @@ public class ChargeJumpController
             case JumpPhase.Charging:
                 chargeTimer = Mathf.Min(chargeTimer + Time.deltaTime, cfg.maxChargeTime);
                 // Launch when no device holds jump anymore — either may have started the charge.
-                if (!Input.GetKey(cfg.chargeJumpKey) && !GamepadInput.JumpHeld)
+                if (!KeyInput.JumpHeld && !GamepadInput.JumpHeld)
                 {
                     LaunchJump(chargeTimer / cfg.maxChargeTime, ref targetVelocity,
                                modelForward, fallbackForward, in cfg);

@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
 using UnityEngine.Rendering.Universal;
 
 public class NoteMenu : MonoBehaviour
@@ -155,8 +154,7 @@ public class NoteMenu : MonoBehaviour
         // disabling them; the notebook lives in a different prefab, so it self-gates here.
         if (MainMenuController.IsTitleSequenceActive) return;
 
-        bool togglePressed = (Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
-                          || GamepadInput.NotebookTogglePressed;
+        bool togglePressed = KeyInput.NotebookTogglePressed || GamepadInput.NotebookTogglePressed;
         if (togglePressed)
         {
             if (isNoteOpen)

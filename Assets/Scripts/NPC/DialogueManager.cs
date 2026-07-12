@@ -128,7 +128,7 @@ public class DialogueManager : GenericSingleton<DialogueManager>
         {
             // A advances/confirms; B also skips through dialogue (it doubles as the cancel/close
             // verb everywhere else, but here it just keeps the lines moving).
-            if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetMouseButtonDown(0)
+            if (KeyInput.InteractPressed || Input.GetKeyDown(KeyCode.Space) || Input.GetKeyDown(KeyCode.Return) || Input.GetMouseButtonDown(0)
                 || GamepadInput.InteractPressed || GamepadInput.ConfirmPressed || GamepadInput.CancelPressed)
             {
                 if (isTyping) { skipTyping = true; return; }
@@ -360,7 +360,7 @@ public class DialogueManager : GenericSingleton<DialogueManager>
     {
         if (Input.GetKeyDown(KeyCode.UpArrow) || Input.GetKeyDown(KeyCode.DownArrow)
             || GamepadInput.DpadUpPressed || GamepadInput.DpadDownPressed) { selectedOption = 1 - selectedOption; UpdateArrowPosition(); }
-        if (Input.GetKeyDown(KeyCode.E) || Input.GetKeyDown(KeyCode.Return)
+        if (KeyInput.InteractPressed || Input.GetKeyDown(KeyCode.Return)
             || GamepadInput.InteractPressed || GamepadInput.ConfirmPressed) { CloseDialogue(); if (selectedOption == 0 && specialUI) specialUI.SetActive(true); }
     }
 

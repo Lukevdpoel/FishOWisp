@@ -32,8 +32,7 @@ public class InventoryUI : MonoBehaviour
         IsLoadoutActive = false;
     }
 
-    [Header("Keybindings")]
-    public KeyCode toggleKey = KeyCode.B;
+    // The toggle key lives on the InputBindings asset (keyboardMouse.inventoryToggle) — read via KeyInput.
 
     [Header("Main References")]
     public GameObject uiPanel;
@@ -305,8 +304,8 @@ public class InventoryUI : MonoBehaviour
     // programmatically (vendor shop, bait-missing prompt) or when hold-to-open is disabled.
     private void HandleInventoryButton()
     {
-        bool pressed  = Input.GetKeyDown(toggleKey) || GamepadInput.InventoryTogglePressed;
-        bool released = Input.GetKeyUp(toggleKey)   || GamepadInput.InventoryToggleReleased;
+        bool pressed  = KeyInput.InventoryTogglePressed || GamepadInput.InventoryTogglePressed;
+        bool released = KeyInput.InventoryToggleReleased || GamepadInput.InventoryToggleReleased;
 
         if (!IsInventoryOpen)
         {

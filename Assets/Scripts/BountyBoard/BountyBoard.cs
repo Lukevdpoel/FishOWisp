@@ -59,14 +59,14 @@ public class BountyBoard : MonoBehaviour
         bool jumpBlocked = PlayerController.IsPlayerJumping;
         if (playerInZone && !isViewingBoard && !jumpBlocked) InteractHint.Ping();
 
-        if (playerInZone && !isViewingBoard && !jumpBlocked && (Input.GetKeyDown(KeyCode.E) || GamepadInput.InteractPressed))
+        if (playerInZone && !isViewingBoard && !jumpBlocked && (KeyInput.InteractPressed || GamepadInput.InteractPressed))
         {
             OpenBoard();
         }
         else if (isViewingBoard)
         {
-            // Exit on E, Escape, Right Click, or gamepad A/B
-            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.E) || Input.GetMouseButtonDown(1)
+            // Exit on interact, cancel, Right Click, or gamepad A/B
+            if (KeyInput.CancelPressed || KeyInput.InteractPressed || Input.GetMouseButtonDown(1)
                 || GamepadInput.InteractPressed || GamepadInput.CancelPressed)
             {
                 CloseBoard();

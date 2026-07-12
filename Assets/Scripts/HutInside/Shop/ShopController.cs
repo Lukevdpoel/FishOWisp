@@ -180,7 +180,9 @@ public class ShopController : GenericSingleton<ShopController>
         }
     }
 
-    private static bool CancelKey() => GamepadInput.CancelPressed || Input.GetKeyDown(KeyCode.Escape);
+    // Keyboard confirm stays a fixed Enter (a menu-navigation key, like the arrow/WASD list nav),
+    // while cancel rides the rebindable cancel binding.
+    private static bool CancelKey() => GamepadInput.CancelPressed || KeyInput.CancelPressed;
     private static bool ConfirmKey() => GamepadInput.ConfirmPressed || Input.GetKeyDown(KeyCode.Return);
 
     // Fire once when the left stick is pushed past 0.6 from a neutral position; returns the

@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 /// <summary>
 /// Drives a notebook page-flip with live world-space UI at rest and a bone-rigged mesh
@@ -106,12 +105,12 @@ public class NotebookPageFlipper : MonoBehaviour
         bool next = false;
         bool prev = false;
 
-        if (useKeyboard && Keyboard.current != null)
+        if (useKeyboard)
         {
-            next = Keyboard.current.rightArrowKey.wasPressedThisFrame
-                || Keyboard.current.eKey.wasPressedThisFrame;
-            prev = Keyboard.current.leftArrowKey.wasPressedThisFrame
-                || Keyboard.current.qKey.wasPressedThisFrame;
+            // The arrow bindings come from the InputBindings asset; E/Q stay as fixed alternates
+            // (they've always flipped pages while the notebook is open).
+            next = KeyInput.PageNextPressed || Input.GetKeyDown(KeyCode.E);
+            prev = KeyInput.PagePrevPressed || Input.GetKeyDown(KeyCode.Q);
         }
 
         // RB flips forward, LB flips backward while the notebook is open.

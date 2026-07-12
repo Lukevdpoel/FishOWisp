@@ -6,8 +6,7 @@ public class CameraTrigger : MonoBehaviour
     public Camera zoneCamera;
     public Camera defaultCamera;
 
-    [Header("Input Settings")]
-    public KeyCode interactKey = KeyCode.E;
+    // The interact key lives on the InputBindings asset (keyboardMouse.interact) — read via KeyInput.
 
     [Header("UI Settings")]
     public Sprite promptIcon;
@@ -38,7 +37,7 @@ public class CameraTrigger : MonoBehaviour
             // Tell the HUD prompt bar an interact is available (toggles the zone camera both ways).
             InteractHint.Ping();
 
-            if (Input.GetKeyDown(interactKey) || GamepadInput.InteractPressed)
+            if (KeyInput.InteractPressed || GamepadInput.InteractPressed)
             {
                 ToggleCamera();
             }

@@ -19,10 +19,9 @@ public class FishVendor : MonoBehaviour
     public List<TimeOfDayOffer> timeOfDayOffers = new List<TimeOfDayOffer>();
 
     [Header("Interaction")]
-    [Tooltip("Player must be within this distance to open the shop with E.")]
+    [Tooltip("Player must be within this distance to open the shop with the interact key.")]
     [Min(0f)] public float interactionRadius = 3f;
-    [Tooltip("Key the player presses to open/close this vendor's shop.")]
-    public KeyCode interactKey = KeyCode.E;
+    // The interact key lives on the InputBindings asset (keyboardMouse.interact) — read via KeyInput.
 
     [Header("Feedback")]
     public ParticleSystem sellParticles;
@@ -67,7 +66,7 @@ public class FishVendor : MonoBehaviour
         // Tell the HUD prompt bar an interact is available (same gate as the press below).
         if (CurrentShoppingVendor == null && IsPlayerInRange()) InteractHint.Ping();
 
-        if (Input.GetKeyDown(interactKey) || GamepadInput.InteractPressed)
+        if (KeyInput.InteractPressed || GamepadInput.InteractPressed)
         {
             // Opening only. While the shop is open, ShopController owns all input (closing is its
             // B/Esc back-out), so the vendor stays out of the way and the same A/Interact button

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using UnityEngine;
 
 /// <summary>
 /// Game actions that can appear as {tokens} in tutorial / description text. Authors write the verb
@@ -32,9 +33,9 @@ public enum PromptVerb
 ///   "Hold {reel} to crank it in."  ->  "Hold <b><color=#FFE08A>RT</color></b> to crank it in."
 ///
 /// Gamepad labels come from the active brand's rebindable table (<see cref="GamepadInput.ControlFor"/>)
-/// so they track remaps and show RT / R2 / ZR for the right pad. Keyboard labels mirror the REAL
-/// hardcoded keys the gameplay scripts use today — NOT the KeyboardMouseBindings asset, which isn't
-/// wired to gameplay yet (writing those there would show keys that don't actually work).
+/// so they track remaps and show RT / R2 / ZR for the right pad. Keyboard labels come from the
+/// KeyboardMouseBindings table on the same asset — the table gameplay actually reads (via
+/// <see cref="KeyInput"/>) — so they track keyboard remaps the same way.
 ///
 /// Output is short text labels for now. To upgrade to glyph art, give the description TMP labels a
 /// button-prompt TMP Sprite Asset and have <see cref="GamepadLabel"/> / <see cref="KeyboardLabel"/>
@@ -121,25 +122,54 @@ public static class ButtonPrompts
             ? GamepadLabel(GamepadInput.ActiveGamepadKind, GamepadInput.ControlFor(v), v)
             : KeyboardLabel(v);
 
-    // Real keys the gameplay scripts actually read (see FishingRodController / InventoryUI /
-    // PlayerController). Fishing verbs share the mouse, context-switched by fishing state.
-    private static string KeyboardLabel(PromptVerb v) => v switch
+    // The keys gameplay actually reads: the KeyboardMouseBindings table (via KeyInput). Walk and
+    // Cycle live on the fixed movement axes / menu-nav keys, so they stay literal.
+    private static string KeyboardLabel(PromptVerb v)
     {
-        PromptVerb.Cast => "Left Click",
-        PromptVerb.Reel => "Left Click",
-        PromptVerb.Attract => "Left Click",
-        PromptVerb.Hook => "Left Click",
-        PromptVerb.Confirm => "Left Click",
-        PromptVerb.Aim => "Right Click",
-        PromptVerb.ResetCast => "E",
-        PromptVerb.Interact => "E",
-        PromptVerb.Inventory => "B",
-        PromptVerb.Notebook => "Tab",
-        PromptVerb.Jump => "Space",
-        PromptVerb.Walk => "WASD",
-        PromptVerb.CycleLeftRight => "A / D",
-        _ => "?",
-    };
+        KeyboardMouseBindings t = GamepadInput.Bindings.keyboardMouse;
+        switch (v)
+        {
+            case PromptVerb.Cast: return KeyLabel(t.castAim);
+            case PromptVerb.Reel: return KeyLabel(t.reel);
+            case PromptVerb.Attract: return KeyLabel(t.attract);
+            case PromptVerb.Hook: return KeyLabel(t.reel);  // hooking shares the reel key
+            case PromptVerb.Confirm: return KeyLabel(t.confirm);
+            case PromptVerb.Aim: return KeyLabel(t.aim);
+            case PromptVerb.ResetCast: return KeyLabel(t.lineReset);
+            case PromptVerb.Interact: return KeyLabel(t.interact);
+            case PromptVerb.Inventory: return KeyLabel(t.inventoryToggle);
+            case PromptVerb.Notebook: return KeyLabel(t.notebookToggle);
+            case PromptVerb.Jump: return KeyLabel(t.jump);
+            case PromptVerb.Walk: return "WASD";
+            case PromptVerb.CycleLeftRight: return "A / D";
+            default: return "?";
+        }
+    }
+
+    /// <summary>Human-readable label for a KeyCode: mouse buttons and modifier/special keys get
+    /// friendly names, everything else falls back to the enum name.</summary>
+    public static string KeyLabel(KeyCode k)
+    {
+        switch (k)
+        {
+            case KeyCode.Mouse0: return "Left Click";
+            case KeyCode.Mouse1: return "Right Click";
+            case KeyCode.Mouse2: return "Middle Click";
+            case KeyCode.LeftShift: case KeyCode.RightShift: return "Shift";
+            case KeyCode.LeftControl: case KeyCode.RightControl: return "Ctrl";
+            case KeyCode.LeftAlt: case KeyCode.RightAlt: return "Alt";
+            case KeyCode.Return: return "Enter";
+            case KeyCode.Escape: return "Esc";
+            case KeyCode.UpArrow: return "Up Arrow";
+            case KeyCode.DownArrow: return "Down Arrow";
+            case KeyCode.LeftArrow: return "Left Arrow";
+            case KeyCode.RightArrow: return "Right Arrow";
+            default:
+                if (k >= KeyCode.Alpha0 && k <= KeyCode.Alpha9)
+                    return ((int)(k - KeyCode.Alpha0)).ToString();
+                return k.ToString();
+        }
+    }
 
     private static string GamepadLabel(GamepadKind kind, GamepadControl c, PromptVerb v)
     {

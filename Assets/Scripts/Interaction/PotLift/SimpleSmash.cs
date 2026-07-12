@@ -100,7 +100,7 @@ public class SimpleSmash : MonoBehaviour
         if (currentBestPot != null) InteractHint.Ping();
 
         // 5. Input
-        if ((Input.GetKeyDown(KeyCode.E) || GamepadInput.InteractPressed) && currentBestPot != null)
+        if ((KeyInput.InteractPressed || GamepadInput.InteractPressed) && currentBestPot != null)
         {
             potsInRange.Remove(currentBestPot);
             StartCoroutine(PerformSmashSequence(currentBestPot));

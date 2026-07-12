@@ -41,7 +41,7 @@ public class Signpost : MonoBehaviour
         // Tell the HUD prompt bar an interact is available (not while already reading).
         if (DialogueManager.Instance != null && !DialogueManager.Instance.IsDialogueActive())
             InteractHint.Ping();
-        if (!(Input.GetKeyDown(KeyCode.E) || GamepadInput.InteractPressed)) return;
+        if (!(KeyInput.InteractPressed || GamepadInput.InteractPressed)) return;
 
         if (DialogueManager.Instance != null && !DialogueManager.Instance.IsDialogueActive())
         {

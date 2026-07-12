@@ -238,7 +238,7 @@ public class FishingRodController : MonoBehaviour
         // are state (not edge), so they're FixedUpdate-safe.
         bool inputBlocked = NoteMenu.IsNotebookOpen || Time.timeScale == 0f;
         bool reelHeld = !inputBlocked
-            && (Input.GetKey(KeyCode.Mouse0) || GamepadInput.ReelHeld);
+            && (KeyInput.ReelHeld || GamepadInput.ReelHeld);
         float steer = inputBlocked
             ? 0f
             : Mathf.Clamp(Input.GetAxisRaw("Horizontal") + GamepadInput.Move.x, -1f, 1f);
@@ -281,7 +281,7 @@ public class FishingRodController : MonoBehaviour
         // continues underneath it. Both reads are state (not edge), so they're FixedUpdate-safe.
         bool inputBlocked = NoteMenu.IsNotebookOpen || Time.timeScale == 0f;
         bool reelHeld = !inputBlocked
-            && (Input.GetKey(KeyCode.Mouse0) || GamepadInput.LureReelHeld);
+            && (KeyInput.ReelHeld || GamepadInput.LureReelHeld);
         float lateral = inputBlocked
             ? 0f
             : Mathf.Clamp(Input.GetAxisRaw("Horizontal") + GamepadInput.Move.x, -1f, 1f);
@@ -352,36 +352,38 @@ public class FishingRodController : MonoBehaviour
             && playerController != null && playerController.areControlsLocked) return;
 
         // --- Aim Mode (RMB / LB) - works in any non-fight/non-inspection state ---
-        if ((Input.GetKeyDown(KeyCode.Mouse1) || GamepadInput.AimPressed) && !isAiming)
+        if ((KeyInput.AimPressed || GamepadInput.AimPressed) && !isAiming)
         {
             isAiming = true;
             FishingEvents.OnStartAiming?.Invoke();
         }
 
-        if ((Input.GetKeyUp(KeyCode.Mouse1) || GamepadInput.AimReleased) && isAiming)
+        if ((KeyInput.AimReleased || GamepadInput.AimReleased) && isAiming)
         {
             StopAiming();
         }
 
-        // --- LMB actions (keyboard/mouse) ---
-        if (Input.GetKeyDown(KeyCode.Mouse0))
+        // --- Keyboard/mouse verbs, context-switched by fishing state. All four default to LMB
+        // (one do-fishing button, like the old hardcoded Mouse0 switch) but each reads its own
+        // binding so they can be split apart on the InputBindings asset. ---
+        switch (currentState)
         {
-            switch (currentState)
-            {
-                case FishingState.Idle:
-                    StartCharging();
-                    break;
-                case FishingState.WaitingForBite:
-                    FishingEvents.OnAttractFish?.Invoke();
-                    break;
-                case FishingState.FishOnTheLine:
+            case FishingState.Idle:
+                if (KeyInput.CastAimPressed) StartCharging();
+                break;
+            case FishingState.WaitingForBite:
+                if (KeyInput.AttractPressed) FishingEvents.OnAttractFish?.Invoke();
+                break;
+            case FishingState.FishOnTheLine:
+                if (KeyInput.HookPressed)
+                {
                     if (isLureGrabActive) ConfirmLureHook();
                     else HookFishAndStartFight();
-                    break;
-                case FishingState.InspectingCatch:
-                    TryFinishInspection();
-                    break;
-            }
+                }
+                break;
+            case FishingState.InspectingCatch:
+                if (KeyInput.ConfirmPressed) TryFinishInspection();
+                break;
         }
 
         // --- LT: hold to aim the cast marker, release to put the rod away — a mirror of holding
@@ -438,17 +440,17 @@ public class FishingRodController : MonoBehaviour
             else HookFishAndStartFight();
         }
 
-        // --- Releasing the aim button (LMB up) without a whip abandons the aim — nothing is
+        // --- Releasing the cast-aim key (LMB up) without a whip abandons the aim — nothing is
         // thrown; the whip gesture inside RodCasting is the only way to actually cast. ---
-        if (Input.GetKeyUp(KeyCode.Mouse0) && currentState == FishingState.Charging)
+        if (KeyInput.CastAimReleased && currentState == FishingState.Charging)
         {
             AbandonCharge();
         }
 
-        // --- Instant reset (E key) — keyboard mirror of the RB cast reset. The reel-in arc is
+        // --- Instant reset (default E) — keyboard mirror of the RB cast reset. The reel-in arc is
         // kinematic and flies over geometry, so this doubles as the escape hatch when the lure
         // snags behind terrain during the physics reel. Mid-fight it cuts the line instead. ---
-        if (Input.GetKeyDown(KeyCode.E))
+        if (KeyInput.ResetCastPressed)
         {
             if (currentState == FishingState.WaitingForBite || currentState == FishingState.LureReeling)
                 ReelLineBack();
