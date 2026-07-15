@@ -1,0 +1,119 @@
+# Inspector values from: Prefabs/PlayerMaster-old.prefab
+# Backup date: 2026-07-12
+
+### FishingUIController  on GameObject "UIManager"
+  fightUIPanel: {fileID: 1099881253731228176}
+  progressBar: {fileID: 6803690746172927599}
+  fishNameText: {fileID: 0}
+  chargeUIPanel: {fileID: 2476867171847741284}
+  chargeSlider: {fileID: 5914845155867572853}
+
+### PlayerInventory  on GameObject "UIManager"
+  inventorySize: 12
+  currentCurrency: 15
+  caughtFishes:
+  - preset: {fileID: 11400000, guid: 599c32615c33e93438130c3b94c4393e, type: 2}
+    lengthCm: 20
+
+### InventoryUI  on GameObject "UIManager"
+  toggleKey: 105
+  uiPanel: {fileID: 7720583282990204009}
+  physicsContainer: {fileID: 7208626950911608334}
+  inventorySlotPrefab: {fileID: 6029703933381533041, guid: 711185cb10943b54fa2ed732b317d7cf, type: 3}
+  tooltip: {fileID: 8421806370269208684}
+  blowForce: 25000
+  normalizedSpawnPoint: {x: 0.5, y: 0.5}
+  spawnSpacing: 120
+  blowSpread: 0.9
+  modelDistance: 8
+  modelScale: 1
+  waterLayerMask:
+    serializedVersion: 2
+    m_Bits: 16
+  raycastIgnoreLayers:
+    serializedVersion: 2
+    m_Bits: 4
+  scriptsToDisableInput:
+  - {fileID: 3099324921643576436}
+  closeButton: {fileID: 0}
+
+### PauseMenu  on GameObject "GameplayUI"
+  PauseMenuUI: {fileID: 1131168632444757981}
+
+### FishEncyclopediaManager  on GameObject "GameplayUI"
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  deleteOnStart: 0
+  allFishPresets: []
+  encyclopediaEntries: []
+
+### EncyclopediaUIController  on GameObject "EncyclopediaInterface"
+  debugIgnoreCaughtRequirement: 1
+  uiContainer: {fileID: 3639632337854363965}
+  gridContentParent: {fileID: 2683814826813203727}
+  gridSlotPrefab: {fileID: 212319093491393878, guid: f6e18e9661f6c014ab8a494214c14441, type: 3}
+  detailsUI: {fileID: 1323528813488550287}
+  fish3DPreview: {fileID: 3575047594901554087}
+
+### FishEntryUI  on GameObject "FishDetailsPanel"
+  fishImage: {fileID: 0}
+  fishNameText: {fileID: 8332177445730524801}
+  rarityText: {fileID: 0}
+  caughtText: {fileID: 4377865076637740780}
+  largestCaughtText: {fileID: 5148977231550417793}
+  smallestCaughtText: {fileID: 362323445087397650}
+  basePriceText: {fileID: 0}
+  pricePerCmText: {fileID: 0}
+  baitText: {fileID: 0}
+  weatherText: {fileID: 0}
+
+### InventoryTooltip  on GameObject "InventoryTooltip"
+  headerText: {fileID: 2650547746234615835}
+  bodyText: {fileID: 5263869854750687820}
+  valueText: {fileID: 6890397900815664519}
+  baseDistance: 160
+  clampToScreen: 1
+
+### NoteMenu  on GameObject "(nested/prefab root)"
+  noteAnimator: {fileID: 1708252961286238500}
+  encyclopediaUI: {fileID: 4810591251941765813}
+  uiDelay: 0.5
+
+### SmoothRandomScaler  on GameObject "(nested/prefab root)"
+  minScaleX: 0.92
+  maxScaleX: 0.98
+  minScaleZ: 0.55
+  maxScaleZ: 0.65
+  scaleDuration: 2
+  pauseDuration: 0
+
+### PREFAB-INSTANCE OVERRIDES (values changed on prefab instances in this file)
+  numFish: 15
+  maxSpeed: 1.52
+  minSpeed: 1.06
+  lockYAxis: 1
+  fishPrefab: 
+  managerSpeed: 0.4
+  wanderArea.x: 1
+  wanderArea.y: 0
+  wanderArea.z: 4
+  spawnBounds.y: 0
+  wanderInterval: 3
+  avoidanceRadius: 1.61
+  perceptionRadius: 2.87
+  reelInRate: 100
+  playerModel: 
+  maxReelWindow: 10
+  minReelWindow: 5
+  reelInDuration: 1
+  maxStruggleTime: 1
+  minStruggleTime: 0
+  reelInArcHeight: 0
+  cameraSpeed: 400

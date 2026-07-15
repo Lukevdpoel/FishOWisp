@@ -1,0 +1,490 @@
+# Inspector values from: Prefabs/PlayerMaster.prefab
+# Backup date: 2026-07-12
+
+### BobberBarUI  on GameObject "BobberBar"
+  onlyShowWhileInventoryOpen: 1
+  blockRoot: {fileID: 2608473240529977937}
+  nameLabel: {fileID: 1968885901421202563}
+  descriptionLabel: {fileID: 5514645209902987076}
+  hintLabel: {fileID: 2821580444433785323}
+  leftButton: {fileID: 1456679706564129619}
+  rightButton: {fileID: 3239768944873470656}
+  leftArrowGlyphRect: {fileID: 7466649727307394414}
+  rightArrowGlyphRect: {fileID: 2289962333294302068}
+  canvasGroup: {fileID: 5548941716448897708}
+
+### FishingUIController  on GameObject "UIManager"
+  fightUIPanel: {fileID: 1099881253731228176}
+  progressBar: {fileID: 6803690746172927599}
+  fishNameText: {fileID: 0}
+  hideProgressBar: 1
+  hideFightPanel: 1
+  chargeUIPanel: {fileID: 2476867171847741284}
+
+### PlayerInventory  on GameObject "UIManager"
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  inventorySize: 12
+  currentCurrency: 60
+  caughtFishes:
+  - preset: {fileID: 11400000, guid: 599c32615c33e93438130c3b94c4393e, type: 2}
+    lengthCm: 20
+  debugCoinAmount: 40
+
+### InventoryUI  on GameObject "UIManager"
+  toggleKey: 98
+  uiPanel: {fileID: 7720583282990204009}
+  physicsContainer: {fileID: 7208626950911608334}
+  inventorySlotPrefab: {fileID: 6029703933381533041, guid: 711185cb10943b54fa2ed732b317d7cf, type: 3}
+  tooltip: {fileID: 8421806370269208684}
+  slotSpacing: 120
+  leftPadding: 40
+  modelDistance: 7.68
+  modelScale: 1
+  waterLayerMask:
+    serializedVersion: 2
+    m_Bits: 8388608
+  vendorLayerMask:
+    serializedVersion: 2
+    m_Bits: 524288
+  tankLayerMask:
+    serializedVersion: 2
+    m_Bits: 131072
+  bountyLayerMask:
+    serializedVersion: 2
+    m_Bits: 67108864
+  raycastIgnoreLayers:
+    serializedVersion: 2
+    m_Bits: 134283276
+  releasePrefab: {fileID: 3994706279997133969, guid: 97c5836dd172ef849932d809a315539d, type: 3}
+  releasePrefabLifetime: 0.8
+  scriptsToDisableInput:
+  - {fileID: 3099324921643576436}
+  closeButton: {fileID: 0}
+  additionalClickThroughRoots: []
+  showCaughtFish: 0
+  holdToOpenLoadout: 1
+  playerModel: {fileID: 0}
+  dangleDrop: 1.37
+  cameraFrontDistance: 2.5
+  cameraHeightOffset: 0.5
+  cameraLookHeightOffset: 0.15
+  cameraLerpSpeed: 10
+
+### NoteMenu  on GameObject "UIManager"
+  noteAnimator: {fileID: 4962700871050019718}
+  mainCamera: {fileID: 7085562951588707355}
+  backdropCamera: {fileID: 6110040160992011145}
+  captureRT: {fileID: 8400000, guid: 898e24cb78d38eb42af6458f9f1127a8, type: 2}
+  backdropMaterial: {fileID: 0}
+  intensityProperty: _Intensity
+  kuwaharaFadeDuration: 0.5
+  kuwaharaMaxIntensity: 1
+
+### DialogueManager  on GameObject "UIManager"
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  dialogueBoxPanel: {fileID: 8853058269603842741}
+  backgroundRect: {fileID: 2766550169936543187}
+  nameText: {fileID: 0}
+  dialogueText: {fileID: 1111098406384981211}
+  mainCanvas: {fileID: 5557422025018919868}
+  continueArrow: {fileID: 7853197983845911101}
+  arrowBlinkSpeed: 8
+  arrowBlinkSharpness: 2
+  horizontalPadding: -260
+  verticalPadding: 143.96
+  repositionSpeed: 8
+  screenEdgeBuffer: 50
+  maxVisibleLines: 3
+  scrollSpeed: 0.2
+  openDuration: 0.2
+  openCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 9.313226e-10
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 136
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 0.7466832
+      value: 1.0218084
+      inSlope: 0.09256133
+      outSlope: 0.09256133
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.24666844
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0.9999982
+      inSlope: -0.24126942
+      outSlope: -0.24126942
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.74017984
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  pulseDuration: 0.1
+  pulseScale: 0.95
+  typingSpeed: 0.03
+  audioSource: {fileID: 7290027688674376257}
+  sentenceStartSounds:
+  - {fileID: 8300000, guid: 78c431767ad9c624f981577053093535, type: 3}
+  - {fileID: 8300000, guid: 7378d5363726bc04c8b09f1da292bf90, type: 3}
+  - {fileID: 8300000, guid: 5780eac24c81b8943b6c03830959d9cd, type: 3}
+  - {fileID: 8300000, guid: 35e092ef07fb9bf419506183368028a5, type: 3}
+  choicePanel: {fileID: 0}
+  arrow: {fileID: 0}
+  yesOption: {fileID: 0}
+  noOption: {fileID: 0}
+  specialUI: {fileID: 0}
+  currentSpeaker: {fileID: 0}
+
+### EncyclopediaUIController  on GameObject "UIManager"
+  lifecycleSource: {fileID: 6037087473319781328}
+  gridContentParent: {fileID: 7318734576447833700}
+  gridSlotPrefab: {fileID: 212319093491393878, guid: f6e18e9661f6c014ab8a494214c14441, type: 3}
+  detailsUI: {fileID: 2582360242298684952}
+  fish3DPreview: {fileID: 1570209812035090493}
+
+### WorldStatePopup  on GameObject "WorldStatePopup"
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  sceneLocations:
+  - sceneName: HUTBUILT
+    displayName: Forest Pond
+  - sceneName: CAVE
+    displayName: Crystal Cave
+  explicitLocationName: 
+  fallbackLocationName: Unknown
+  uppercaseLocation: 1
+  use24HourClock: 0
+  fadeInDuration: 0.4
+  holdDuration: 2.5
+  fadeOutDuration: 0.7
+  useUnscaledTime: 1
+  showOnSceneLoad: 1
+  canvasGroup: {fileID: 0}
+  locationText: {fileID: 0}
+  timeText: {fileID: 0}
+  weatherText: {fileID: 0}
+  buildDefaultUIIfMissing: 1
+  bannerSprite: {fileID: 0}
+  bannerColor: {r: 1, g: 1, b: 1, a: 1}
+
+### ShopMenuUI  on GameObject "ShopUI"
+  highlightColor: {r: 0.4, g: 0.7, b: 0.95, a: 1}
+  buttonColor: {r: 0.25, g: 0.5, b: 0.7, a: 1}
+  rowColor: {r: 1, g: 1, b: 1, a: 0.08}
+  goldColor: {r: 1, g: 0.85, b: 0.4, a: 1}
+  soldOutColor: {r: 1, g: 0.45, b: 0.4, a: 1}
+  conversationRoot: {fileID: 3862009150345436896}
+  fishingSuppliesButton: {fileID: 5381705005564001739}
+  sellFishButton: {fileID: 7784405451409105926}
+  browsingRoot: {fileID: 9197953888024663617}
+  cardRoot: {fileID: 7264321989712266069}
+  cardName: {fileID: 702513507681620259}
+  cardPrice: {fileID: 6631948237637983702}
+  cardDescription: {fileID: 5151078826592270144}
+  sellRoot: {fileID: 0}
+  sellListRoot: {fileID: 0}
+  sellRowPrefab: {fileID: 0}
+  sellEmptyLabel: {fileID: 0}
+  confirmRoot: {fileID: 0}
+  confirmText: {fileID: 0}
+  confirmYesButton: {fileID: 0}
+  confirmNoButton: {fileID: 0}
+  toastRoot: {fileID: 0}
+  toastLabel: {fileID: 0}
+
+### PauseMenu  on GameObject "GameplayUI"
+  PauseMenuUI: {fileID: 1131168632444757981}
+  MenuImage: {fileID: 2912726778595183088}
+  PostProcessVolume: {fileID: 7826596063639537984}
+  fullScreenMaterial: {fileID: 2100000, guid: 829609d61a1b56f4a870f0ef197c8e10, type: 2}
+  shaderIntensityName: _Intensity
+  transitionDuration: 0.5
+
+### FishEncyclopediaManager  on GameObject "GameplayUI"
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  deleteOnStart: 0
+  allFishPresets:
+  - {fileID: 11400000, guid: 599c32615c33e93438130c3b94c4393e, type: 2}
+  - {fileID: 11400000, guid: 497a14c126ccec047888c7092706854b, type: 2}
+  - {fileID: 11400000, guid: 51adb0e7344610843baee0e4ed41ab9c, type: 2}
+  - {fileID: 11400000, guid: 8a7be413503e5e34e863a04c64ffffa9, type: 2}
+  - {fileID: 11400000, guid: 44d32b653b9f0d84296037208a93cfd8, type: 2}
+  - {fileID: 11400000, guid: fc5d74fd564d7834cbbdd9edd02fd2f3, type: 2}
+  - {fileID: 11400000, guid: a0fe0e5a1de96e9468293bb94c31a23e, type: 2}
+  - {fileID: 11400000, guid: c6b7cc6730100944c84da1c444c8306a, type: 2}
+  - {fileID: 11400000, guid: 9e7c1b5588628c34fa466c595886ee85, type: 2}
+  - {fileID: 11400000, guid: 0f770c6603d04984b9cca6a3eb07e427, type: 2}
+  encyclopediaEntries: []
+
+### InteractionPromptUI  on GameObject "GameplayUI"
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  promptContainer: {fileID: 8575925370253316760}
+  promptImage: {fileID: 1826788946060869034}
+  worldOffset: {x: 0, y: 1.5, z: 0}
+  isOverlayCanvas: 1
+  animationDuration: 0.1
+  scaleCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.9955323
+      value: 1.0031453
+      inSlope: 2.1191394
+      outSlope: 2.1191394
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.05416855
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+
+### FishingPromptBar  on GameObject "FishingPromptBar"
+  bottomOffset: 40
+  promptSpacing: 22
+  chipLabelSpacing: 8
+  buttonFontSize: 22
+  actionFontSize: 22
+  glyphSize: 34
+  buttonTextColor: {r: 1, g: 0.88, b: 0.54, a: 1}
+  actionTextColor: {r: 1, g: 1, b: 1, a: 1}
+  chipColor: {r: 0, g: 0, b: 0, a: 0.55}
+  addTextOutline: 1
+  showWhileIdle: 1
+
+### VersionDisplay  on GameObject "Version"
+  prefix: v
+
+### EncyclopediaUIController  on GameObject "EncyclopediaInterface"
+  lifecycleSource: {fileID: 0}
+  gridContentParent: {fileID: 2683814826813203727}
+  gridSlotPrefab: {fileID: 212319093491393878, guid: f6e18e9661f6c014ab8a494214c14441, type: 3}
+  detailsUI: {fileID: 1323528813488550287}
+  fish3DPreview: {fileID: 3575047594901554087}
+
+### BaitInventory  on GameObject "BaitInventory"
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  registeredBaits:
+  - {fileID: 11400000, guid: 11ccbd758765b2a4a8e806319dce81c0, type: 2}
+  - {fileID: 11400000, guid: 675b0f0aa1ddd4a49a9c19e15293a9d2, type: 2}
+  - {fileID: 11400000, guid: e936b5f9f7fc306488dc57f867b11d37, type: 2}
+  selectedBait: {fileID: 11400000, guid: 11ccbd758765b2a4a8e806319dce81c0, type: 2}
+  defaultBait: {fileID: 11400000, guid: 11ccbd758765b2a4a8e806319dce81c0, type: 2}
+  startingBaits:
+  - bait: {fileID: 11400000, guid: 11ccbd758765b2a4a8e806319dce81c0, type: 2}
+    count: 5
+
+### DebugProgressReset  on GameObject "BaitInventory"
+  bootMenuScene: HUTBUILT
+
+### FishEntryUI  on GameObject "FishDetailsPanel"
+  fishImage: {fileID: 0}
+  fishNameText: {fileID: 8332177445730524801}
+  sizeClassText: {fileID: 0}
+  caughtText: {fileID: 4377865076637740780}
+  largestCaughtText: {fileID: 5148977231550417793}
+  smallestCaughtText: {fileID: 362323445087397650}
+  basePriceText: {fileID: 0}
+  pricePerCmText: {fileID: 0}
+  baitText: {fileID: 8812734551234567814}
+  weatherText: {fileID: 8812734551234567834}
+  researchChecklist: {fileID: 8812734551234568120}
+
+### BobberInventory  on GameObject "Bobberinventory"
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  registeredBobbers:
+  - {fileID: 11400000, guid: cee2ba223dfe7d34d894d5dbeea6a159, type: 2}
+  - {fileID: 11400000, guid: 9d41fa074c23b994c85a408b38f35114, type: 2}
+  - {fileID: 11400000, guid: dd0876eb05312564d9fb9cea6a7297f5, type: 2}
+  ownedBobbers:
+  - {fileID: 11400000, guid: cee2ba223dfe7d34d894d5dbeea6a159, type: 2}
+  selectedBobber: {fileID: 11400000, guid: cee2ba223dfe7d34d894d5dbeea6a159, type: 2}
+  fishingLine: {fileID: 0}
+
+### FPSLimiter  on GameObject "PlayerMaster"
+  targetFPS: 60
+
+### InventoryTooltip  on GameObject "InventoryTooltip"
+  headerText: {fileID: 2650547746234615835}
+  bodyText: {fileID: 5263869854750687820}
+  valueText: {fileID: 6890397900815664519}
+  baseDistance: 160
+  clampToScreen: 1
+
+### CurrencyHUD  on GameObject "Currency"
+  currencyText: {fileID: 7721069605884404366}
+  prefix: 'Coins: '
+
+### ResearchChecklistUI  on GameObject "ResearchChecklist"
+  dots:
+  - {fileID: 8812734551234568073}
+  - {fileID: 8812734551234568083}
+  - {fileID: 8812734551234568093}
+  - {fileID: 8812734551234568103}
+  filledSprite: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
+  emptySprite: {fileID: 10913, guid: 0000000000000000f000000000000000, type: 0}
+  filledColor: {r: 0.5566038, g: 0.4839624, b: 0.41220188, a: 1}
+  emptyColor: {r: 0.5566038, g: 0.4839624, b: 0.41220188, a: 0.25}
+  researchIcon: {fileID: 8812734551234568113}
+  tier1Icon: {fileID: 10913, guid: 0000000000000000f000000000000000, type: 0}
+  tier2Icon: {fileID: 10901, guid: 0000000000000000f000000000000000, type: 0}
+  percentText: {fileID: 8812734551234568043}
+  catchTaskText: {fileID: 8812734551234568053}
+  zoomTaskText: {fileID: 8812734551234568063}
+
+### BaitBarUI  on GameObject "BaitBar"
+  onlyShowWhileInventoryOpen: 1
+  blockRoot: {fileID: 0}
+  nameLabel: {fileID: 0}
+  descriptionLabel: {fileID: 0}
+  hintLabel: {fileID: 0}
+  leftButton: {fileID: 0}
+  rightButton: {fileID: 0}
+  leftArrowGlyphRect: {fileID: 0}
+  rightArrowGlyphRect: {fileID: 0}
+  canvasGroup: {fileID: 0}
+
+### SoftBodyJiggle  on GameObject "(nested/prefab root)"
+  stiffness: 0.289
+  damping: 0.08
+  constraintIterations: 2
+  edgeStiffness: 0.5
+  simulationRate: 60
+  maxSubSteps: 8
+  dampenWhileSprinting: 1
+  sprintIntensity: 0.6
+  sprintBlendTime: 0.15
+  maxOffset: 0.5
+  teleportThreshold: 3
+  recalculateNormals: 1
+  weldEpsilon: 0.0001
+  anchorPivot: 0
+  anchors: []
+  anchorRadius: 0.15
+  anchorFalloff: 0.25
+
+### PlantPusher  on GameObject "(nested/prefab root)"
+  radius: 0.51
+  height: 1.85
+  centerOffset: {x: 0, y: -0.14, z: 0}
+
+### PREFAB-INSTANCE OVERRIDES (values changed on prefab instances in this file)
+  baitText: 
+  reactionTime: 0.8
+  catchDistance: 2.42
+  inventoryUIRef: 
+  waterlineMask.m_Bits: 8388608
+  lureSettings.yankPullSpeed: 2.92
+  lureSettings.maxArcAngleDeg: 65
+  lureSettings.retractDistance: 3.5
+  lureSettings.yankArcAngleDeg: 121.7
+  lureSettings.visualBobAmplitude: 0.87
+  lureSettings.visualPitchAngleDeg: 12.54
+  lureSettings.visualBobFrequencyHz: 3.84
+  lureSettings.yankAlignmentImpulse: 1.2
+  field of view: 38
+  airSteerAccel: 9.19
+  jumpStretchDecay: 1.42
+  jumpStretchAmount: 0.834
+  bounceImpactIntensity: 0.03
+  jumpStretchBounceScale: 0.408
+  chainJumpWindowAfterBounce: 0
+  ballPivotExcludeRoots.Array.size: 1
+  hideRenderersDuringJump.Array.size: 1
+  ballPivotExcludeRoots.Array.data[0]: 
+  hideRenderersDuringJump.Array.data[0]: 
+  noteMenu: 
+  smoothTime: 1.75
+  biteBendDeg: 25
+  castWhipDeg: 15
+  fightBendDeg: 6
+  extremeBendDeg: 15
+  reelingBoostDeg: 25.92
+  struggleBoostDeg: 15
+  fishNameText: 
+  hangLineLength: 0.2
+  catchInfoBackdrop: 
+  fishRotationSpeed: 24.5
+  fishDescriptionText: 
+  pivotHeight: 1.82
+  fightShoulderBack: 4.57
+  fightShoulderSide: 4.13
+  bobberFollowHeight: 0
+  fightShoulderHeight: 3.3
+  bobberFollowDistance: 4
+  bobberReturnDuration: 1.44

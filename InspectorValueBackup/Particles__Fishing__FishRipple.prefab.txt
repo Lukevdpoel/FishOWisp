@@ -1,0 +1,42 @@
+# Inspector values from: Particles/Fishing/FishRipple.prefab
+# Backup date: 2026-07-12
+
+### FishRipple  on GameObject "FishRipple"
+  swimSpeed: 0.5
+  attractSpeed: 0.5
+  scareSpeed: 4.01
+  wanderRadius: 1.5
+  naturalAttraction: 0.055
+  naturalAttractionMinDist: 3.5
+  weaveAmplitude: 4
+  weaveIntervalMin: 0.5
+  weaveIntervalMax: 1.5
+  attractPauseMin: 0.3
+  attractPauseMax: 0.5
+  attractPauseChance: 0.3
+  loseInterestDelay: 4
+  loseInterestChancePerSec: 0.25
+  loseInterestDriftDistance: 3
+  wakePrefab: {fileID: 0}
+  obstacleLayers:
+    serializedVersion: 2
+    m_Bits: 256
+  obstacleRayHeight: 5
+  nibbleRange: 0.5
+  scareRange: 1
+  bobberAvoidRadius: 3
+  followerHoverDistance: 1.4
+  actionRadius: 8
+  aimRevealRange: 15
+  glimpseIntervalMin: 1.5
+  glimpseIntervalMax: 4
+  glimpseDurationMin: 0.25
+  glimpseDurationMax: 0.6
+  glimpseFadeIn: 0.35
+  glimpseFadeOut: 0.6
+  alwaysShowIndicator: 1
+  scareCooldown: 2
+  wanderPauseMin: 0.5
+  wanderPauseMax: 1
+  preset: {fileID: 0}
+  silhouetteMaterial: {fileID: 2100000, guid: 7e2d9c4f6b1a4358a9d0e3f5c8b7a624, type: 2}

@@ -1,0 +1,59 @@
+# Inspector values from: UI Stuffies/EncyclopediaGridSlot.prefab
+# Backup date: 2026-07-12
+
+### CustomButton  on GameObject "EncyclopediaGridSlot"
+  interactible: 1
+  onIdle:
+    m_PersistentCalls:
+      m_Calls: []
+  onHover:
+    m_PersistentCalls:
+      m_Calls: []
+  unDelayedSubmit:
+    m_PersistentCalls:
+      m_Calls: []
+  onSubmit:
+    m_PersistentCalls:
+      m_Calls:
+      - m_Target: {fileID: 5226665969792359538}
+        m_TargetAssemblyTypeName: EncyclopediaGridSlot, Assembly-CSharp
+        m_MethodName: OnClicked
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
+  submitDelay: 0
+  onEnter:
+    m_PersistentCalls:
+      m_Calls: []
+  onExit:
+    m_PersistentCalls:
+      m_Calls: []
+  onPressed:
+    m_PersistentCalls:
+      m_Calls: []
+  onReleasedOverButton:
+    m_PersistentCalls:
+      m_Calls: []
+  onReleasedOutsideButton:
+    m_PersistentCalls:
+      m_Calls: []
+  onNotSelected:
+    m_PersistentCalls:
+      m_Calls: []
+  onEnterSoundEffects: []
+
+### EncyclopediaGridSlot  on GameObject "EncyclopediaGridSlot"
+  iconImage: {fileID: 8472200273318483343}
+  selectionHighlight: {fileID: 7870068637008552197}
+  unknownOverlay: {fileID: 4193728521509839961}
+  myEntry:
+    preset: {fileID: 0}
+    hasCaught: 0
+    largestCaught: 0
+    smallestCaught: 0

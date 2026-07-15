@@ -1,0 +1,380 @@
+# Inspector values from: Scenes/MAIN.unity
+# Backup date: 2026-07-12
+
+### ModelViewer  on GameObject "ModelViewerRoot"
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  modelContainer: {fileID: 355849884}
+  camera: {fileID: 554444963}
+  uncaughtSilhouetteMaterial: {fileID: 2100000, guid: 7e2d9c4f6b1a4358a9d0e3f5c8b7a624, type: 2}
+
+### InteractionPromptUI  on GameObject "InteractionTriggerZone"
+  uiElement: {fileID: 1459636181}
+
+### FishingZone  on GameObject "FishingZone_Up"
+  fishPool: {fileID: 11400000, guid: 5d1342804cf861d4bab7b452ddcaeb29, type: 2}
+
+### FishingZone  on GameObject "FishingZone_Up (1)"
+  fishPool: {fileID: 11400000, guid: 5d1342804cf861d4bab7b452ddcaeb29, type: 2}
+
+### ParticleTrigger  on GameObject "(nested/prefab root)"
+  particleEffect: {fileID: 498457614}
+  audioSource: {fileID: 790458941}
+
+### TimedAnimationTrigger  on GameObject "(nested/prefab root)"
+  animator: {fileID: 1101509860}
+  triggerName: Play
+  intervalSeconds: 15
+
+### ParticleTrigger  on GameObject "(nested/prefab root)"
+  particleEffect: {fileID: 1922947683}
+  audioSource: {fileID: 790458941}
+
+### ParticleTrigger  on GameObject "(nested/prefab root)"
+  particleEffect: {fileID: 1926163471}
+  audioSource: {fileID: 790458941}
+
+### FishingZone  on GameObject "FishingZone_Up (2)"
+  fishPool: {fileID: 11400000, guid: 5d1342804cf861d4bab7b452ddcaeb29, type: 2}
+
+### FishingZone  on GameObject "FishingZone_Up (3)"
+  fishPool: {fileID: 11400000, guid: 5d1342804cf861d4bab7b452ddcaeb29, type: 2}
+
+### SceneTrigger  on GameObject "GoToCave_Trigger"
+  sceneName: CAVE
+
+### ParticleTrigger  on GameObject "(nested/prefab root)"
+  particleEffect: {fileID: 1561531109}
+  audioSource: {fileID: 790458941}
+
+### ModelRotator  on GameObject "3Dturnmodel"
+  rotationSpeed: 30
+
+### ParticleTrigger  on GameObject "(nested/prefab root)"
+  particleEffect: {fileID: 1568997688}
+  audioSource: {fileID: 790458941}
+
+### SaveRenderTexture  on GameObject "SaveRT"
+  TextureToSave: {fileID: 8400000, guid: cb9f5b49feabb7842a79ceab4dbc884d, type: 2}
+  SavePath: Assets/ART/Textures/MySavedImage
+
+### ParticleTrigger  on GameObject "(nested/prefab root)"
+  particleEffect: {fileID: 1011974454}
+  audioSource: {fileID: 790458941}
+
+### LoopingAudioWithRandomInterval  on GameObject "Soundtrack"
+  audioClips:
+  - {fileID: 8300000, guid: c9d294d45682ec942b1e35a6ea822786, type: 3}
+  - {fileID: 8300000, guid: 0b1ee6ea683ad4749b318e57b818a747, type: 3}
+  playOnStart: 1
+  minInterval: 30
+  maxInterval: 120
+
+### TimedAnimationTrigger  on GameObject "LeafCurved"
+  animator: {fileID: 7794008602532017477}
+  triggerName: Play
+  intervalSeconds: 200
+
+### PREFAB-INSTANCE OVERRIDES (values changed on prefab instances in this file)
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  autoRandomSeed: 1
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  RotationModule.enabled: 1
+  looping: 0
+  lengthInSec: 0.4
+  simulationSpeed: 1
+  ShapeModule.type: 0
+  ForceModule.x.scalar: 0
+  ForceModule.y.scalar: 0
+  ForceModule.z.scalar: 0
+  ShapeModule.m_Scale.z: 25
+  ShapeModule.arc.spread: 0
+  VelocityModule.x.scalar: -3
+  VelocityModule.y.scalar: -3
+  VelocityModule.z.scalar: -3
+  ForceModule.inWorldSpace: 0
+  ShapeModule.radius.value: 0.04
+  VelocityModule.x.minScalar: 3
+  VelocityModule.y.minScalar: 3
+  VelocityModule.z.minScalar: 3
+  NoiseModule.strength.scalar: 0.1
+  ShapeModule.radiusThickness: 1
+  VelocityModule.x.minMaxState: 3
+  VelocityModule.y.minMaxState: 3
+  VelocityModule.z.minMaxState: 3
+  InheritVelocityModule.enabled: 1
+  InitialModule.maxNumParticles: 50
+  InitialModule.startSize.scalar: 0.3
+  VelocityModule.orbitalX.scalar: 0
+  VelocityModule.orbitalY.scalar: 0
+  VelocityModule.orbitalZ.scalar: 0
+  InitialModule.startSizeY.scalar: 0.3
+  InitialModule.startSizeZ.scalar: 0.3
+  NoiseModule.positionAmount.scalar: 0
+  ShapeModule.randomDirectionAmount: 1
+  EmissionModule.rateOverTime.scalar: 50
+  InitialModule.startLifetime.scalar: 0.3
+  VelocityModule.speedModifier.scalar: 1.66
+  InheritVelocityModule.m_Curve.scalar: 5
+  InheritVelocityModule.m_Curve.minScalar: -5
+  InheritVelocityModule.m_Curve.minMaxState: 3
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  autoRandomSeed: 1
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  looping: 0
+  lengthInSec: 0.4
+  simulationSpeed: 1
+  ShapeModule.type: 0
+  ForceModule.x.scalar: 0
+  ForceModule.y.scalar: 0
+  ForceModule.z.scalar: 0
+  ShapeModule.m_Scale.z: 25
+  ShapeModule.arc.spread: 0
+  VelocityModule.x.scalar: -3
+  VelocityModule.y.scalar: -3
+  VelocityModule.z.scalar: -3
+  ForceModule.inWorldSpace: 0
+  ShapeModule.radius.value: 0.04
+  VelocityModule.x.minScalar: 3
+  VelocityModule.y.minScalar: 3
+  VelocityModule.z.minScalar: 3
+  NoiseModule.strength.scalar: 0.1
+  ShapeModule.radiusThickness: 1
+  VelocityModule.x.minMaxState: 3
+  VelocityModule.y.minMaxState: 3
+  VelocityModule.z.minMaxState: 3
+  InheritVelocityModule.enabled: 1
+  InitialModule.maxNumParticles: 50
+  InitialModule.startSize.scalar: 0.3
+  VelocityModule.orbitalX.scalar: 0
+  VelocityModule.orbitalY.scalar: 0
+  VelocityModule.orbitalZ.scalar: 0
+  InitialModule.startSizeY.scalar: 0.3
+  InitialModule.startSizeZ.scalar: 0.3
+  NoiseModule.positionAmount.scalar: 0
+  ShapeModule.randomDirectionAmount: 1
+  EmissionModule.rateOverTime.scalar: 50
+  InitialModule.startLifetime.scalar: 0.3
+  VelocityModule.speedModifier.scalar: 1.66
+  InheritVelocityModule.m_Curve.scalar: 5
+  InheritVelocityModule.m_Curve.minScalar: -5
+  InheritVelocityModule.m_Curve.minMaxState: 3
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  autoRandomSeed: 1
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 88
+  EmissionModule.rateOverDistance.scalar: 8.24
+  simulationSpeed: 0.5
+  NoiseModule.strength.scalar: 0.1
+  InitialModule.maxNumParticles: 5
+  looping: 0
+  lengthInSec: 0.4
+  simulationSpeed: 1
+  ShapeModule.type: 0
+  ForceModule.x.scalar: 0
+  ForceModule.y.scalar: 0
+  ForceModule.z.scalar: 0
+  ShapeModule.m_Scale.z: 25
+  ShapeModule.arc.spread: 0
+  VelocityModule.x.scalar: -3
+  VelocityModule.y.scalar: -3
+  VelocityModule.z.scalar: -3
+  ForceModule.inWorldSpace: 0
+  ShapeModule.radius.value: 0.04
+  VelocityModule.x.minScalar: 3
+  VelocityModule.y.minScalar: 3
+  VelocityModule.z.minScalar: 3
+  NoiseModule.strength.scalar: 0.1
+  ShapeModule.radiusThickness: 1
+  VelocityModule.x.minMaxState: 3
+  VelocityModule.y.minMaxState: 3
+  VelocityModule.z.minMaxState: 3
+  InheritVelocityModule.enabled: 1
+  InitialModule.maxNumParticles: 50
+  InitialModule.startSize.scalar: 0.3
+  VelocityModule.orbitalX.scalar: 0
+  VelocityModule.orbitalY.scalar: 0
+  VelocityModule.orbitalZ.scalar: 0
+  InitialModule.startSizeY.scalar: 0.3
+  InitialModule.startSizeZ.scalar: 0.3
+  NoiseModule.positionAmount.scalar: 0
+  ShapeModule.randomDirectionAmount: 1
+  EmissionModule.rateOverTime.scalar: 50
+  InitialModule.startLifetime.scalar: 0.3
+  VelocityModule.speedModifier.scalar: 1.66
+  InheritVelocityModule.m_Curve.scalar: 5
+  InheritVelocityModule.m_Curve.minScalar: -5
+  InheritVelocityModule.m_Curve.minMaxState: 3
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  looping: 0
+  lengthInSec: 0.4
+  simulationSpeed: 1
+  ShapeModule.type: 0
+  ForceModule.x.scalar: 0
+  ForceModule.y.scalar: 0
+  ForceModule.z.scalar: 0
+  ShapeModule.m_Scale.z: 25
+  ShapeModule.arc.spread: 0
+  VelocityModule.x.scalar: -3
+  VelocityModule.y.scalar: -3
+  VelocityModule.z.scalar: -3
+  ForceModule.inWorldSpace: 0
+  ShapeModule.radius.value: 0.04
+  VelocityModule.x.minScalar: 3
+  VelocityModule.y.minScalar: 3
+  VelocityModule.z.minScalar: 3
+  NoiseModule.strength.scalar: 0.1
+  ShapeModule.radiusThickness: 1
+  VelocityModule.x.minMaxState: 3
+  VelocityModule.y.minMaxState: 3
+  VelocityModule.z.minMaxState: 3
+  InheritVelocityModule.enabled: 1
+  InitialModule.maxNumParticles: 50
+  InitialModule.startSize.scalar: 0.3
+  VelocityModule.orbitalX.scalar: 0
+  VelocityModule.orbitalY.scalar: 0
+  VelocityModule.orbitalZ.scalar: 0
+  InitialModule.startSizeY.scalar: 0.3
+  InitialModule.startSizeZ.scalar: 0.3
+  NoiseModule.positionAmount.scalar: 0
+  ShapeModule.randomDirectionAmount: 1
+  EmissionModule.rateOverTime.scalar: 50
+  InitialModule.startLifetime.scalar: 0.3
+  VelocityModule.speedModifier.scalar: 1.66
+  InheritVelocityModule.m_Curve.scalar: 5
+  InheritVelocityModule.m_Curve.minScalar: -5
+  InheritVelocityModule.m_Curve.minMaxState: 3
+  numFish: 15
+  maxSpeed: 3.9
+  lockYAxis: 1
+  fishPrefab: 
+  managerSpeed: 0.4
+  wanderArea.y: 0
+  wanderArea.z: 4
+  spawnBounds.y: 0
+  wanderInterval: 3
+  looping: 0
+  lengthInSec: 0.4
+  simulationSpeed: 1
+  ShapeModule.type: 0
+  ForceModule.x.scalar: 0
+  ForceModule.y.scalar: 0
+  ForceModule.z.scalar: 0
+  ShapeModule.m_Scale.z: 25
+  ShapeModule.arc.spread: 0
+  VelocityModule.x.scalar: -3
+  VelocityModule.y.scalar: -3
+  VelocityModule.z.scalar: -3
+  ForceModule.inWorldSpace: 0
+  ShapeModule.radius.value: 0.04
+  VelocityModule.x.minScalar: 3
+  VelocityModule.y.minScalar: 3
+  VelocityModule.z.minScalar: 3
+  NoiseModule.strength.scalar: 0.1
+  ShapeModule.radiusThickness: 1
+  VelocityModule.x.minMaxState: 3
+  VelocityModule.y.minMaxState: 3
+  VelocityModule.z.minMaxState: 3
+  InheritVelocityModule.enabled: 1
+  InitialModule.maxNumParticles: 50
+  InitialModule.startSize.scalar: 0.3
+  VelocityModule.orbitalX.scalar: 0
+  VelocityModule.orbitalY.scalar: 0
+  VelocityModule.orbitalZ.scalar: 0
+  InitialModule.startSizeY.scalar: 0.3
+  InitialModule.startSizeZ.scalar: 0.3
+  NoiseModule.positionAmount.scalar: 0
+  ShapeModule.randomDirectionAmount: 1
+  EmissionModule.rateOverTime.scalar: 50
+  InitialModule.startLifetime.scalar: 0.3
+  VelocityModule.speedModifier.scalar: 1.66
+  InheritVelocityModule.m_Curve.scalar: 5
+  InheritVelocityModule.m_Curve.minScalar: -5
+  InheritVelocityModule.m_Curve.minMaxState: 3
+  looping: 0
+  lengthInSec: 0.4
+  simulationSpeed: 1
+  ShapeModule.type: 0
+  ForceModule.x.scalar: 0
+  ForceModule.y.scalar: 0
+  ForceModule.z.scalar: 0
+  ShapeModule.m_Scale.z: 25
+  ShapeModule.arc.spread: 0
+  VelocityModule.x.scalar: -3
+  VelocityModule.y.scalar: -3
+  VelocityModule.z.scalar: -3
+  ForceModule.inWorldSpace: 0
+  ShapeModule.radius.value: 0.04
+  VelocityModule.x.minScalar: 3
+  VelocityModule.y.minScalar: 3
+  VelocityModule.z.minScalar: 3
+  NoiseModule.strength.scalar: 0.1
+  ShapeModule.radiusThickness: 1
+  VelocityModule.x.minMaxState: 3
+  VelocityModule.y.minMaxState: 3
+  VelocityModule.z.minMaxState: 3
+  InheritVelocityModule.enabled: 1
+  InitialModule.maxNumParticles: 50
+  InitialModule.startSize.scalar: 0.3
+  VelocityModule.orbitalX.scalar: 0
+  VelocityModule.orbitalY.scalar: 0
+  VelocityModule.orbitalZ.scalar: 0
+  InitialModule.startSizeY.scalar: 0.3
+  InitialModule.startSizeZ.scalar: 0.3
+  NoiseModule.positionAmount.scalar: 0
+  ShapeModule.randomDirectionAmount: 1
+  EmissionModule.rateOverTime.scalar: 50
+  InitialModule.startLifetime.scalar: 0.3
+  VelocityModule.speedModifier.scalar: 1.66
+  InheritVelocityModule.m_Curve.scalar: 5
+  InheritVelocityModule.m_Curve.minScalar: -5
+  InheritVelocityModule.m_Curve.minMaxState: 3
+  numFish: 15
+  maxSpeed: 3.96
+  lockYAxis: 1
+  fishPrefab: 
+  managerSpeed: 0.4
+  wanderArea.x: 8
+  wanderArea.y: 0
+  wanderArea.z: 8
+  spawnBounds.y: 0
+  wanderInterval: 3
+  simulationSpeed: 0.5
+  NoiseModule.strength.scalar: 0.1
+  InitialModule.maxNumParticles: 8
+  maxDelay: 20
+  minDelay: 5
+  serializationData.Prefab: 

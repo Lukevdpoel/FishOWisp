@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 2448358778906509668}
   - component: {fileID: 5588188843629919066}
+  - component: {fileID: -6110303022926591184}
   m_Layer: 0
   m_Name: LightDecal
   m_TagString: Untagged
@@ -60,3 +61,20 @@ MonoBehaviour:
   m_FadeFactor: 1
   version: 1
   m_DecalLayerMask: 1
+--- !u!114 &-6110303022926591184
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5850171862818631822}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8ffbc682699257f408e59c6bca00f747, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LightDecalToMoss
+  decalTexture: {fileID: 8600000, guid: f5c52b17e0b53a44183c3e7f52acf2d2, type: 2}
+  color: {r: 1, g: 1, b: 1, a: 1}
+  intensity: 1
+  size: {x: 1, y: 1, z: 1}
+  pivot: {x: 0, y: 0, z: 0}

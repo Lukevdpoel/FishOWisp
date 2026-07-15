@@ -1,57 +1,86 @@
 using UnityEngine;
-using TMPro;
 
-// Two small billboarded text indicators shown above a zone fish so the player can read its interest
-// in the tackle without staring at the bobber:
-//   NOTICE ("!")   — a one-shot text pop the instant a wandering fish first turns toward the
-//                    bobber/lure, paired (by the owner) with a single sound cue. Holds for a beat,
-//                    then fades.
-//   INVESTIGATE    — text that cycles "." -> ".." -> "..." in code WHILE the fish is circling /
-//                    working the tackle (approaching, hovering, nibbling the bobber, or teasing a
-//                    lure), and hides once it commits to the bite or loses interest.
+// A single billboarded flame quad shown above a zone fish so the player can read its interest in
+// the tackle without staring at the bobber. One object, two moods, told apart by COLOR rather than
+// by swapping sprites:
+//   NOTICE      — the instant a wandering fish first turns toward the bobber/lure, the flame pops
+//                 up shifted to the warmer notice palette (paired by the owner with a single sound
+//                 cue), holds for a beat, then crossfades back to...
+//   INVESTIGATE — the flame's own authored material colors (no override — tune the look on the
+//                 material itself), shown WHILE the fish is circling / working the tackle
+//                 (approaching, hovering, nibbling the bobber, or teasing a lure), hidden once it
+//                 commits to the bite or loses interest.
 //
-// Both are plain TextMeshPro for now — no art needed. Owned by FishRipple, which detects the notice
-// edge and the per-frame "investigating" flag; this helper owns the objects, the camera
-// billboarding, the fades and the dot clock. Both are created LAZILY — only for fish that actually
-// engage — and torn down with the fish (Cleanup from FishRipple.OnDisable). The notice sits on top
-// of the dots, and the dots stay suppressed while the notice is still on screen, so the two read as
-// a sequence: "!" (I saw it) -> "..." (let me look).
+// The visual is an owner-authored prefab: a quad with the Flame_Texture_Wobble material, typically
+// carrying BillboardSprite (camera facing) and FlameLag (tip trails the fish's motion). This class
+// only positions it and drives the shader through a MaterialPropertyBlock: _CoreColor/_OuterColor/
+// _GlowColor crossfade between palettes, and _Fade ramps 0..1 so the flame fades in and out
+// instead of popping. Emission intensity rides in the HDR _GlowColor — the shader's _Glow is the
+// glow TEXTURE, not a float, so there is no separate intensity scalar to drive. Owned by
+// FishRipple, created LAZILY — only for fish that actually engage —
+// and torn down with the fish (Cleanup from FishRipple.OnDisable).
 public class FishInterestIndicator
 {
-    public struct Settings
+    // The flame shader colors for one mood. Lerped, not swapped, when the mood changes.
+    [System.Serializable]
+    public struct FlamePalette
     {
-        public string noticeText;       // the notice symbol, e.g. "!"
-        public Color noticeColor;       // tint of the notice text
-        public float noticeFontSize;    // TMP font size for the notice
-        public float noticeDuration;    // seconds the notice holds before fading out
-        public float dotCyclesPerSecond;// how fast the "." -> ".." -> "..." text steps
-        public Color dotColor;          // tint of the investigating dots
-        public float dotFontSize;       // TMP font size for the dots
-        public float fadeTime;          // seconds either indicator fades in/out (0 = instant)
-        public float heightAboveFish;   // world units above the fish the indicators float
-        public float scale;             // uniform world scale applied to the indicator objects
-        public int sortingOrder;        // sort order (the notice draws one above the dots)
+        [ColorUsage(true, true)] public Color core;   // -> _CoreColor (inner flame)
+        [ColorUsage(true, true)] public Color outer;  // -> _OuterColor (outer flame)
+        [ColorUsage(true, true)] public Color glow;   // -> _GlowColor (emission tint + intensity, HDR)
+
+        public static FlamePalette Lerp(in FlamePalette a, in FlamePalette b, float t)
+        {
+            return new FlamePalette
+            {
+                core = Color.Lerp(a.core, b.core, t),
+                outer = Color.Lerp(a.outer, b.outer, t),
+                glow = Color.Lerp(a.glow, b.glow, t),
+            };
+        }
     }
 
-    // The dot steps cycled through while investigating.
-    private static readonly string[] DotSteps = { ".", "..", "..." };
+    public struct Settings
+    {
+        public GameObject flamePrefab;      // owner-authored flame quad; nothing shows while null
+        public FlamePalette noticePalette;  // the warm shift; base colors come from the material
+        public float paletteBlendTime;      // seconds a notice <-> base crossfade takes
+        public float noticeDuration;        // seconds the notice palette holds before blending back
+        public float fadeTime;              // seconds the flame fades in/out (0 = instant)
+        public float heightAboveFish;       // world units above the fish the flame floats
+        public float scale;                 // multiplier on top of the prefab's authored scale
+        public int sortingOrder;            // renderer sorting order
+    }
 
-    private TextMeshPro noticeText;
-    private TextMeshPro investigateText;
+    private static readonly int FadeId = Shader.PropertyToID("_Fade");
+    private static readonly int CoreColorId = Shader.PropertyToID("_CoreColor");
+    private static readonly int OuterColorId = Shader.PropertyToID("_OuterColor");
+    private static readonly int GlowColorId = Shader.PropertyToID("_GlowColor");
 
-    private bool noticeActive;
-    private float noticeTimer;      // > 0 while the notice is in its hold
-    private float noticeAlpha;
-    private float dotAlpha;
-    private float dotClock;         // advances only while the dots are actually showing
+    private GameObject flame;
+    private Renderer flameRenderer;
+    private MaterialPropertyBlock propertyBlock;
+    private Vector3 prefabScale = Vector3.one;
+    private FlamePalette basePalette;   // the material's authored colors, sampled at build
 
     private bool built;
+    private bool noticeActive;
+    private float noticeTimer;      // > 0 while the notice is in its hold
+    private float alpha;            // drives _Fade
+
+    // Palette crossfade state: from -> to over blend 0..1.
+    private FlamePalette fromPalette;
+    private FlamePalette toPalette;
+    private float blend = 1f;
+    private bool showingNotice;
+    private bool moodInitialized;
 
     // Fire the one-shot notice pop. The owner plays the sound itself (it holds the AudioClip and
     // the world position), so this stays purely visual.
     public void TriggerNotice(in Settings s)
     {
         EnsureBuilt(s);
+        if (!built) return;
         noticeActive = true;
         noticeTimer = Mathf.Max(0.01f, s.noticeDuration);
     }
@@ -66,102 +95,125 @@ public class FishInterestIndicator
         {
             if (!investigating && !noticeActive) return;
             EnsureBuilt(s);
+            if (!built) return; // no prefab assigned
         }
 
         float dt = Time.deltaTime;
 
-        // ----- Notice "!" -----
         if (noticeActive)
         {
             noticeTimer -= dt;
             if (noticeTimer <= 0f) noticeActive = false;
         }
-        noticeAlpha = Fade(noticeAlpha, noticeActive ? 1f : 0f, s.fadeTime, dt);
-        ApplyNotice(fishPos, s);
 
-        // ----- Investigate "..." ----- (held back while the notice is still on screen)
-        bool showDots = investigating && !noticeActive;
-        dotAlpha = Fade(dotAlpha, showDots ? 1f : 0f, s.fadeTime, dt);
-        if (showDots) dotClock += dt * Mathf.Max(0.01f, s.dotCyclesPerSecond);
-        ApplyDots(fishPos, s);
+        // While hidden, snap the palette so the flame never fades in mid-crossfade in stale colors.
+        SetMood(noticeActive, in s, instant: alpha <= 0.001f);
+        if (s.paletteBlendTime <= 0f) blend = 1f;
+        else blend = Mathf.MoveTowards(blend, 1f, dt / s.paletteBlendTime);
+
+        bool visible = noticeActive || investigating;
+        alpha = Fade(alpha, visible ? 1f : 0f, s.fadeTime, dt);
+
+        Apply(fishPos, in s);
     }
 
-    // Destroy the indicator objects with the fish. Safe to call more than once.
+    // Destroy the flame with the fish. Safe to call more than once.
     public void Cleanup()
     {
-        if (noticeText != null) Object.Destroy(noticeText.gameObject);
-        if (investigateText != null) Object.Destroy(investigateText.gameObject);
-        noticeText = null;
-        investigateText = null;
+        if (flame != null) Object.Destroy(flame);
+        flame = null;
+        flameRenderer = null;
         built = false;
         noticeActive = false;
-        noticeAlpha = 0f;
-        dotAlpha = 0f;
+        alpha = 0f;
+        blend = 1f;
+        moodInitialized = false;
     }
 
     private void EnsureBuilt(in Settings s)
     {
         if (built) return;
-        noticeText = CreateText("FishNoticeIndicator", s.sortingOrder + 1);
-        investigateText = CreateText("FishInvestigateIndicator", s.sortingOrder);
+        if (s.flamePrefab == null) return; // owner hasn't wired the flame prefab yet
+
+        flame = Object.Instantiate(s.flamePrefab);
+        flame.name = "FishInterestFlame";
+        flameRenderer = flame.GetComponentInChildren<Renderer>(true);
+        if (flameRenderer == null)
+        {
+            Debug.LogWarning("FishInterestIndicator: flame prefab has no Renderer.", s.flamePrefab);
+            Object.Destroy(flame);
+            flame = null;
+            return;
+        }
+        prefabScale = flame.transform.localScale;
+
+        // The investigate look IS the material — sample its colors once so the notice shift can
+        // crossfade from/to them.
+        Material mat = flameRenderer.sharedMaterial;
+        basePalette = new FlamePalette
+        {
+            core = mat != null && mat.HasProperty(CoreColorId) ? mat.GetColor(CoreColorId) : Color.white,
+            outer = mat != null && mat.HasProperty(OuterColorId) ? mat.GetColor(OuterColorId) : Color.white,
+            glow = mat != null && mat.HasProperty(GlowColorId) ? mat.GetColor(GlowColorId) : Color.white,
+        };
+
+        if (propertyBlock == null) propertyBlock = new MaterialPropertyBlock();
+        flame.SetActive(false);
         built = true;
     }
 
-    // A world-space TextMeshPro (MeshRenderer-based, no Canvas) that uses the TMP default font.
-    private static TextMeshPro CreateText(string name, int sortingOrder)
+    private void SetMood(bool notice, in Settings s, bool instant)
     {
-        GameObject go = new GameObject(name);
-        TextMeshPro tmp = go.AddComponent<TextMeshPro>();
-        tmp.alignment = TextAlignmentOptions.Center;
-        var mr = tmp.GetComponent<MeshRenderer>();
-        if (mr != null) mr.sortingOrder = sortingOrder;
-        go.SetActive(false);
-        return tmp;
+        FlamePalette target = notice ? s.noticePalette : basePalette;
+
+        if (!moodInitialized || instant)
+        {
+            fromPalette = target;
+            toPalette = target;
+            blend = 1f;
+            showingNotice = notice;
+            moodInitialized = true;
+            return;
+        }
+
+        if (showingNotice != notice)
+        {
+            fromPalette = CurrentPalette();
+            toPalette = target;
+            blend = 0f;
+            showingNotice = notice;
+            return;
+        }
+
+        // Same mood: keep tracking the settings so inspector tuning shows up live.
+        toPalette = target;
     }
 
-    private void ApplyNotice(Vector3 fishPos, in Settings s)
+    private FlamePalette CurrentPalette() => FlamePalette.Lerp(in fromPalette, in toPalette, blend);
+
+    private void Apply(Vector3 fishPos, in Settings s)
     {
-        if (noticeText == null) return;
+        if (flame == null) return;
 
-        bool visible = noticeAlpha > 0.001f;
-        if (noticeText.gameObject.activeSelf != visible) noticeText.gameObject.SetActive(visible);
-        if (!visible) return;
+        bool show = alpha > 0.001f;
+        if (flame.activeSelf != show) flame.SetActive(show);
+        if (!show) return;
 
-        noticeText.text = s.noticeText;
-        noticeText.fontSize = s.noticeFontSize;
-        Color c = s.noticeColor; c.a *= noticeAlpha; noticeText.color = c;
-        SetSortingOrder(noticeText, s.sortingOrder + 1);
-        Place(noticeText.transform, fishPos, s);
-    }
+        // Position and scale only — facing is BillboardSprite's job and the motion-trail is
+        // FlameLag's, both living on the prefab.
+        flame.transform.position = fishPos + Vector3.up * s.heightAboveFish;
+        flame.transform.localScale = prefabScale * Mathf.Max(0.01f, s.scale);
 
-    private void ApplyDots(Vector3 fishPos, in Settings s)
-    {
-        if (investigateText == null) return;
+        FlamePalette p = CurrentPalette();
+        flameRenderer.GetPropertyBlock(propertyBlock);
+        propertyBlock.SetFloat(FadeId, alpha);
+        propertyBlock.SetColor(CoreColorId, p.core);
+        propertyBlock.SetColor(OuterColorId, p.outer);
+        propertyBlock.SetColor(GlowColorId, p.glow);
+        flameRenderer.SetPropertyBlock(propertyBlock);
 
-        bool visible = dotAlpha > 0.001f;
-        if (investigateText.gameObject.activeSelf != visible) investigateText.gameObject.SetActive(visible);
-        if (!visible) return;
-
-        investigateText.text = DotSteps[Mathf.Abs((int)dotClock) % DotSteps.Length];
-        investigateText.fontSize = s.dotFontSize;
-        Color c = s.dotColor; c.a *= dotAlpha; investigateText.color = c;
-        SetSortingOrder(investigateText, s.sortingOrder);
-        Place(investigateText.transform, fishPos, s);
-    }
-
-    private static void SetSortingOrder(TextMeshPro tmp, int order)
-    {
-        var mr = tmp.GetComponent<MeshRenderer>();
-        if (mr != null) mr.sortingOrder = order;
-    }
-
-    // Float above the fish and billboard to the camera so the flat text always faces the player.
-    private static void Place(Transform t, Vector3 fishPos, in Settings s)
-    {
-        t.position = fishPos + Vector3.up * s.heightAboveFish;
-        t.localScale = Vector3.one * Mathf.Max(0.01f, s.scale);
-        Camera cam = Camera.main;
-        if (cam != null) t.rotation = cam.transform.rotation;
+        if (flameRenderer.sortingOrder != s.sortingOrder)
+            flameRenderer.sortingOrder = s.sortingOrder;
     }
 
     private static float Fade(float current, float target, float fadeTime, float dt)

@@ -12,6 +12,7 @@ struct Attributes
     float3 normalOS : NORMAL;
     float4 tangentOS : TANGENT;
     float2 uv : TEXCOORD0;
+    float4 color : COLOR;
 };
 
 struct Varyings
@@ -20,6 +21,7 @@ struct Varyings
     float2 uv : TEXCOORD0;
     float  fogCoord : TEXCOORD1;
     float  layer : TEXCOORD2;
+    float  mask : TEXCOORD3;
 };
 
 Attributes vert(Attributes input)
@@ -40,22 +42,28 @@ void AppendShellVertex(inout TriangleStream<Varyings> stream, Attributes input, 
     float3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
     float3 move = moveFactor * _BaseMove.xyz;
 
+    float mask = ComputeMossMask(input.color);
     float3 shellDir = normalize(normalInput.normalWS + move + windMove);
-    float3 posWS = vertexInput.positionWS + shellDir * (_ShellStep * index);
+    float3 posWS = vertexInput.positionWS + shellDir * (_ShellStep * index * mask);
     //float4 posCS = TransformWorldToHClip(posWS);
     float4 posCS = GetShadowPositionHClip(posWS, normalInput.normalWS);
-    
+
     output.vertex = posCS;
     output.uv = TRANSFORM_TEX(input.uv, _FurMap);
     output.fogCoord = ComputeFogFactor(posCS.z);
     output.layer = (float)index / _ShellAmount;
+    output.mask = mask;
 
     stream.Append(output);
 }
 
-[maxvertexcount(128)]
+[maxvertexcount(42)]
 void geom(triangle Attributes input[3], inout TriangleStream<Varyings> stream)
 {
+    float triMask = max(ComputeMossMask(input[0].color),
+                    max(ComputeMossMask(input[1].color), ComputeMossMask(input[2].color)));
+    if (triMask <= 0.0) return;
+
     [loop] for (float i = 0; i < _ShellAmount; ++i)
     {
         [unroll] for (float j = 0; j < 3; ++j)
@@ -72,8 +80,9 @@ void frag(
     out float outDepth : SV_Depth)
 {
     float4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, input.uv * _FurScale);
-    float alpha = furColor.r * (1.0 - input.layer);
-    if (input.layer > 0.0 && alpha < _AlphaCutout) discard;
+    float cov = MossCoverage(input.mask, furColor.r);
+    float alpha = (input.layer == 0.0) ? cov : furColor.r * (1.0 - input.layer) * cov;
+    if (alpha < _AlphaCutout) discard;
 
     outColor = outDepth = input.vertex.z / input.vertex.w;
 }

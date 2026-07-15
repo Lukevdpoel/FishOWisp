@@ -30,6 +30,10 @@ public static class KeyInput
     public static bool InventoryToggleReleased => Input.GetKeyUp(T.inventoryToggle);
     public static bool PageNextPressed => Input.GetKeyDown(T.pageNext);
     public static bool PagePrevPressed => Input.GetKeyDown(T.pagePrev);
+    // The small in-page flip through the encyclopedia fish list, distinct from the big
+    // pageNext/pagePrev physical page turn above.
+    public static bool FishListNextPressed => Input.GetKeyDown(T.fishListNext);
+    public static bool FishListPrevPressed => Input.GetKeyDown(T.fishListPrev);
     public static bool ConfirmPressed => Input.GetKeyDown(T.confirm);
 
     // --- Fishing ---

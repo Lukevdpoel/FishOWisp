@@ -21,16 +21,19 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: TreeRoots 2
-  m_Shader: {fileID: -6465566751694194690, guid: b323f523183f89a41bb6fa3311ce8ba8, type: 3}
+  m_Shader: {fileID: 4800000, guid: 933532a4fcc9baf4fa0491de14d08ed7, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
-  m_ValidKeywords: []
+  m_ValidKeywords:
+  - _NORMALMAP
+  - _OCCLUSIONMAP
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
   m_CustomRenderQueue: -1
-  stringTagMap: {}
+  stringTagMap:
+    RenderType: Opaque
   disabledShaderPasses:
   - MOTIONVECTORS
   m_LockedProperties: 
@@ -167,7 +170,7 @@ Material:
     m_Colors:
     - _AmbientColor: {r: 0.007843138, g: 0.078431375, b: 0.023529412, a: 0}
     - _BaseColor: {r: 0.70980394, g: 0.99215686, b: 0.6509804, a: 1}
-    - _Color: {r: 0.63040227, g: 0.8301887, b: 0.59131366, a: 1}
+    - _Color: {r: 0.70980394, g: 0.9921568, b: 0.6509804, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _Levels: {r: -0.03, g: 1, b: 0, a: 0}
     - _Normalcolor: {r: 0.050980568, g: 1, b: 0, a: 1}

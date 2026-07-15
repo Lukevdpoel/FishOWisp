@@ -4,9 +4,12 @@ using UnityEngine;
 // The "About Fishing"-style whip gesture that replaces the old hold-to-charge cast. While the
 // player holds the aim button, this watches the mouse (and, on gamepad, the right stick) for a
 // PULL in any direction — left, right, back or forward — followed by a fast PUSH back through
-// center the opposite way. The reversal speed becomes the throw power (0..1): a reversal slower
-// than minCastSpeed simply does not cast — the pull relaxes and the player can wind up again,
-// with no failure state.
+// center the opposite way. The throw power (0..1) is the DEPTH of the wind-up — how far back
+// the pull reached before the flick — not the reversal speed: smoothed velocity is capped at
+// roughly responsiveness × distance travelled, so it can't distinguish a hard flick from a soft
+// one and reads near-constant on a stick (fixed engage→release geometry). Speed only gates
+// validity: a reversal slower than minCastSpeed simply does not cast — the pull relaxes and the
+// player can wind up again, with no failure state.
 //
 // Pure input math, no scene access: RodCasting feeds it deltas every frame and reads the pull
 // pose back out for the procedural arm/rod animation (ProceduralCastArms).
@@ -20,12 +23,10 @@ public class CastFlickGesture
     public class Settings
     {
         [Header("Shared")]
-        [Tooltip("Pull distance (0..1) at which a wind-up arms the CAST detector. The pose follows the pull freely at any distance — this only decides when a reversal can throw.")]
+        [Tooltip("Pull distance (0..1) at which a wind-up arms the CAST detector, and the zero-power point of the depth→power map (a full pull to 1 is full power). The pose follows the pull freely at any distance.")]
         [Range(0.1f, 0.9f)] public float pullEngageDistance = 0.35f;
-        [Tooltip("Reversal speed (normalized pull units/sec) below which releasing the pull does NOT cast. Too slow = no throw, keep aiming.")]
+        [Tooltip("Reversal speed (normalized pull units/sec) below which releasing the pull does NOT cast. Too slow = no throw, keep aiming. Power comes from the wind-up depth, not this speed.")]
         public float minCastSpeed = 3f;
-        [Tooltip("Reversal speed that maps to full throw power. Speeds between min and max lerp the cast toward the marker.")]
-        public float maxCastSpeed = 14f;
         [Tooltip("How fast the mouse pull relaxes toward center (units/sec) once the hand is idle. Never fights live movement — any motion, however small, pauses it. (The stick self-centers on its own, so this is mouse-only.)")]
         public float idleReturnRate = 3f;
         [Tooltip("Mouse speed (normalized units/sec) below which the hand counts as idle. Movement above this — however slow — is read 1:1 and never eaten by the relaxation.")]
@@ -40,10 +41,10 @@ public class CastFlickGesture
         public float mouseSensitivity = 0.05f;
 
         [Header("Right Stick")]
-        [Tooltip("Stick deflection at which the wind-up arms the CAST detector (the pose follows any deflection regardless — this mirrors pullEngageDistance on the mouse). The marker lives on the LEFT stick, so the right stick belongs entirely to the whip.")]
-        [Range(0.4f, 1f)] public float stickEngageMagnitude = 0.75f;
-        [Tooltip("Stick reversal speed (deflection/sec) → cast speed multiplier, so pads land in the same min/maxCastSpeed window as the mouse.")]
-        public float stickVelocityScale = 1.0f;
+        [Tooltip("Stick deflection at which the wind-up arms the CAST detector, and the zero-power point of the depth→power map (rim yank = full power, so keep this low enough to leave a soft-cast tilt range). The pose follows any deflection regardless. The marker lives on the LEFT stick, so the right stick belongs entirely to the whip.")]
+        [Range(0.4f, 1f)] public float stickEngageMagnitude = 0.45f;
+        [Tooltip("Stick reversal speed (deflection/sec) multiplier before the minCastSpeed validity gate, so pad flicks clear the same bar as the mouse.")]
+        public float stickVelocityScale = 2.0f;
     }
 
     // --- mouse pull state ---
@@ -52,6 +53,7 @@ public class CastFlickGesture
     private bool mousePulled;
     private Vector2 mousePullDir;
     private float mouseIdleTime;
+    private float mouseApex;   // deepest wind-up (along pull dir) this pull — the flick distance
 
     // --- stick pull state ---
     private Vector2 prevStick;
@@ -59,6 +61,7 @@ public class CastFlickGesture
     private bool stickEngaged;
     private Vector2 stickPullDir;
     private Vector2 lastStick;
+    private float stickApex;   // deepest deflection (along pull dir) this wind-up
 
     /// <summary>Current combined pull (x = right, y = away), magnitude ≤ 1. Drives the rod/arm pose.</summary>
     public Vector2 Pull { get; private set; }
@@ -75,10 +78,12 @@ public class CastFlickGesture
         mouseVel = Vector2.zero;
         mousePulled = false;
         mouseIdleTime = 0f;
+        mouseApex = 0f;
         prevStick = Vector2.zero;
         stickVel = Vector2.zero;
         stickEngaged = false;
         lastStick = Vector2.zero;
+        stickApex = 0f;
         Pull = Vector2.zero;
     }
 
@@ -135,9 +140,16 @@ public class CastFlickGesture
             {
                 mousePulled = true;
                 mousePullDir = mouseOffset.normalized;
+                mouseApex = mouseOffset.magnitude;
             }
             return false;
         }
+
+        // The apex is the flick distance: it rises with active pulling, and follows the idle
+        // decay back down so a deep pull that relaxed home can't inflate a tiny late flick.
+        float depth = Vector2.Dot(mouseOffset, mousePullDir);
+        mouseApex = mouseIdleTime >= s.idleDelay ? Mathf.Min(mouseApex, depth)
+                                                 : Mathf.Max(mouseApex, depth);
 
         // Still wound up on the pull side: let a slow drag re-aim the wind-up direction.
         if (mouseOffset.magnitude >= s.pullEngageDistance && Vector2.Dot(mouseOffset, mousePullDir) > 0f)
@@ -147,12 +159,13 @@ public class CastFlickGesture
         }
 
         // Crossed back inside the engage ring (or flipped straight through center in one fast
-        // frame): this is the moment of truth — read the push speed against the pull direction.
+        // frame): this is the moment of truth — the push speed against the pull direction decides
+        // WHETHER this was a flick; the wind-up depth decides how HARD the throw is.
         float speed = Vector2.Dot(mouseVel, -mousePullDir);
         mousePulled = false;
         if (speed < s.minCastSpeed) return false;
 
-        power = Mathf.Clamp01(Mathf.InverseLerp(s.minCastSpeed, s.maxCastSpeed, speed));
+        power = Mathf.Clamp01(Mathf.InverseLerp(s.pullEngageDistance, 1f, mouseApex));
         pushDir = -mousePullDir;
         return true;
     }
@@ -174,9 +187,14 @@ public class CastFlickGesture
             {
                 stickEngaged = true;
                 stickPullDir = stick.normalized;
+                stickApex = mag;
             }
             return false;
         }
+
+        // The deepest deflection reached is the flick distance (sticks self-center, so unlike the
+        // mouse there is no idle decay to follow back down).
+        stickApex = Mathf.Max(stickApex, Vector2.Dot(stick, stickPullDir));
 
         // Track the pull direction while the stick stays out on the pull side.
         if (mag >= s.stickEngageMagnitude * 0.8f && Vector2.Dot(stick, stickPullDir) > 0f)
@@ -189,11 +207,13 @@ public class CastFlickGesture
         bool flipped = Vector2.Dot(stick, stickPullDir) < 0f;
         if (!released && !flipped) return false;
 
+        // Reversal speed decides WHETHER this was a flick; the wind-up depth decides the power —
+        // half-tilt flick = soft cast, rim yank = full cast.
         float speed = Vector2.Dot(stickVel, -stickPullDir) * s.stickVelocityScale;
         stickEngaged = false;
         if (speed < s.minCastSpeed) return false;
 
-        power = Mathf.Clamp01(Mathf.InverseLerp(s.minCastSpeed, s.maxCastSpeed, speed));
+        power = Mathf.Clamp01(Mathf.InverseLerp(s.stickEngageMagnitude, 1f, stickApex));
         pushDir = -stickPullDir;
         return true;
     }

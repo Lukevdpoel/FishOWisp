@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 8142249931869863498}
   - component: {fileID: 3172988632922909741}
   - component: {fileID: 2236535008149840354}
+  - component: {fileID: -5225542410690272447}
   m_Layer: 0
   m_Name: FishRipple2
   m_TagString: Untagged
@@ -4881,6 +4882,7 @@ MonoBehaviour:
   huntCatchRange: 1.5
   huntLeashRadius: 9
   huntCooldown: 3
+  huntCoastDecay: 0.9
   naturalAttraction: 0.05
   naturalAttractionMinDist: 3.5
   weaveAmplitude: 4
@@ -4939,15 +4941,15 @@ MonoBehaviour:
   alwaysShowIndicator: 1
   enableBaitIndicator: 0
   enableInterestIndicators: 1
-  noticeText: '!'
-  noticeColor: {r: 1, g: 0.79607844, b: 0.15686275, a: 1}
-  noticeFontSize: 8
+  interestFlamePrefab: {fileID: 1748329257967248724, guid: afef629677348064993705e217293fcf, type: 3}
+  noticeFlame:
+    core: {r: 1, g: 1, b: 1, a: 1}
+    outer: {r: 1, g: 0.85, b: 0.3, a: 1}
+    glow: {r: 2, g: 1.2, b: 0.2, a: 1}
+  flameBlendTime: 0.35
   noticeSound: {fileID: 8300000, guid: 2657a5c5a2579ab4b9dcfa6a3b9e9f1b, type: 3}
   noticeSoundVolume: 1
   noticeDuration: 1
-  investigateDotSpeed: 3
-  investigateDotColor: {r: 1, g: 0.7971703, b: 0.15566039, a: 1}
-  investigateDotFontSize: 5.82
   indicatorHeight: 0.04
   indicatorScale: 0.5
   indicatorFadeTime: 0.15
@@ -4962,3 +4964,20 @@ MonoBehaviour:
   lifetimeJitterSeconds: 20
   spawnFadeInSeconds: 2.5
   preset: {fileID: 0}
+--- !u!114 &-5225542410690272447
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 86703556735717939}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ba92df5f031c88b4c9fb74b2655dacda, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlantPusher
+  radius: 0.001
+  height: 1.8
+  centerOffset: {x: 0, y: 0.9, z: 0}
+  impulseOnly: 1
+  impulseStrength: 0.5

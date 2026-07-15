@@ -1,0 +1,59 @@
+# Inspector values from: Prefabs/GameplayUI.prefab
+# Backup date: 2026-07-12
+
+### FishEntryUI  on GameObject "Entry"
+  fishImage: {fileID: 0}
+  fishNameText: {fileID: 7036357578699373971}
+  sizeClassText: {fileID: 0}
+  caughtText: {fileID: 2672963499552611984}
+  largestCaughtText: {fileID: 625639077621191133}
+  smallestCaughtText: {fileID: 3699896021789568708}
+  basePriceText: {fileID: 4308992560894666338}
+  pricePerCmText: {fileID: 0}
+  baitText: {fileID: 7441712053268373792}
+  weatherText: {fileID: 8381272816837524114}
+
+### FishEncyclopediaManager  on GameObject "NoteMenu"
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  deleteOnStart: 0
+  allFishPresets:
+  - {fileID: 11400000, guid: 599c32615c33e93438130c3b94c4393e, type: 2}
+  - {fileID: 11400000, guid: 497a14c126ccec047888c7092706854b, type: 2}
+  - {fileID: 11400000, guid: 51adb0e7344610843baee0e4ed41ab9c, type: 2}
+  - {fileID: 11400000, guid: 8a7be413503e5e34e863a04c64ffffa9, type: 2}
+  - {fileID: 11400000, guid: 44d32b653b9f0d84296037208a93cfd8, type: 2}
+  - {fileID: 11400000, guid: fc5d74fd564d7834cbbdd9edd02fd2f3, type: 2}
+  - {fileID: 11400000, guid: a0fe0e5a1de96e9468293bb94c31a23e, type: 2}
+  - {fileID: 11400000, guid: c6b7cc6730100944c84da1c444c8306a, type: 2}
+  - {fileID: 11400000, guid: 9e7c1b5588628c34fa466c595886ee85, type: 2}
+  - {fileID: 11400000, guid: 0f770c6603d04984b9cca6a3eb07e427, type: 2}
+  encyclopediaEntries: []
+
+### DebugFishCatcher  on GameObject "NoteMenu"
+  fishPool: {fileID: 11400000, guid: 5d1342804cf861d4bab7b452ddcaeb29, type: 2}
+
+### PauseMenu  on GameObject "GameplayUI"
+  PauseMenuUI: {fileID: 489133856050564953}
+  MenuImage: {fileID: 0}
+  PostProcessVolume: {fileID: 0}
+  fullScreenMaterial: {fileID: 0}
+  shaderIntensityName: _Intensity
+  transitionDuration: 0.5
+
+### NoteMenu  on GameObject "GameplayUI"
+  noteAnimator: {fileID: 0}
+  mainCamera: {fileID: 0}
+  backdropCamera: {fileID: 0}
+  captureRT: {fileID: 0}
+  backdropMaterial: {fileID: 0}
+  intensityProperty: _Intensity
+  kuwaharaFadeDuration: 0.5
+  kuwaharaMaxIntensity: 1

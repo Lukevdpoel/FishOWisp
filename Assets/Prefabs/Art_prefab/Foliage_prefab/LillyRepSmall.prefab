@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 2896901194401375847}
   - component: {fileID: 3158691596802878309}
   - component: {fileID: 2311820461340780493}
+  - component: {fileID: 5487002086218485924}
   m_Layer: 0
   m_Name: LillyRepSmall
   m_TagString: Untagged
@@ -89,3 +90,24 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &5487002086218485924
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7817897610715369811}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7c4e21a9f6d40c58a13e7d2b0956c8f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  reach: 0.35
+  padRadius: 0
+  bobStrength: 0.4
+  tiltStrength: 25
+  stiffness: 45
+  damping: 6
+  maxRise: 0.2
+  maxTilt: 20
+  gateByVisibility: 1

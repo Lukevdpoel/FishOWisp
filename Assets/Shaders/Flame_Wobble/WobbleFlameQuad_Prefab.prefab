@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &350651953177723463
+--- !u!1 &1748329257967248724
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,50 +8,52 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 9213138714568172761}
-  - component: {fileID: 1597575230813758477}
-  - component: {fileID: 7224465818057543647}
+  - component: {fileID: 933931980685579356}
+  - component: {fileID: 3703102981647459959}
+  - component: {fileID: 1760356874021599973}
+  - component: {fileID: 1912581855324990696}
+  - component: {fileID: 206284821435032095}
   m_Layer: 0
-  m_Name: LillyRepBigWalk
+  m_Name: WobbleFlameQuad_Prefab
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &9213138714568172761
+--- !u!4 &933931980685579356
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 350651953177723463}
+  m_GameObject: {fileID: 1748329257967248724}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 44.86, y: -1.51, z: 26.13}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1.0344683, y: 1.0344684, z: 1.0344683}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &1597575230813758477
+--- !u!33 &3703102981647459959
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 350651953177723463}
-  m_Mesh: {fileID: -2432090755550338912, guid: 028d48181b689c848b280d7182943364, type: 3}
---- !u!23 &7224465818057543647
+  m_GameObject: {fileID: 1748329257967248724}
+  m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
+--- !u!23 &1760356874021599973
 MeshRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 350651953177723463}
+  m_GameObject: {fileID: 1748329257967248724}
   m_Enabled: 1
   m_CastShadows: 0
   m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
+  m_DynamicOccludee: 0
   m_StaticShadowCaster: 0
   m_MotionVectors: 1
   m_LightProbeUsage: 1
@@ -66,7 +68,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 7e420a84b6dfdb54993c353bf67df156, type: 2}
+  - {fileID: 2100000, guid: 08e89e33095437b468fe14a5d6ad465c, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -89,3 +91,36 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &1912581855324990696
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1748329257967248724}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d2b431ee5891b66489313f1e80c6f1cc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::BillboardSprite
+  type: 0
+  smoothRotation: 1
+--- !u!114 &206284821435032095
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1748329257967248724}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c96e031af1684de1893d8e8cb6eadcfb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FlameLag
+  flameRenderer: {fileID: 1760356874021599973}
+  velocityToOffset: 0.08
+  stiffness: 80
+  damping: 12
+  maxOffset: 0.3
+  teleportDistance: 3
+  useUnscaledTime: 1

@@ -60,6 +60,7 @@ public class FishDisplaySway : MonoBehaviour
         public Vector3[] workVertices;
     }
     private System.Collections.Generic.List<CpuMesh> cpuMeshes;
+    private Renderer[] cpuRenderers; // visibility gate for the CPU path — no viewer, no per-vertex work
 
     private void Start()
     {
@@ -111,6 +112,7 @@ public class FishDisplaySway : MonoBehaviour
 
     private void SetupCpuFallback()
     {
+        cpuRenderers = GetComponentsInChildren<Renderer>(true);
         cpuMeshes = new System.Collections.Generic.List<CpuMesh>();
         foreach (MeshFilter filter in GetComponentsInChildren<MeshFilter>(true))
         {
@@ -150,6 +152,16 @@ public class FishDisplaySway : MonoBehaviour
         }
 
         if (cpuMeshes == null || cpuMeshes.Count == 0) return;
+
+        // No camera can see this fish (display fish spend most of their life inside closed
+        // menus or across the map) — skip the per-vertex deform. The clock above still
+        // advances, so the wave is in the right pose the moment it's visible again.
+        bool anyVisible = false;
+        for (int i = 0; i < cpuRenderers.Length; i++)
+        {
+            if (cpuRenderers[i] != null && cpuRenderers[i].isVisible) { anyVisible = true; break; }
+        }
+        if (!anyVisible) return;
 
         // CPU mirror of FishSwayLateralWave in FishSway.hlsl: travelling wave masked from
         // the head, plus drift/wobble faded in over the front third (the head guard).

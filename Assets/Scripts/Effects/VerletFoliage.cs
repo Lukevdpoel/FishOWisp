@@ -7,15 +7,28 @@ using UnityEngine;
 // for plants the player/fish move THROUGH rather than a character body that wobbles from its own
 // motion. The two differences from SoftBodyJiggle:
 //
-//   1. EXTERNAL PUSHERS. Every PlantPusher (the player, later each fish) shoves the sim points out
-//      of its capsule each step. Verlet converts that positional shove into momentum for free, so
-//      the curtain parts as you walk in and swings + settles once you pass through. SoftBodyJiggle
-//      had no concept of an outside agent touching it.
+//   1. EXTERNAL PUSHERS. Every continuous PlantPusher (the player) shoves the sim points out of its
+//      capsule each step. Verlet converts that positional shove into momentum for free, so the
+//      curtain parts as you walk in and swings + settles once you pass through. SoftBodyJiggle had
+//      no concept of an outside agent touching it. Pushers marked impulseOnly (fish) instead
+//      deliver ONE wiggle kick on first touch and are then ignored until they leave and return —
+//      they never appear in the per-step solver loop and never block sleeping.
 //
 //   2. EDGE ANCHORING. A vine hangs from its top edge, so verts near the top (along anchorAxis) are
 //      pinned to their rest pose while the rest swing freely — instead of SoftBodyJiggle's pin-by-
 //      distance-to-a-socket scheme. Set anchorAxis to pin a different edge (lily pads will pin a
 //      centre region instead; that's a future mode).
+//
+//   3. SLEEPING. Once the plant has settled back at its rest pose (and no wind is configured), the
+//      sim parks the rest mesh and shuts off completely; a sleeping instance costs one distance
+//      check per PlantPusher per frame. This is what makes it OK to scatter dozens of lily pads
+//      with this component — only the plants actively being pushed (or still swinging afterwards)
+//      pay for the solver. Three rules keep that true even with fish pushers roaming BETWEEN the
+//      plants all day:
+//        - Waking needs actual contact: a capsule near a real (rest) vertex, not merely inside the
+//          mesh's bounds sphere. A fish idling beside or under a pad doesn't hold it awake.
+//        - Off-screen plants never wake, and an awake plant that leaves the screen parks instantly.
+//        - MaxAwake caps how many instances may simulate at once, bounding the worst frame.
 //
 // Like SoftBodyJiggle, this writes ONLY vertex data on a private mesh copy, so it composes under any
 // transform animation and never mutates the shared asset. The source mesh MUST be Read/Write enabled
@@ -43,6 +56,14 @@ public class VerletFoliage : MonoBehaviour
     [Tooltip("Max distance (world units) a vertex may sit from its rest position. Bounds how far the curtain parts and stops a frame hitch from blowing it apart. Make this larger than how far the player should be able to shove a strand.")]
     public float maxOffset = 1.2f;
 
+    public enum ImpulseStyle { Radial, WaterBob }
+    [Tooltip("Shape of the one-shot fish wiggle. Radial: shoved away from the body — bushes, curtains, reeds. WaterBob: lifted upward (strongest at the contact side, so the plant tilts and rocks) like water displaced under it — lily pads and anything floating.")]
+    public ImpulseStyle impulseStyle = ImpulseStyle.Radial;
+    [Tooltip("Spring-back used ONLY while ringing out from a fish wiggle — the normal Stiffness above still governs player interaction. Lower = slower, lazier bob (water). Set equal to Stiffness for no difference.")]
+    [Range(0f, 1f)] public float impulseStiffness = 0.03f;
+    [Tooltip("Velocity bleed used ONLY while ringing out from a fish wiggle — the normal Damping above still governs player interaction. Lower = the wiggle rings longer before settling.")]
+    [Range(0f, 1f)] public float impulseDamping = 0.02f;
+
     [Header("Ambient Wind")]
     [Tooltip("Gentle idle sway so the foliage isn't dead-static. 0 = OFF, which is the right choice when the foliage SHADER already does wind (e.g. the willow leaves) — let the GPU shader handle ambient flutter and leave Verlet for interaction only, otherwise the two stack. Turn this on only for plants with no wind shader.")]
     public float windStrength = 0f;
@@ -66,6 +87,25 @@ public class VerletFoliage : MonoBehaviour
     public float simulationRate = 60f;
     [Tooltip("Max fixed steps run in one frame — a spiral-of-death guard. Below simulationRate/maxSubSteps FPS the sim slows down rather than exploding.")]
     [Range(1, 16)] public int maxSubSteps = 8;
+
+    [Header("Sleeping")]
+    [Tooltip("Shut the sim off completely once the plant has settled at rest — a sleeping plant costs one distance check per pusher per frame. It wakes when a PlantPusher comes in reach. Has no effect while Wind Strength > 0 (wind never lets the plant settle).")]
+    public bool allowSleep = true;
+    [Tooltip("The plant counts as settled when every vertex sits within this world-space distance of its rest position.")]
+    public float sleepThreshold = 0.01f;
+    [Tooltip("Seconds the plant must stay settled, with no pusher in reach, before it sleeps.")]
+    public float sleepDelay = 0.4f;
+    [Tooltip("Extra reach (world units) on the wake check, so the plant is already simulating by the time a pusher actually touches it.")]
+    public float wakeMargin = 0.3f;
+
+    // Hard cap on how many instances may run the solver at once, across the whole scene. Wakes past
+    // the cap are skipped (the plant stays parked at rest) — a swarm of fish can then never blow the
+    // frame budget, it can only animate the MaxAwake nearest-to-contact plants. Tune from code.
+    public static int MaxAwake = 5;
+    private static int awakeCount;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics() { awakeCount = 0; } // survives disabled domain reload
 
     [Header("Limits & Safety")]
     [Tooltip("If this object moves more than this in one frame (scene load / teleport), the sim snaps to rest instead of flinging.")]
@@ -106,9 +146,30 @@ public class VerletFoliage : MonoBehaviour
     private float accumulator;          // unspent real time, drained in fixed simulationRate steps
     private bool initialized;
 
+    // Sleep state + the rest-mesh bounds (local space) used as the broad phase for wake/cull checks.
+    private bool asleep;
+    private bool countedAwake;         // holds one MaxAwake slot right now
+    private float settleTimer;
+    private Bounds restLocalBounds;
+    private Vector3 localBoundsCenter;
+    private float localBoundsRadius;
+    private Renderer meshRenderer;     // visibility gate; null-safe if somehow absent
+
+    // Impulse-mode pushers (fish): who already delivered their one-shot wiggle (spent until they
+    // leave the broad sphere), and wiggles queued for the next sim step. Lazy — most plants never
+    // meet a fish.
+    private HashSet<PlantPusher> impulseSpent;
+    private struct QueuedImpulse { public Vector3 a, b; public float r, strength; }
+    private readonly List<QueuedImpulse> queuedImpulses = new List<QueuedImpulse>();
+    // True while the current motion is a fish-wiggle ring-out: Step swaps to impulseStiffness /
+    // impulseDamping for the floaty water feel. Cleared when a continuous pusher (the player)
+    // gets involved, or on sleep — player interaction always uses the normal spring values.
+    private bool impulseRinging;
+
     void Awake()
     {
         meshFilter = GetComponent<MeshFilter>();
+        meshRenderer = GetComponent<Renderer>();
 
         Mesh source = meshFilter.sharedMesh;
         if (source == null)
@@ -134,22 +195,36 @@ public class VerletFoliage : MonoBehaviour
         workingMesh.MarkDynamic();
         meshFilter.mesh = workingMesh;
 
+        restLocalBounds = source.bounds;
+        localBoundsCenter = restLocalBounds.center;
+        localBoundsRadius = restLocalBounds.extents.magnitude;
+        ApplyFixedMeshBounds();
+
         BuildSimData(source);
         ComputeWeights();
         ComputeWindPhases();
         ResetToRest();
         lastPosition = transform.position;
         initialized = true;
+
+        // Born asleep (the mesh IS the rest pose); the first pusher in reach wakes it. Keeps a scene
+        // full of lily pads at zero sim cost until something actually swims up to one.
+        asleep = allowSleep && windStrength <= 0f;
     }
 
     void OnDisable()
     {
-        // Leave the mesh at its clean rest pose when switched off.
+        // A disabled instance must not keep holding a MaxAwake slot.
+        if (countedAwake) { awakeCount--; countedAwake = false; }
+        // Leave the mesh at its clean rest pose when switched off, and re-enter through the sleep
+        // path on re-enable (the parked mesh already matches the sleeping state).
         if (initialized && workingMesh != null)
         {
             workingMesh.SetVertices(restLocalFull);
             if (recalculateNormals) workingMesh.RecalculateNormals();
-            workingMesh.RecalculateBounds();
+            asleep = allowSleep && windStrength <= 0f;
+            settleTimer = 0f;
+            accumulator = 0f;
         }
     }
 
@@ -163,6 +238,33 @@ public class VerletFoliage : MonoBehaviour
         if (!initialized) return;
         // Freeze with the game (pause / notebook), matching SoftBodyJiggle and PlayerController.
         if (Time.timeScale == 0f || Time.deltaTime <= 0.0001f) return;
+
+        if (asleep)
+        {
+            // Wind switched on at runtime always wakes; otherwise waking needs the plant on screen,
+            // real contact (continuous pusher near a vertex, or a fish first-touch wiggle), and a
+            // free MaxAwake slot.
+            if (windStrength <= 0f)
+            {
+                if (meshRenderer != null && !meshRenderer.isVisible) return;
+                bool contact = AnyPusherTouching();
+                bool wiggle = CheckImpulseTriggers();
+                if (!contact && !wiggle) return;
+                if (awakeCount >= MaxAwake) { queuedImpulses.Clear(); return; }
+            }
+            WakeUp();
+        }
+        else if (allowSleep && windStrength <= 0f && meshRenderer != null && !meshRenderer.isVisible)
+        {
+            // Went off-screen mid-swing: park immediately — nobody can see the snap to rest.
+            Sleep();
+            return;
+        }
+        else
+        {
+            // Awake and visible: a fish can also first-touch while the player is already pushing.
+            CheckImpulseTriggers();
+        }
 
         // Teleport guard: a scene move shouldn't fling the mesh across the world.
         if ((transform.position - lastPosition).sqrMagnitude > teleportThreshold * teleportThreshold)
@@ -178,6 +280,7 @@ public class VerletFoliage : MonoBehaviour
         if (accumulator >= fixedDt)
         {
             PrepareFrame();
+            ApplyQueuedImpulses();
             while (accumulator >= fixedDt)
             {
                 Step(fixedDt);
@@ -186,6 +289,7 @@ public class VerletFoliage : MonoBehaviour
         }
 
         WriteBack(accumulator / fixedDt);
+        TrySleep();
     }
 
     // Per-frame setup that depends only on the (frame-constant) transform and pusher set: rest world
@@ -203,22 +307,34 @@ public class VerletFoliage : MonoBehaviour
         pushP0.Clear();
         pushP1.Clear();
         pushR.Clear();
+        GetWorldBounds(out Vector3 boundsC, out float boundsR);
         var all = PlantPusher.All;
         for (int i = 0; i < all.Count; i++)
         {
             PlantPusher p = all[i];
-            if (p == null || !p.isActiveAndEnabled) continue;
+            if (p == null || !p.isActiveAndEnabled || p.impulseOnly) continue;
             p.GetCapsule(out Vector3 a, out Vector3 b, out float r);
+            // Broad phase: verts live within maxOffset of rest, and rest within boundsR of the bounds
+            // centre — a capsule farther than that can't touch anything, so it never reaches the
+            // per-vertex loop. Keeps cost flat when many pushers (a school of fish) share the pond.
+            float reach = r + pusherPadding + boundsR + maxOffset;
+            if ((ClosestPointOnSegment(a, b, boundsC) - boundsC).sqrMagnitude >= reach * reach) continue;
             pushP0.Add(a);
             pushP1.Add(b);
             pushR.Add(r + pusherPadding);
         }
+
+        // A continuous body (the player) in play takes over the feel: back to the normal spring.
+        if (pushP0.Count > 0) impulseRinging = false;
     }
 
     private void Step(float dt)
     {
         int n = cur.Length;
-        float keep = 1f - damping;
+        // A fish-wiggle ring-out gets its own floatier spring; everything else (player, wind) uses
+        // the normal values.
+        float useStiffness = impulseRinging ? impulseStiffness : stiffness;
+        float keep = 1f - (impulseRinging ? impulseDamping : damping);
 
         // Per-vertex ambient wind: a travelling wave (phase varies by rest position) so the curtain
         // sways out of phase rather than as one rigid block. Off by default — the willow shader owns
@@ -245,7 +361,7 @@ public class VerletFoliage : MonoBehaviour
                 float s = (Mathf.Sin(baseT + ph) + 0.5f * Mathf.Sin(baseT * 1.7f + ph * 1.7f + 1.3f)) * 0.6667f;
                 p += windDirN * (s * windStrength * dt * weight[i]);
             }
-            float stiff = Mathf.Lerp(1f, stiffness, weight[i]);
+            float stiff = Mathf.Lerp(1f, useStiffness, weight[i]);
             p = Vector3.Lerp(p, restWorldCache[i], stiff);
             cur[i] = p;
         }
@@ -336,7 +452,7 @@ public class VerletFoliage : MonoBehaviour
 
         workingMesh.SetVertices(renderVerts);
         if (recalculateNormals) workingMesh.RecalculateNormals();
-        workingMesh.RecalculateBounds();
+        // No RecalculateBounds: the mesh keeps the fixed conservative bounds set at startup.
     }
 
     private void ResetToRest()
@@ -347,9 +463,221 @@ public class VerletFoliage : MonoBehaviour
             Vector3 w = l2w.MultiplyPoint3x4(uniqueRest[i]);
             cur[i] = w;
             prev[i] = w;
+            restWorldCache[i] = w; // keep the cache honest even before the first PrepareFrame
         }
         accumulator = 0f;
         if (workingMesh != null) workingMesh.SetVertices(restLocalFull);
+    }
+
+    // Verts never leave rest ± maxOffset, so the private mesh gets one conservative fixed bound at
+    // startup instead of paying RecalculateBounds every frame. maxOffset is world units; divide by
+    // the smallest scale axis to expand safely in local space.
+    private void ApplyFixedMeshBounds()
+    {
+        if (workingMesh == null) return;
+        Vector3 s = transform.lossyScale;
+        float minScale = Mathf.Min(Mathf.Abs(s.x), Mathf.Min(Mathf.Abs(s.y), Mathf.Abs(s.z)));
+        Bounds b = restLocalBounds;
+        b.Expand(2f * maxOffset / Mathf.Max(1e-4f, minScale));
+        workingMesh.bounds = b;
+    }
+
+    // Rest-mesh bounds as a world-space sphere — the shared broad phase for waking and pusher culling.
+    private void GetWorldBounds(out Vector3 center, out float radius)
+    {
+        center = transform.TransformPoint(localBoundsCenter);
+        Vector3 s = transform.lossyScale;
+        radius = localBoundsRadius * Mathf.Max(Mathf.Abs(s.x), Mathf.Max(Mathf.Abs(s.y), Mathf.Abs(s.z)));
+    }
+
+    // True when any pusher capsule is within (radius + padding + wakeMargin) of an actual movable
+    // REST vertex. Two phases: a bounds-sphere test rejects far pushers for pennies; only a pusher
+    // inside the bounds pays the per-vertex loop. Vertex-precise on purpose — fish live BETWEEN the
+    // lily pads, so a bounds-only test would hold every pad on a fish's route awake all day.
+    // Uses the rest pose (recomputed from the live transform), which is exact while asleep and the
+    // right question ("would it touch the settled plant?") when deciding whether sleeping is safe.
+    private bool AnyPusherTouching()
+    {
+        var all = PlantPusher.All;
+        if (all.Count == 0) return false;
+        GetWorldBounds(out Vector3 c, out float br);
+        Matrix4x4 l2w = transform.localToWorldMatrix;
+        for (int i = 0; i < all.Count; i++)
+        {
+            PlantPusher p = all[i];
+            if (p == null || !p.isActiveAndEnabled || p.impulseOnly) continue; // fish: CheckImpulseTriggers
+            p.GetCapsule(out Vector3 a, out Vector3 b, out float r);
+            float reach = r + pusherPadding + wakeMargin;
+
+            float broad = reach + br;
+            if ((ClosestPointOnSegment(a, b, c) - c).sqrMagnitude >= broad * broad) continue;
+
+            float reachSqr = reach * reach;
+            for (int v = 0; v < uniqueRest.Length; v++)
+            {
+                if (weight[v] <= 0f) continue; // pinned verts can't move anyway
+                Vector3 w = l2w.MultiplyPoint3x4(uniqueRest[v]);
+                if ((ClosestPointOnSegment(a, b, w) - w).sqrMagnitude < reachSqr) return true;
+            }
+        }
+        return false;
+    }
+
+    // Fish-mode contact edge detection. Fires ONE wiggle the first time an impulse pusher touches a
+    // movable rest vertex; that pusher is then 'spent' for this plant until it exits the broad
+    // sphere (hysteresis — hovering at the touch boundary can't retrigger, and a fish parked on a
+    // lily pad costs nothing after its one kick). Returns true when a new wiggle got queued, which
+    // is the caller's cue to wake the plant.
+    private bool CheckImpulseTriggers()
+    {
+        var all = PlantPusher.All;
+        if (all.Count == 0) return false;
+
+        bool fired = false;
+        GetWorldBounds(out Vector3 c, out float br);
+        Matrix4x4 l2w = transform.localToWorldMatrix;
+        for (int i = 0; i < all.Count; i++)
+        {
+            PlantPusher p = all[i];
+            if (p == null || !p.isActiveAndEnabled || !p.impulseOnly) continue;
+            p.GetCapsule(out Vector3 a, out Vector3 b, out float r);
+            float reach = r + pusherPadding + wakeMargin;
+            float broad = reach + br;
+            bool inBroad = (ClosestPointOnSegment(a, b, c) - c).sqrMagnitude < broad * broad;
+
+            if (impulseSpent != null && impulseSpent.Contains(p))
+            {
+                if (!inBroad) impulseSpent.Remove(p); // left the area — re-armed
+                continue;
+            }
+            if (!inBroad) continue;
+
+            // Narrow phase: only a capsule near an actual movable rest vertex counts as a touch.
+            float reachSqr = reach * reach;
+            bool touch = false;
+            for (int v = 0; v < uniqueRest.Length; v++)
+            {
+                if (weight[v] <= 0f) continue;
+                Vector3 w = l2w.MultiplyPoint3x4(uniqueRest[v]);
+                if ((ClosestPointOnSegment(a, b, w) - w).sqrMagnitude < reachSqr) { touch = true; break; }
+            }
+            if (!touch) continue;
+
+            impulseSpent ??= new HashSet<PlantPusher>();
+            impulseSpent.RemoveWhere(x => x == null); // adds are rare; drop destroyed fish here
+            impulseSpent.Add(p);
+            // Kick radius spans the WHOLE plant (touch reach + bounds diameter): 'first touch' fires
+            // at the reach boundary by definition, and the wiggle should read as the plant reacting,
+            // not one rim vertex twitching. The falloff (with its floor in ApplyQueuedImpulses)
+            // still makes the contact side move the most.
+            queuedImpulses.Add(new QueuedImpulse { a = a, b = b, r = reach * 2f + br * 2f, strength = p.impulseStrength });
+            impulseRinging = true;
+            fired = true;
+        }
+        return fired;
+    }
+
+    // Play-mode sanity check: right-click the component header → 'Test Wiggle' fires a kick from the
+    // plant's own centre, no fish needed. Separates "the response is broken/too subtle" from "the
+    // trigger never fired" (usually a fish capsule that doesn't actually reach the verts).
+    [ContextMenu("Test Wiggle")]
+    private void TestWiggle()
+    {
+        if (!initialized || !Application.isPlaying) return;
+        GetWorldBounds(out Vector3 c, out float br);
+        queuedImpulses.Add(new QueuedImpulse { a = c, b = c, r = br + maxOffset, strength = 0.3f });
+        impulseRinging = true;
+        if (asleep)
+        {
+            if (awakeCount >= MaxAwake) { queuedImpulses.Clear(); return; }
+            WakeUp();
+        }
+    }
+
+    // Convert queued wiggles into outward vertex velocity. Verlet velocity is (cur - prev), so a
+    // kick of S world-units/sec means moving prev against the push by S / simulationRate.
+    private void ApplyQueuedImpulses()
+    {
+        if (queuedImpulses.Count == 0) return;
+        float invRate = 1f / Mathf.Max(1f, simulationRate);
+        for (int q = 0; q < queuedImpulses.Count; q++)
+        {
+            QueuedImpulse imp = queuedImpulses[q];
+            float rSqr = imp.r * imp.r;
+            for (int i = 0; i < cur.Length; i++)
+            {
+                if (weight[i] <= 0f) continue;
+                Vector3 closest = ClosestPointOnSegment(imp.a, imp.b, cur[i]);
+                Vector3 d = cur[i] - closest;
+                float distSqr = d.sqrMagnitude;
+                if (distSqr >= rSqr) continue;
+
+                float dist = Mathf.Sqrt(distSqr);
+                Vector3 dir = dist > 1e-5f ? d / dist : StableSideways(imp.a, imp.b);
+                if (impulseStyle == ImpulseStyle.WaterBob)
+                {
+                    // Water displaced under a floating plant lifts it: mostly straight up, with a
+                    // whisper of horizontal drift away from the body. The falloff gradient makes the
+                    // contact side rise first, so the plant TILTS and rocks as the spring rings out
+                    // instead of jello-ing sideways.
+                    Vector3 flat = new Vector3(dir.x, 0f, dir.z);
+                    dir = (Vector3.up + flat * 0.35f).normalized;
+                }
+                // Floor of 0.35 so the far side of the plant visibly joins the wiggle instead of
+                // only the contact zone twitching; the gradient on top keeps the near side dominant.
+                float falloff = Mathf.Lerp(0.35f, 1f, Mathf.SmoothStep(0f, 1f, 1f - dist / imp.r));
+                prev[i] -= dir * (imp.strength * falloff * weight[i] * invRate);
+            }
+        }
+        queuedImpulses.Clear();
+    }
+
+    private void WakeUp()
+    {
+        asleep = false;
+        settleTimer = 0f;
+        if (windStrength <= 0f) { awakeCount++; countedAwake = true; } // wind wakes bypass the budget
+        // The transform may have moved while asleep; re-seed at the CURRENT rest pose so the first
+        // step doesn't read that move as a fling.
+        ResetToRest();
+        lastPosition = transform.position;
+    }
+
+    private void Sleep()
+    {
+        asleep = true;
+        settleTimer = 0f;
+        accumulator = 0f;
+        queuedImpulses.Clear(); // never carry a stale world-space wiggle into a later wake
+        impulseRinging = false;
+        if (countedAwake) { awakeCount--; countedAwake = false; }
+        workingMesh.SetVertices(restLocalFull);
+        if (recalculateNormals) workingMesh.RecalculateNormals();
+    }
+
+    // Runs each awake frame after WriteBack: once every vert has hugged its rest position for
+    // sleepDelay seconds and nothing is touching, park the exact rest mesh and stop simulating.
+    private void TrySleep()
+    {
+        if (!allowSleep || windStrength > 0f) { settleTimer = 0f; return; }
+
+        float thrSqr = sleepThreshold * sleepThreshold;
+        for (int i = 0; i < cur.Length; i++)
+        {
+            if ((cur[i] - restWorldCache[i]).sqrMagnitude > thrSqr)
+            {
+                settleTimer = 0f;
+                return;
+            }
+        }
+        // Same test (and margin) as waking, so sleep implies the wake check is false next frame —
+        // no wake/sleep churn while a pusher hovers at the boundary.
+        if (AnyPusherTouching()) { settleTimer = 0f; return; }
+
+        settleTimer += Time.deltaTime;
+        if (settleTimer < sleepDelay) return;
+
+        Sleep();
     }
 
     // Welds duplicate vertices by quantized position, then builds the unique-vertex set and a deduped
@@ -448,6 +776,7 @@ public class VerletFoliage : MonoBehaviour
         {
             ComputeWeights();
             ComputeWindPhases();
+            ApplyFixedMeshBounds();
         }
     }
 

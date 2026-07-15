@@ -1,0 +1,77 @@
+# Inspector values from: Scenes/AquariumRoom.unity
+# Backup date: 2026-07-12
+
+### CameraTrigger  on GameObject "BountyBoardCollider"
+  zoneCamera: {fileID: 214306215}
+  defaultCamera: {fileID: 1037107732}
+  interactKey: 101
+  promptIcon: {fileID: 21300000, guid: 968193ae8afb39a4c83c516d1836f8af, type: 3}
+
+### BountyBoard  on GameObject "BountyBoardCollider"
+  bountiesPerDay: 5
+  rewardMultiplier: 1.5
+  minRequired: 1
+  maxRequired: 4
+  promptUI: {fileID: 1136289917}
+  bountyPanelUI: {fileID: 0}
+  bountyText: {fileID: 1725160872}
+
+### CameraTrigger  on GameObject "AquariumCollider"
+  zoneCamera: {fileID: 672201406}
+  defaultCamera: {fileID: 1037107732}
+  interactKey: 101
+  promptIcon: {fileID: 21300000, guid: 968193ae8afb39a4c83c516d1836f8af, type: 3}
+
+### WorldFishHover  on GameObject "Camera Aquarius"
+  tooltip: {fileID: 127287661}
+  fishLayerMask:
+    serializedVersion: 2
+    m_Bits: 1
+  rayDistance: 20
+  castRadius: 0.5
+
+### FishVendor  on GameObject "(nested/prefab root)"
+  priceMultiplier: 1
+  baitStackSize: 1
+  baitOffers:
+  - bait: {fileID: 11400000, guid: 675b0f0aa1ddd4a49a9c19e15293a9d2, type: 2}
+    pricePerStack: 15
+  - bait: {fileID: 11400000, guid: 11ccbd758765b2a4a8e806319dce81c0, type: 2}
+    pricePerStack: 15
+  - bait: {fileID: 11400000, guid: e936b5f9f7fc306488dc57f867b11d37, type: 2}
+    pricePerStack: 15
+  timeOfDayOffers:
+  - displayName: Night Lantern
+    icon: {fileID: 0}
+    price: 100
+    mode: 2
+  - displayName: Force Day
+    icon: {fileID: 0}
+    price: 100
+    mode: 1
+  interactionRadius: 4.5
+  interactKey: 101
+  sellParticles: {fileID: 0}
+  buyParticles: {fileID: 0}
+
+### SpawnPoint  on GameObject "Hutinside_Spawn"
+  spawnID: Hutinside_Spawn
+
+### SceneTrigger  on GameObject "GoToOutside_Trigger"
+  sceneName: HUTBUILT
+  targetSpawnID: Hutoutside_Spawn
+
+### SaveRenderTexture  on GameObject "SaveRT"
+  TextureToSave: {fileID: 8400000, guid: cb9f5b49feabb7842a79ceab4dbc884d, type: 2}
+  SavePath: Assets/ART/Textures/MySavedImage
+
+### PREFAB-INSTANCE OVERRIDES (values changed on prefab instances in this file)
+  serializationData.Prefab: 
+  serializationData.Prefab: 
+  serializationData.Prefab: 
+  serializationData.Prefab: 
+  staticCameraTarget: 
+  serializationData.Prefab: 
+  staticCameraTarget: 
+  serializationData.Prefab: 
+  serializationData.Prefab: 

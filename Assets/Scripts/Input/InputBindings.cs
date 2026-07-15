@@ -39,9 +39,15 @@ public class GamepadBindings
     public GamepadControl cancel = GamepadControl.ButtonEast;
     public GamepadControl notebookToggle = GamepadControl.Start;
     public GamepadControl inventoryToggle = GamepadControl.Select;
-    [Tooltip("Flip the notebook forward / backward while it is open.")]
+    [Tooltip("Flip the notebook forward / backward while it is open — the BIG flip that turns " +
+             "the physical page (rigged page mesh animation).")]
     public GamepadControl pageNext = GamepadControl.RightShoulder;
     public GamepadControl pagePrev = GamepadControl.LeftShoulder;
+    [Tooltip("Flip to the next / previous fish-list page INSIDE the encyclopedia spread (the " +
+             "small in-page flip through the fish list) — separate from the big pageNext/pagePrev " +
+             "physical page turn. Triggers are free while the notebook is open (fishing is gated).")]
+    public GamepadControl fishListNext = GamepadControl.RightTrigger;
+    public GamepadControl fishListPrev = GamepadControl.LeftTrigger;
 
     [Header("Fishing")]
     [Tooltip("Hold to aim the cast marker (left stick steers it); release to put the rod away. " +
@@ -127,9 +133,16 @@ public class KeyboardMouseBindings
     public KeyCode notebookToggle = KeyCode.Tab;
     [Tooltip("Hold to keep the gear/loadout menu open; release closes it.")]
     public KeyCode inventoryToggle = KeyCode.B;
-    [Tooltip("Flip the notebook forward / backward while it is open. (E and Q also flip, fixed.)")]
+    [Tooltip("Flip the notebook forward / backward while it is open — the BIG flip that turns " +
+             "the physical page. (E and Q also flip, fixed.)")]
     public KeyCode pageNext = KeyCode.RightArrow;
     public KeyCode pagePrev = KeyCode.LeftArrow;
+    [Tooltip("Flip to the next / previous fish-list page INSIDE the encyclopedia spread (the " +
+             "small in-page flip through the fish list) — separate from the big pageNext/pagePrev " +
+             "physical page turn. Defaults A/D: the strafe movement keys, free while the notebook " +
+             "is open. (W/S and the up/down arrows scroll the selection through the slots, fixed.)")]
+    public KeyCode fishListNext = KeyCode.D;
+    public KeyCode fishListPrev = KeyCode.A;
 
     [Header("Fishing")]
     [Tooltip("Hold to aim the cast (the whip gesture throws); release without a whip to put the " +

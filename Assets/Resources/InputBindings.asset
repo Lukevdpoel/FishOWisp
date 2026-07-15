@@ -13,14 +13,22 @@ MonoBehaviour:
   m_Name: InputBindings
   m_EditorClassIdentifier: Assembly-CSharp::InputBindings
   keyboardMouse:
-    interact: 101
-    jump: 32
     sprint: 304
+    jump: 32
+    interact: 101
     cancel: 27
-    lineReset: 101
     notebookToggle: 9
-    pageNext: 275
-    pagePrev: 276
+    inventoryToggle: 98
+    pageNext: 101
+    pagePrev: 113
+    fishListNext: 100
+    fishListPrev: 97
+    castAim: 323
+    reel: 323
+    attract: 323
+    confirm: 323
+    aim: 324
+    lineReset: 101
   xbox:
     sprintToggle: 7
     jump: 3
@@ -30,6 +38,8 @@ MonoBehaviour:
     inventoryToggle: 4
     pageNext: 6
     pagePrev: 5
+    fishListNext: 8
+    fishListPrev: 7
     castAim: 8
     throwCharge: 8
     resetCast: 6
@@ -45,6 +55,8 @@ MonoBehaviour:
     inventoryToggle: 4
     pageNext: 6
     pagePrev: 5
+    fishListNext: 8
+    fishListPrev: 7
     castAim: 7
     throwCharge: 8
     resetCast: 6
@@ -60,6 +72,8 @@ MonoBehaviour:
     inventoryToggle: 4
     pageNext: 6
     pagePrev: 5
+    fishListNext: 8
+    fishListPrev: 7
     castAim: 7
     throwCharge: 8
     resetCast: 6

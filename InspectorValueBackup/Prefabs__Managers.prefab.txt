@@ -1,0 +1,44 @@
+# Inspector values from: Prefabs/Managers.prefab
+# Backup date: 2026-07-12
+
+### WorldStateManager  on GameObject "WorldStageManager"
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  forcedDayHour: 12
+  forcedNightHour: 23
+  autoNightStartHour: 19
+  autoNightEndHour: 6
+
+### GameTimeManager  on GameObject "GameTimeManager"
+  serializationData:
+    SerializedFormat: 2
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  secondsPerGameHour: 60
+  startingHour: 16
+  useSimulatedTime: 0
+  simulatedTime: 12
+
+### FPSDisplay  on GameObject "FPSDisplay"
+  fpsText: {fileID: 0}
+  updateInterval: 0.5
+  corner: 0
+  padding: {x: 10, y: 10}
+  fontSize: 22
+
+### PREFAB-INSTANCE OVERRIDES (values changed on prefab instances in this file)
+  loadingIcon: 
+  transitionTime: 2
+  serializationData.Prefab: 

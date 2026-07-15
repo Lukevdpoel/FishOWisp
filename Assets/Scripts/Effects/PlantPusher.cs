@@ -1,10 +1,17 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// A moving body that shoves VerletFoliage (vines now, lily pads / fish later) out of its way.
-// Register the player here (and later each fish) so foliage reacts without any per-object wiring —
-// VerletFoliage walks PlantPusher.All every frame, exactly the decoupled, global-broadcast style
-// the project already uses for WaterRippleSimRenderer and FoliageInteractionSetter.
+// A moving body that shoves VerletFoliage (vine curtains, lily pads) out of its way. Register the
+// player and each fish here so foliage reacts without any per-object wiring — VerletFoliage walks
+// PlantPusher.All every frame, exactly the decoupled, global-broadcast style the project already
+// uses for WaterRippleSimRenderer and FoliageInteractionSetter.
+//
+// Two response modes:
+//   - CONTINUOUS (default, the player): foliage verts are projected out of the capsule every sim
+//     step while the body is inside, so a curtain stays parted around you.
+//   - IMPULSE (impulseOnly, fish): foliage gets ONE wiggle kick the first time the body touches it,
+//     then ignores the body until it leaves and comes back. Impulse bodies never hold plants awake
+//     and never enter the per-vertex solver loop, so a pond full of fish stays near-free.
 //
 // Modeled as a CAPSULE (a vertical segment + radius), not a point, so a tall vine curtain is parted
 // along the whole height of the body rather than only where its centre sits. Set height ~= 2*radius
@@ -23,6 +30,12 @@ public class PlantPusher : MonoBehaviour
     public float height = 1.8f;
     [Tooltip("Local-space offset of the capsule centre from this transform (e.g. raise it to the body's middle).")]
     public Vector3 centerOffset = new Vector3(0f, 0.9f, 0f);
+
+    [Header("Response Mode")]
+    [Tooltip("OFF (player): continuously parts foliage while inside it. ON (fish): foliage gets a single wiggle when this body first touches it, then ignores it until it leaves and returns — it never holds plants awake, so schools of fish cost almost nothing.")]
+    public bool impulseOnly = false;
+    [Tooltip("Impulse mode only: outward vertex speed (world units/sec) of the wiggle at the contact point. Keep SMALL — the plant's impulseStiffness/impulseDamping are floaty, so this velocity travels far before it's reined in (~0.15 gives a gentle few-cm bob; 0.6 launches the plant).")]
+    public float impulseStrength = 0.15f;
 
     // The capsule as a segment p0..p1 plus radius, in world space. half collapses to 0 (a sphere)
     // when height <= 2*radius.

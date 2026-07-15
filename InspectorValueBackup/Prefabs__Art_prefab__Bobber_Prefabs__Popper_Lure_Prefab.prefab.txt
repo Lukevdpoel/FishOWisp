@@ -1,0 +1,79 @@
+# Inspector values from: Prefabs/Art_prefab/Bobber_Prefabs/Popper_Lure_Prefab.prefab
+# Backup date: 2026-07-12
+
+### BobberController  on GameObject "Popper_Lure_Prefab"
+  impactPrefab: {fileID: 3994706279997133969, guid: 97c5836dd172ef849932d809a315539d, type: 3}
+  impactLifetime: 0.8
+  wakePrefab: {fileID: 0}
+  nibblePrefab: {fileID: 1370866258836361411, guid: 083ef2191dedfb747adc6daffe6e7c63, type: 3}
+  nibbleLifetime: 2
+  bitePrefab: {fileID: 2230609935683277320, guid: 148f577ce39aebe4c9011b5515a19cdc, type: 3}
+  biteLifetime: 1
+  waterEntrySound: {fileID: 8300000, guid: dc4ba211051ab5f4cbbf9e2c4a95b238, type: 3}
+  waterEntryVolumeScale: 2.24
+  impactSound: {fileID: 8300000, guid: a6c45050064a0e648b6e521a85da2f54, type: 3}
+  castFlySound: {fileID: 0}
+  castFlyVolume: 1
+  fishStruggleSound: {fileID: 0}
+  fishStruggleVolume: 1
+  fishHookedIdleSound: {fileID: 0}
+  fishHookedIdleVolume: 1
+  airTumbleTorque: 70
+  airSteerEnabled: 1
+  airSteerSideAccel: 8
+  airSteerForwardAccel: 6
+  extraGravity: 15
+  spiralOnCast: 0
+  spiralRadius: 0
+  spiralFrequency: 3
+  spiralRampInTime: 0.15
+  spiralDecayRate: 0.4
+  spiralChargeInfluence: 1
+  spiralOrientSpeed: 12
+  waterTag: Water
+  floatHeight: -0.3
+  bounceDamp: 0.08
+  buoyancyForce: 28.4
+  waterDrag: 5
+  waterAngularDamping: 2
+  waterRotationSpeed: 5
+  waterImpactVelocityRetention: 0.15
+  minNibbles: 1
+  maxNibbles: 2
+  nibbleInterval: 0.8
+  nibbleForce: 175
+  nibbleWobbleForce: 1.5
+  nibbleWobbleDeg: 12
+  nibbleWobbleDecay: 7
+  nibbleWobbleFrequency: 9
+  biteSubmergeDepth: 0.05
+  biteDelay: 0.15
+  struggleForce: 6
+  struggleHoldRange: {x: 0.4, y: 2.5}
+  maxAngleOffsetDegrees: 35
+  repeatSideChance: 0.25
+  forceMultiplierRange: {x: 0.5, y: 1.6}
+  strugglePullAwayForce: 2.5
+  maxPullAwayDistance: 3
+  pullAwayAnchorSpeed: 0.5
+  fightJumpChance: 0.15
+  jumpUpSpeed: 3.62
+  jumpForwardSpeed: 2.05
+  jumpCooldown: 5
+  maxJumpDuration: 2.5
+  jumpSpeedMultiplier: 1.1
+  tetherRadius: 3
+  tetherReturnForce: 4
+  tetherInwardBiasThreshold: 0.7
+  obstacleCheckLayers:
+    serializedVersion: 2
+    m_Bits: 256
+  obstacleCheckDistance: 0.5
+  bobberVisuals: {fileID: 6589509764283316377}
+  hookedFishSilhouetteMaterial: {fileID: 2100000, guid: 7e2d9c4f6b1a4358a9d0e3f5c8b7a624, type: 2}
+  cameraAnchor: {fileID: 0}
+  lineAttachPoint: {fileID: 332894759975922099}
+  popperSplashPrefab: {fileID: 0}
+  popperSplashLifetime: 1
+  grabTowMaxSpeed: 6
+  waterInertiaTensorOverride: 0

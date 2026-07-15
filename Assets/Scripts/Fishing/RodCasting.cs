@@ -5,8 +5,9 @@ using UnityEngine;
 // WASD / the left stick steer it across land or water inside the cast range, and the player
 // decides how far to throw by where they put it. The throw itself is an "About Fishing"-style
 // whip: pull the mouse (or yank the stick) left/right/back/forward, then push it back the
-// opposite way — the reversal speed is the power, and a full-speed whip lands exactly on the
-// marker while a soft one drops short. Too slow a push is simply not a cast; keep aiming.
+// opposite way — the wind-up depth is the power (a full pull lands exactly on the marker, a
+// shallow one drops short); the reversal speed only decides whether it counts as a flick at
+// all. Too slow a push is simply not a cast; keep aiming.
 //
 // Owns: the marker, the gesture (CastFlickGesture), and the ballistic solve that turns
 // "land on this point" into the (direction, force) pair the rest of the fishing stack already
@@ -51,8 +52,8 @@ public class RodCasting : MonoBehaviour
     public float maxThrowForce = 25f;
     [Tooltip("The weakest whip that still casts lands this fraction of the way to the marker; a full-speed whip lands on it.")]
     [Range(0.1f, 1f)] public float minPowerDistanceFraction = 0.45f;
-    [Tooltip("MUST MATCH the 'Extra Gravity' value in your BobberController script.")]
-    public float bobberExtraGravity = 30f;
+    [Tooltip("Fallback only: the solve reads Extra Gravity live from the equipped bobber; this is used when no bobber instance exists yet.")]
+    public float bobberExtraGravity = 15f;
     [Tooltip("Used only if no FishingLine is found to read the real launch angle from.")]
     public float launchAngleFallback = 20f;
 
@@ -80,7 +81,17 @@ public class RodCasting : MonoBehaviour
     private FishingLine fishingLine;
 
     private float LaunchAngle => fishingLine != null ? fishingLine.launchAngle : launchAngleFallback;
-    private float TotalGravity => Physics.gravity.magnitude + bobberExtraGravity;
+    // The equipped bobber's own extra gravity, so the solve and the actual flight can never drift
+    // apart when a prefab is retuned. The serialized value is only a fallback for the no-bobber case.
+    private float TotalGravity
+    {
+        get
+        {
+            BobberController bobber = fishingLine != null ? fishingLine.ActiveBobber : null;
+            float extra = bobber != null ? bobber.extraGravity : bobberExtraGravity;
+            return Physics.gravity.magnitude + extra;
+        }
+    }
     private Vector3 CastOrigin => predictionOrigin != null ? predictionOrigin.position
                                 : throwOrigin != null ? throwOrigin.position
                                 : transform.position;

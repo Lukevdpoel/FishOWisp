@@ -251,6 +251,11 @@ public static class GamepadInput
     public static bool InventoryToggleReleased => ReleasedButton(Table.inventoryToggle);
     public static bool PageNextPressed => Pressed(Table.pageNext);
     public static bool PagePrevPressed => Pressed(Table.pagePrev);
+    // The small in-page flip through the encyclopedia fish list, distinct from the big
+    // pageNext/pagePrev physical page turn above. Default RT/LT — free while the notebook
+    // is open because all fishing input is gated behind NoteMenu.IsNotebookOpen.
+    public static bool FishListNextPressed => Pressed(Table.fishListNext);
+    public static bool FishListPrevPressed => Pressed(Table.fishListPrev);
 
     // --- D-pad (menu navigation, brand-agnostic, not rebindable) ---
     public static bool DpadUpPressed => Pad != null && Pad.dpad.up.wasPressedThisFrame;

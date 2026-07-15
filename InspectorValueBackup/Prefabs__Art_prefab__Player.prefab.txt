@@ -1,0 +1,506 @@
+# Inspector values from: Prefabs/Art_prefab/Player.prefab
+# Backup date: 2026-07-12
+
+### FishEntryUI  on GameObject "FishDetailsPanel"
+  fishImage: {fileID: 0}
+  fishNameText: {fileID: 4442403968692596380}
+  sizeClassText: {fileID: 0}
+  caughtText: {fileID: 4355844002181758444}
+  largestCaughtText: {fileID: 7416789091040777074}
+  smallestCaughtText: {fileID: 8893495772202800412}
+  basePriceText: {fileID: 0}
+  pricePerCmText: {fileID: 0}
+  baitText: {fileID: 0}
+  weatherText: {fileID: 0}
+  researchChecklist: {fileID: 0}
+
+### FishingRodController  on GameObject "Casting"
+  currentState: 0
+  danglingBobber: {fileID: 73350193116209274}
+  playerModel: {fileID: 5864620747877901436}
+  inspectionHandler: {fileID: 9122994942126807759}
+  inventoryUIRef: {fileID: 0}
+  playerAnimator: {fileID: 5048647682359618787}
+  failAnimationTrigger: FailHook
+  failCooldown: 1
+  reelInDuration: 0.8
+  reelInArcHeight: 0
+  reactionTime: 10
+  maxDistanceFromCast: 2
+  turnAwayDotThreshold: -0.05
+  turnAwayGracePeriod: 0.5
+  fightSettings:
+    swimSpeed: 1
+    fightSwimSpeed: 2.5
+    steerTurnRate: 140
+    fightTurnRate: 220
+    fightSteerAuthority: 0.3
+    fightArcDegrees: 75
+    calmDurationRange: {x: 1.5, y: 3}
+    fightDurationRange: {x: 0.5, y: 1.1}
+    sizeIntensity: 0.5
+    minFightSeconds: 1.5
+  lineSlackBeforeBreak: 8
+  catchDistance: 3
+  reelPullSpeed: 2
+  waterlineMask:
+    serializedVersion: 2
+    m_Bits: 0
+  lureSettings:
+    reelHoldForce: 30
+    reelAlignRate: 6
+    yankPullSpeed: 2.5
+    pullDecayRate: 2.5
+    yankArcAngleDeg: 30
+    maxArcAngleDeg: 45
+    headingRecenterRate: 2
+    yankAlignmentImpulse: 0.6
+    lureAngularDamping: 1.5
+    retractDistance: 3
+    intensityDecayRate: 4
+    visualPitchAngleDeg: 10
+    visualBobAmplitude: 0
+    visualBobFrequencyHz: 3
+    popperBounceAmplitudeDeg: 6
+    popperBounceFrequencyHz: 5
+    popperSplashInterval: 0.4
+
+### RodCasting  on GameObject "Casting"
+  throwOrigin: {fileID: 7187859982427345917}
+  predictionOrigin: {fileID: 1412664251059254680}
+  playerModel: {fileID: 5864620747877901436}
+  markerPrefab: {fileID: 0}
+  markerMoveSpeed: 10
+  minAimDistance: 2
+  maxAimDistance: 12
+  startAimDistance: 6
+  aimSurfaceMask:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  waterMask:
+    serializedVersion: 2
+    m_Bits: 0
+  gestureSettings:
+    pullEngageDistance: 0.35
+    minCastSpeed: 3
+    maxCastSpeed: 14
+    idleReturnRate: 3
+    velocityResponsiveness: 25
+    mouseSensitivity: 0.05
+    stickEngageMagnitude: 0.75
+    stickEngageSpeed: 3.5
+    stickVelocityScale: 1
+  minThrowForce: 8
+  maxThrowForce: 23
+  minPowerDistanceFraction: 0.45
+  bobberExtraGravity: 20
+  launchAngleFallback: 20
+  playerAimRotationSpeed: 10
+
+### CatchInspectionHandler  on GameObject "Casting"
+  playerAnimator: {fileID: 5048647682359618787}
+  playerController: {fileID: 6851105562881306366}
+  turnToCameraSpeed: 10
+  fishRotationSpeed: 45
+  minInspectionTime: 0.5
+  hangLineLength: 0.5
+  materialRevealDelay: 0.45
+  showCatchAnimBool: ShowCatch
+  fishNameText: {fileID: 0}
+  fishDescriptionText: {fileID: 0}
+  catchInfoBackdrop: {fileID: 0}
+  bannerFadeTime: 0.4
+
+### FootStepLooper  on GameObject "Player"
+  movementThreshold: 0.1
+  footstepPitch: 3.4
+
+### PlayerController  on GameObject "Player"
+  animator: {fileID: 5048647682359618787}
+  playerModel: {fileID: 5864620747877901436}
+  normalMeshRoot: {fileID: 457833080931538018}
+  cameraController: {fileID: 9141111527247244841}
+  fishingAnimHandler: {fileID: 5922089739667301084}
+  walkSpeed: 5
+  sprintSpeed: 9
+  acceleration: 25
+  deceleration: 35
+  tapKickSpeed: 6
+  tapKickThreshold: 1.5
+  rotationSpeed: 15
+  gravity: -20
+  speedAnimFloat: Speed
+  jumpAnimTrigger: Jump
+  chargeJumpKey: 32
+  maxChargeTime: 1
+  minLaunchCharge: 0.15
+  forwardByCharge:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 4
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 12
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  upwardByCharge:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 5
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 10
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  bounceForwardMultiplier: 0.592
+  bounceUpwardMultiplier: 0.63
+  airSteerAccel: 6
+  wallBounceRestitution: 0.6
+  wallBounceMaxSurfaceY: 0.5
+  chainJumpWindow: 0.3
+  chainJumpWindowAfterBounce: 0.15
+  chainFullChargeThreshold: 0.95
+  chargeMaxSquash: 0.55
+  scaleLerpSpeed: 18
+  chargeGroundSink: 0.1
+  bounceImpactCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.15
+      value: 0.5
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.5
+      value: 1.3
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  bounceImpactDuration: 0.35
+  bounceImpactIntensity: 0.5
+  enableJumpStretch: 1
+  jumpStretchMaxSpeed: 12
+  jumpStretchAmount: 0.6
+  jumpStretchDecay: 6
+  jumpStretchBounceScale: 0.4
+  jumpStretchDirResponse: 10
+  ballTransitionInTrigger: BallTransitionIn
+  ballTransitionOutTrigger: BallTransitionOut
+  ballToFormTrigger: BallToForm
+  enableBallTumble: 0
+  ballTumbleMinSpeed: 220
+  ballTumbleMaxSpeed: 540
+  ballPivotExcludeRoots: []
+  enableJumpArcLook: 1
+  jumpArcPitchScale: 1
+  hideRenderersDuringJump: []
+  hideSpriteWhileCharging: {fileID: 0}
+  sitdownAnimTrigger: Sitdown
+  sitDownHoldTime: 5
+  useStaticCamera: 1
+  staticCameraTarget: {fileID: 0}
+  groundedDownForce: -2
+  speedAnimDampTime: 0.1
+  areControlsLocked: 0
+  suppressCameraControl: 0
+
+### PlayerCameraController  on GameObject "Player"
+  cameraTransform: {fileID: 7708899931553779794}
+  framingTarget: {fileID: 0}
+  cameraSpeed: 120
+  gamepadLookSpeedX: 150
+  gamepadLookSpeedY: 90
+  cameraYClamp: {x: -2.88, y: 57.64}
+  pivotHeight: 1.5
+  catchLookDownAngle: 25
+  catchZoomDistance: 7
+  catchVerticalOffset: 1.6
+  catchHorizontalOffset: 0
+  pivotSmoothTime: 0.25
+  dialogueCameraLerpSpeed: 3
+  dialogueCameraYAngle: 20
+  catchCameraLerpSpeed: 5
+  fightCameraLerpSpeed: 2
+  cameraSmoothTime: 0.05
+  gameplayFieldOfView: 38
+  aimZoomInAmount: 2.5
+  zoomStep: 1
+  playerZoomMinDistance: 2
+  playerZoomMaxDistance: 12
+  bobberZoomMinDistance: 1.5
+  bobberZoomMaxDistance: 8
+  bobberFollowHeight: 1.8
+  bobberFollowDistance: 5.87
+  bobberFollowLerpSpeed: 4
+  bobberReturnDuration: 0.35
+  bobberOrbitWithMouse: 1
+  bobberFollowPositionSmoothTime: 0.3
+  bobberCameraWaterClearance: 0.4
+  fightShoulderSide: 1.4
+  fightShoulderBack: 1.2
+  fightShoulderHeight: 1.7
+  fightFramingAimT: 0.4
+  fightFramingLerpSpeed: 4
+  chargeZoomAmount: 3
+  chargeMinDistance: 0.6
+  chargePitchUpAngle: 22
+  chargeSmoothTime: 0.38
+  chargeMaxSpeed: 4
+  collisionLayers:
+    serializedVersion: 2
+    m_Bits: 66304
+  collisionRadius: 0.2
+  zoomDampTime: 0.1
+  nibblePitchOffset: 2
+  nibblePitchHoldTime: 0.1
+  nibblePitchLerpSpeed: 6
+  biteFovZoom: 15
+  biteFovLerpSpeed: 8
+  sprintFovBoost: 10
+  sprintFovLerpSpeed: 2.23
+  useStaticCamera: 0
+  staticCameraTarget: {fileID: 0}
+  aimTrackLerpSpeed: 4
+  aimTrackVerticalOffset: 1.5
+  aimTrackLiftSmoothTime: 0.3
+  aimTrackMaxPitch: 78
+  aimTrackFramingHeight: 0.6
+  aimTrackFovZoom: 8
+  aimTrackFovLerpSpeed: 1
+  aimTrackFovDelay: 0
+  castAimYawFollowSpeed: 5
+  castAimLiftFarDistance: 7
+  castAimLiftNearDistance: 2.5
+  castAimClosePitch: 22
+  castAimLiftSmoothTime: 0.35
+  castAimShoulderOffset: 1.6
+
+### PlayerFishingAnimHandler  on GameObject "Player"
+  animator: {fileID: 5048647682359618787}
+  playerController: {fileID: 6851105562881306366}
+  playCastAnimations: 0
+  holdRodBoolParam: IsHoldingRod
+  startChargingAnim: StartCharging
+  throwAnim: Throw
+  reelInAnim: ReelIn
+  isFightingAnimBool: IsFighting
+  isReelingDuringFightAnimBool: IsReelingDuringFight
+  isWaitingForBiteAnimBool: IsWaitingForBite
+  rodDirectionAnimFloat: RodDirection
+  attractAnim: Attract
+  biteReactionAnim: BiteReaction
+  defaultLocomotionState: Locomotion
+  cancelTransitionDuration: 0.05
+
+### PlayerDustSystem  on GameObject "Player"
+  characterController: {fileID: 3559968745154457789}
+  dustPrefab: {fileID: 4804353534899693966, guid: 6262f644d9562514eb05ae6a299046fd, type: 3}
+  feetPosition: {fileID: 3511839155171576022}
+  stepDistance: 2
+  minSpeedToSpawn: 2
+  positionOffset: {x: 0, y: 0, z: 0}
+
+### SimpleSmash  on GameObject "Player"
+  playerController: {fileID: 6851105562881306366}
+  animator: {fileID: 5048647682359618787}
+  playerModel: {fileID: 941635426524368600}
+  modelForwardOffset: 90
+  pointerPrefab: {fileID: 5836111168746242878, guid: 9890b7e5e380ce042a775fc75d55e77a, type: 3}
+  pointerHeight: 1.75
+  bobSpeed: 10
+  bobDistance: 0.1
+  holdPoint: {fileID: 2018368639565880431}
+  obstacleLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  potCenterHeightOffset: 0.5
+  raycastOriginHeight: 1
+  maxPickupAngle: 45
+  liftDuration: 0.1
+  smashImpactDelay: 0.7
+  recoveryDelay: 0.1
+  smashTrigger: LiftAndSmash
+
+### FoliageInteractionSetter  on GameObject "Player"
+  interactionRadius: 1.2
+  bendStrength: 0.35
+  flattenStrength: 0.87
+
+### GrassPlayerBroadcaster  on GameObject "Player"
+  player: {fileID: 8869207768773921664}
+
+### FoliageTrailRenderer  on GameObject "Player"
+  player: {fileID: 0}
+  worldSize: 20
+  resolution: 256
+  fadePerSecond: 0.6
+  stampRadiusUV: 0.0604
+  stampStrength: 1
+  updateInterval: 2
+
+### FishResearchScanner  on GameObject "Player"
+  maxLockRange: 25
+  reticleRadiusFraction: 0.245
+  reticleVerticalOffset: 0.239
+  studyDuration: 3
+  studyAudioSource: {fileID: 0}
+  studyChargeClip: {fileID: 0}
+  studyProgressFill: {fileID: 0}
+  learnedBannerGroup: {fileID: 0}
+  learnedBannerText: {fileID: 0}
+  learnedMessage: You learned this fish's bait preferences!
+  bannerHoldTime: 2.5
+  bannerFadeTime: 0.4
+  mouseSwitchThreshold: 3
+  stickSwitchThreshold: 0.5
+  switchCooldown: 0.3
+  switchAngleTolerance: 65
+
+### BackdropQuadFit  on GameObject "Quad"
+  targetCamera: {fileID: 7302614250018387359}
+  distance: 1
+
+### EyeLookRandomizer  on GameObject "IffyEyes"
+  radius: 0.08
+  moveSpeed: 21.98
+  minWaitTime: 0.19
+  maxWaitTime: 3
+  centerLookProbability: 0.2
+  velocityThreshold: 0.1
+  characterTransform: {fileID: 8869207768773921664}
+  eyeRenderer: {fileID: 9070943811485257308}
+  propertyName: _LookOffset
+
+### VerletRope  on GameObject "RopeManager"
+  segmentCount: 10
+  constraintIterations: 50
+  gravity: {x: 0, y: -9.81, z: 0}
+  landedTightenAmount: 0.25
+  nibbleTightenAmount: 0.6
+  nibbleTightenDecay: 0.4
+  tugTightenAmount: 0.85
+  tugTightenDecay: 0.35
+  reelTightenAmount: 0.9
+  reelTightenAttack: 0.12
+  reelTightenRelease: 0.4
+  jumpSlackAmount: 0.85
+  jumpSlackAttack: 0.08
+  jumpSlackRelease: 0.6
+  coilOnCast: 0
+  coilTurns: 8
+  coilRadius: 0.35
+  coilSpineStraighten: 0.6
+  coilBobberFraction: 0.4
+  coilEndTaper: 0.06
+  coilRampInTime: 0.1
+  coilDecayRate: 0.5
+  coilRelease: 0.25
+  coilSpinSpeed: 1.5
+  coilChargeInfluence: 1
+  coilRenderPoints: 64
+  snapFlickerExponent: 2.5
+  snapFlickerMinHz: 6
+  snapFlickerMaxHz: 14
+  snapRecoverDuration: 1.2
+
+### FishingLine  on GameObject "RopeManager"
+  rodTip: {fileID: 9508444000121283}
+  stableThrowOrigin: {fileID: 9508444000121283}
+  anchorLocalOffset: {x: 0, y: 0, z: 0}
+  currentBobber: {fileID: 11400000, guid: cee2ba223dfe7d34d894d5dbeea6a159, type: 2}
+  launchAngle: 15
+  dangleLength: 1
+  castMaxDistance: 30
+  dangleLinearDamping: 4
+  dangleAngularDamping: 7.93
+  dangleOrientStrength: 60
+  logDiagnostics: 0
+  logEveryNFixed: 10
+
+### PREFAB-INSTANCE OVERRIDES (values changed on prefab instances in this file)
+  endBuffer: 0
+  backFaceRT: 
+  frontFaceRT: 
+  flipAnimator: 
+  flipDuration: 0.35
+  flipPageObject: 
+  leftBakeCamera: 
+  rightBakeCamera: 
+  textureProperty: _OverlayMap
+  topFaceRenderer: 
+  pages.Array.size: 6
+  bottomFaceRenderer: 
+  pages.Array.data[0]: 
+  pages.Array.data[1]: 
+  pages.Array.data[2]: 
+  pages.Array.data[3]: 
+  pages.Array.data[4]: 
+  pages.Array.data[5]: 
+  bakeableCanvases.Array.size: 6
+  bakeableCanvases.Array.data[0]: 
+  bakeableCanvases.Array.data[1]: 
+  bakeableCanvases.Array.data[2]: 
+  bakeableCanvases.Array.data[3]: 
+  bakeableCanvases.Array.data[4]: 
+  bakeableCanvases.Array.data[5]: 
+  orthographic size: 0.98
+  orthographic size: 0.98

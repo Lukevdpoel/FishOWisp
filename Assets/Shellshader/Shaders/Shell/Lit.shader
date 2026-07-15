@@ -15,13 +15,18 @@ Properties
     [Normal] _NormalMap("Normal", 2D) = "bump" {}
     _NormalScale("Normal Scale", Range(0.0, 2.0)) = 1.0
     [IntRange] _ShellAmount("Shell Amount", Range(1, 14)) = 14
-    _ShellStep("Shell Step", Range(0.0, 0.01)) = 0.001
+    _ShellStep("Shell Step", Range(0.0, 0.05)) = 0.001
     _AlphaCutout("Alpha Cutout", Range(0.0, 1.0)) = 0.2
     _FurScale("Fur Scale", Range(0.0, 10.0)) = 1.0
     _Occlusion("Occlusion", Range(0.0, 1.0)) = 0.5
     _BaseMove("Base Move", Vector) = (0.0, -0.0, 0.0, 3.0)
     _WindFreq("Wind Freq", Vector) = (0.5, 0.7, 0.9, 1.0)
     _WindMove("Wind Move", Vector) = (0.2, 0.3, 0.2, 1.0)
+
+    [Header(Moss Mask (Polybrush Vertex Color))][Space]
+    _MossMaskChannel("Vertex Color Channel (RGBA weights)", Vector) = (1, 0, 0, 0)
+    [ToggleUI] _MossMaskInvert("Invert Mask", Float) = 0
+    _MossMaskSoftness("Mask Softness", Range(0.0, 1.0)) = 0.5
 
     [Header(Lighting)][Space]
     _RimLightPower("Rim Light Power", Range(1.0, 20.0)) = 6.0
@@ -115,6 +120,10 @@ SubShader
         ENDHLSL
     }
 
+    // PERF: ShadowCaster pass disabled. The geometry-shader shell fan-out is expensive and
+    // re-runs per shadow-casting light; short moss/fur casting shadows isn't worth it.
+    // Moss still RECEIVES shadows (ForwardLit samples the shadowmap). Un-comment to restore.
+    /*
     Pass
     {
         Name "ShadowCaster"
@@ -133,6 +142,7 @@ SubShader
         #include "./Shadow.hlsl"
         ENDHLSL
     }
+    */
 }
 
 }

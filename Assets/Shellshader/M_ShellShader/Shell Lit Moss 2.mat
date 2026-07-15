@@ -37,21 +37,24 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _AlphaCutout: 0.172
-    - _FurScale: 0.52
+    - _AlphaCutout: 0.146
+    - _FurScale: 0.65
     - _Metallic: 0
-    - _NormalScale: 0.048
+    - _MossMaskInvert: 0
+    - _MossMaskSoftness: 0.5
+    - _NormalScale: 0.06
     - _Occlusion: 0
-    - _RimLightIntensity: 0.457
-    - _RimLightPower: 1
-    - _ShadowExtraBias: -1
-    - _ShellAmount: 7
-    - _ShellStep: 0.01
+    - _RimLightIntensity: 1
+    - _RimLightPower: 5.8
+    - _ShadowExtraBias: -0
+    - _ShellAmount: 5
+    - _ShellStep: 0.0398
     - _Smoothness: 0
     m_Colors:
     - _AmbientColor: {r: 0.015782593, g: 0.100765854, b: 0.13207549, a: 1}
-    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BaseColor: {r: 0.8227447, g: 1, b: 0.19339621, a: 1}
     - _BaseMove: {r: 0, g: 0, b: 0, a: 1}
+    - _MossMaskChannel: {r: 1, g: 0, b: 0, a: 0}
     - _WindFreq: {r: 0, g: 0, b: 0, a: 0}
     - _WindMove: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []

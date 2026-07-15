@@ -25,7 +25,7 @@ Material:
     m_TexEnvs:
     - _BaseMap:
         m_Texture: {fileID: 2800000, guid: 441be1a2eb824c24b914562e107b5ea2, type: 3}
-        m_Scale: {x: 1, y: 1}
+        m_Scale: {x: 2, y: 2}
         m_Offset: {x: 0, y: 0}
     - _FurMap:
         m_Texture: {fileID: 2800000, guid: c22fc16178bfeb94cb1b5985380c4287, type: 3}
@@ -37,22 +37,25 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _AlphaCutout: 0.172
-    - _FurScale: 0.28
+    - _AlphaCutout: 0.037
+    - _FurScale: 4.64
     - _Metallic: 0
-    - _NormalScale: 0.048
-    - _Occlusion: 0
+    - _MossMaskInvert: 1
+    - _MossMaskSoftness: 0.071
+    - _NormalScale: 0.51
+    - _Occlusion: 0.064
     - _RimLightIntensity: 0
     - _RimLightPower: 1
-    - _ShadowExtraBias: -0.211
-    - _ShellAmount: 8
-    - _ShellStep: 0.0068
-    - _Smoothness: 0.089
+    - _ShadowExtraBias: -0
+    - _ShellAmount: 5
+    - _ShellStep: 0.05
+    - _Smoothness: 0
     m_Colors:
-    - _AmbientColor: {r: 0.015782593, g: 0.100765854, b: 0.13207549, a: 1}
-    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _AmbientColor: {r: 0.015686275, g: 0.101960786, b: 0.13333334, a: 1}
+    - _BaseColor: {r: 0.5939298, g: 0.7264151, b: 0.119927004, a: 1}
     - _BaseMove: {r: 0, g: 0, b: 0, a: 1}
-    - _WindFreq: {r: 0.4, g: 0.4, b: 0.4, a: 1}
-    - _WindMove: {r: 0.4, g: 0.4, b: 0.2, a: 1}
+    - _MossMaskChannel: {r: 1, g: 0, b: 0, a: 0}
+    - _WindFreq: {r: 0.5, g: 0.5, b: 0.5, a: 0.5}
+    - _WindMove: {r: 0.3, g: 0.1, b: 0.2, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

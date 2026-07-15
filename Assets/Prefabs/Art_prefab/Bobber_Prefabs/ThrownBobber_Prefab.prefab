@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 545233111595933618}
   - component: {fileID: 693156924994179394}
   - component: {fileID: 8704116694854614809}
+  - component: {fileID: -4334303229627857703}
   m_Layer: 7
   m_Name: ThrownBobber_Prefab
   m_TagString: Bobber
@@ -269,6 +270,21 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &-4334303229627857703
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2096275447604763850}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ba92df5f031c88b4c9fb74b2655dacda, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlantPusher
+  radius: 0.45
+  height: 1.8
+  centerOffset: {x: 0, y: 0.9, z: 0}
 --- !u!1 &3855882591336779785
 GameObject:
   m_ObjectHideFlags: 0

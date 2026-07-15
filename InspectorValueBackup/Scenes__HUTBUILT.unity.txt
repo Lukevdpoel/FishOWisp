@@ -1,0 +1,676 @@
+# Inspector values from: Scenes/HUTBUILT.unity
+# Backup date: 2026-07-12
+
+### WallFader  on GameObject "(nested/prefab root)"
+  fadeDuration: 0.4
+  opaqueAlpha: 1
+  fadedAlpha: 0
+  colorProperty: _BaseColor
+
+### ShopItem  on GameObject "Shop_WormBucket"
+  offer: {fileID: 11400000, guid: e9228708263faa541b36d9e0bab9fd46, type: 2}
+  category: 0
+  outlineTargets:
+  - {fileID: 111647402}
+  outlineMaterial: {fileID: 2100000, guid: 4960773755c492b47b6509f29760fc65, type: 2}
+  liftRoot: {fileID: 111647399}
+  liftHeight: 0.15
+  liftSpeed: 8
+
+### DragonflyWanderer  on GameObject "(nested/prefab root)"
+  areaCenter: {fileID: 1181834632}
+  areaSize: {x: 12.24, y: 1.1, z: 8.75}
+  minHeightAboveAnchor: 0.3
+  dartSmoothTime: 0.1
+  maxSpeed: 15
+  hoverTimeRange: {x: 0.2, y: 1.5}
+  arriveDistance: {x: 0.02, y: 0.3}
+  bobAmplitude: 0.05
+  bobFrequency: 0
+  turnSpeed: 8
+
+### InteractionPromptUI  on GameObject "InteractionTriggerZone"
+  serializationData:
+    SerializedFormat: 0
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  promptContainer: {fileID: 0}
+  promptImage: {fileID: 0}
+  worldOffset: {x: 0, y: 2.2, z: 0}
+  isOverlayCanvas: 1
+  animationDuration: 0.2
+  scaleCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+
+### WallFader  on GameObject "(nested/prefab root)"
+  fadeDuration: 0.4
+  opaqueAlpha: 1
+  fadedAlpha: 0
+  colorProperty: _BaseColor
+
+### TextureAtlasPacker  on GameObject "Atlas Manager"
+  objectsToCombine:
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  - {fileID: 0}
+  maxAtlasSize: 4096
+  padding: 0
+  shaderName: Universal Render Pipeline/Lit
+  saveFolder: Assets/ART/Materials/OptimizedRocks
+
+### ShopController  on GameObject "ShopSystem"
+  serializationData:
+    SerializedFormat: 0
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+  shopCamera: {fileID: 2085831672}
+  cameraLerpDuration: 0.6
+  cameraEase:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  mouseRayDistance: 100
+
+### VerletFoliage  on GameObject "(nested/prefab root)"
+  stiffness: 0.018
+  damping: 0.06
+  constraintIterations: 1
+  edgeStiffness: 0.178
+  pusherPadding: 2
+  maxOffset: 48.8
+  windStrength: 0.07
+  windFrequency: 0.27
+  windDirection: {x: 1, y: 0, z: 0.3}
+  windWaveScale: {x: 3, y: 0, z: 3}
+  anchorAxis: {x: 0, y: 1, z: 0}
+  pinFraction: 0.153
+  falloffFraction: 0.065
+  simulationRate: 60
+  maxSubSteps: 8
+  teleportThreshold: 5
+  recalculateNormals: 0
+  weldEpsilon: 0.0001
+
+### FishingZone  on GameObject "FishingZone_Up (1)"
+  fishPool: {fileID: 11400000, guid: 5d1342804cf861d4bab7b452ddcaeb29, type: 2}
+  fishRipplePrefab: {fileID: 86703556735717939, guid: 20787bbab00640a469eb7bf0d98e9fe9, type: 3}
+  aimIndicatorPrefab: {fileID: 5836111168746242878, guid: 9890b7e5e380ce042a775fc75d55e77a, type: 3}
+  maxFishCount: 3
+  respawnTimeMin: 10
+  respawnTimeMax: 30
+  maxFollowers: 4
+  attractCallRadius: 0
+  maxBaitHoverFish: 2
+  lureBrainSettings:
+    movingRadiusMultiplier: 1.5
+    movedDurationPerYank: 0.5
+    crankMovedTopUp: 0.15
+    directHitRadius: 0.8
+    maxHoverFish: 2
+    maxActiveChasers: 2
+    ringDistance: 2.5
+    arrivalBiteDelayMin: 0.3
+    arrivalBiteDelayMax: 1.5
+    rearmBiteDelayMin: 0.25
+    rearmBiteDelayMax: 0.7
+    patienceMin: 2.5
+    patienceMax: 5.5
+    boredCooldown: 8
+    postMissCooldown: 1.5
+    responseCooldown: 0
+    baseBiteChance: 0.15
+    movingBiteChance: 0.3
+    nightChanceMultiplier: 1.5
+    neutralCatchProbability: 0.5
+    biteCommitChance: 0.4
+    popperPreferenceRadiusMultiplier: 1.5
+    popperPreferenceBiteMultiplier: 2
+  autoNibbleMin: 4
+  autoNibbleMax: 12
+  autoNibbleRetryDelay: 1.5
+  noBaitInterestMultiplier: 2.5
+  waterTag: Water
+  waterSurfaceMarker: {fileID: 0}
+  maxAttractsBeforeScare: 3
+  scareWindow: 2
+
+### ShopItem  on GameObject "Shop_SetNightTime"
+  offer: {fileID: 11400000, guid: d875b1b8388ea4448a4742b39a0d705f, type: 2}
+  category: 0
+  outlineTargets:
+  - {fileID: 944347753}
+  outlineMaterial: {fileID: 2100000, guid: 4960773755c492b47b6509f29760fc65, type: 2}
+  liftRoot: {fileID: 944347750}
+  liftHeight: 0.15
+  liftSpeed: 8
+
+### ShopTackleHanger  on GameObject "Slot_Tackle_Crankbait"
+  tackle: {fileID: 11400000, guid: 9d41fa074c23b994c85a408b38f35114, type: 2}
+  localEuler: {x: 0, y: 0, z: 0}
+  scaleMultiplier: 0.8
+  hangFromAttachPoint: 1
+  hangOffset: {x: 0, y: 0, z: 0}
+  enableWiggle: 1
+  wiggleFrequency: 2.2
+  wiggleDamping: 0.12
+  wiggleStrength: 12
+  wiggleMaxAngle: 35
+
+### ShopItem  on GameObject "Slot_Tackle_Crankbait"
+  offer: {fileID: 11400000, guid: 018a49d5a61a1bd47b5d0b45e6b424c5, type: 2}
+  category: 0
+  outlineTargets:
+  - {fileID: 0}
+  outlineMaterial: {fileID: 2100000, guid: 4960773755c492b47b6509f29760fc65, type: 2}
+  liftRoot: {fileID: 0}
+  liftHeight: 0.15
+  liftSpeed: 8
+
+### SaveRenderTexture  on GameObject "TerrainCapture"
+  TextureToSave: {fileID: 8400000, guid: cb9f5b49feabb7842a79ceab4dbc884d, type: 2}
+  SavePath: Assets/ART/Textures/MySavedImage
+
+### CaptureCameraThrottle  on GameObject "TerrainCapture"
+  interval: 1
+
+### ShopItem  on GameObject "Shop_AntiPredatorFeed"
+  offer: {fileID: 11400000, guid: 8888f62ce9f2ddf44a4dc03fc569e4f1, type: 2}
+  category: 0
+  outlineTargets:
+  - {fileID: 1039016463}
+  outlineMaterial: {fileID: 2100000, guid: 4960773755c492b47b6509f29760fc65, type: 2}
+  liftRoot: {fileID: 1039016460}
+  liftHeight: 0.15
+  liftSpeed: 8
+
+### TimedAnimationTrigger  on GameObject "(nested/prefab root)"
+  animator: {fileID: 1101509860}
+  triggerName: Play
+  intervalSeconds: 15
+
+### SpawnPoint  on GameObject "Caveoutside_Spawn"
+  spawnID: Caveoutside_Spawn
+
+### FishingZone  on GameObject "FishingZone_Up (2)"
+  fishPool: {fileID: 11400000, guid: 5d1342804cf861d4bab7b452ddcaeb29, type: 2}
+  fishRipplePrefab: {fileID: 86703556735717939, guid: 20787bbab00640a469eb7bf0d98e9fe9, type: 3}
+  aimIndicatorPrefab: {fileID: 5836111168746242878, guid: 9890b7e5e380ce042a775fc75d55e77a, type: 3}
+  maxFishCount: 3
+  respawnTimeMin: 10
+  respawnTimeMax: 30
+  maxFollowers: 4
+  attractCallRadius: 0
+  maxBaitHoverFish: 2
+  lureBrainSettings:
+    movingRadiusMultiplier: 1.5
+    movedDurationPerYank: 0.5
+    crankMovedTopUp: 0.15
+    directHitRadius: 0.8
+    maxHoverFish: 2
+    maxActiveChasers: 2
+    ringDistance: 2.5
+    arrivalBiteDelayMin: 0.3
+    arrivalBiteDelayMax: 1.5
+    rearmBiteDelayMin: 0.25
+    rearmBiteDelayMax: 0.7
+    patienceMin: 2.5
+    patienceMax: 5.5
+    boredCooldown: 8
+    postMissCooldown: 1.5
+    responseCooldown: 0
+    baseBiteChance: 0.15
+    movingBiteChance: 0.3
+    nightChanceMultiplier: 1.5
+    neutralCatchProbability: 0.5
+    biteCommitChance: 0.4
+    popperPreferenceRadiusMultiplier: 1.5
+    popperPreferenceBiteMultiplier: 2
+  autoNibbleMin: 4
+  autoNibbleMax: 12
+  autoNibbleRetryDelay: 1.5
+  noBaitInterestMultiplier: 2.5
+  waterTag: Water
+  waterSurfaceMarker: {fileID: 0}
+  maxAttractsBeforeScare: 3
+  scareWindow: 2
+
+### ShopTackleHanger  on GameObject "Slot_Tackle_SimpleSlipBobber"
+  tackle: {fileID: 11400000, guid: cee2ba223dfe7d34d894d5dbeea6a159, type: 2}
+  localEuler: {x: 0, y: 0, z: 0}
+  scaleMultiplier: 0.8
+  hangFromAttachPoint: 1
+  hangOffset: {x: 0, y: 0, z: 0}
+  enableWiggle: 1
+  wiggleFrequency: 2.2
+  wiggleDamping: 0.12
+  wiggleStrength: 12
+  wiggleMaxAngle: 35
+
+### ShopItem  on GameObject "Slot_Tackle_SimpleSlipBobber"
+  offer: {fileID: 11400000, guid: f5566979a0e5861438ae2754efef2034, type: 2}
+  category: 0
+  outlineTargets:
+  - {fileID: 0}
+  outlineMaterial: {fileID: 2100000, guid: 4960773755c492b47b6509f29760fc65, type: 2}
+  liftRoot: {fileID: 0}
+  liftHeight: 0.15
+  liftSpeed: 8
+
+### FishingZone  on GameObject "FishingZone_Up (3)"
+  fishPool: {fileID: 11400000, guid: 5d1342804cf861d4bab7b452ddcaeb29, type: 2}
+  fishRipplePrefab: {fileID: 86703556735717939, guid: 20787bbab00640a469eb7bf0d98e9fe9, type: 3}
+  aimIndicatorPrefab: {fileID: 5836111168746242878, guid: 9890b7e5e380ce042a775fc75d55e77a, type: 3}
+  maxFishCount: 5
+  respawnTimeMin: 10
+  respawnTimeMax: 30
+  maxFollowers: 4
+  attractCallRadius: 0
+  maxBaitHoverFish: 2
+  lureBrainSettings:
+    movingRadiusMultiplier: 1.5
+    movedDurationPerYank: 0.5
+    crankMovedTopUp: 0.15
+    directHitRadius: 0.8
+    maxHoverFish: 2
+    maxActiveChasers: 2
+    ringDistance: 2.5
+    arrivalBiteDelayMin: 0.3
+    arrivalBiteDelayMax: 1.5
+    rearmBiteDelayMin: 0.25
+    rearmBiteDelayMax: 0.7
+    patienceMin: 2.5
+    patienceMax: 5.5
+    boredCooldown: 8
+    postMissCooldown: 1.5
+    responseCooldown: 0
+    baseBiteChance: 0.15
+    movingBiteChance: 0.3
+    nightChanceMultiplier: 1.5
+    neutralCatchProbability: 0.5
+    biteCommitChance: 0.4
+    popperPreferenceRadiusMultiplier: 1.5
+    popperPreferenceBiteMultiplier: 2
+  autoNibbleMin: 4
+  autoNibbleMax: 12
+  autoNibbleRetryDelay: 1.5
+  noBaitInterestMultiplier: 2.5
+  waterTag: Water
+  waterSurfaceMarker: {fileID: 0}
+  maxAttractsBeforeScare: 3
+  scareWindow: 2
+
+### SceneTrigger  on GameObject "GoToCave_Trigger"
+  sceneName: CAVE
+  targetSpawnID: Caveinside_Spawn
+
+### ProceduralCastArms  on GameObject "(nested/prefab root)"
+  rodCasting: {fileID: 1503220714}
+  armsPivot: {fileID: 2084520539}
+  referenceRoot: {fileID: 0}
+  maxBackPitch: 45
+  maxForwardPitch: 103.1
+  maxSideYaw: 87
+  pitchDirection: -1
+  poseLerpSpeed: 14
+  activePullThreshold: 0.05
+  returnLerpSpeed: 6
+  swingPitch: 95
+  minSwingScale: 0.5
+  swingDuration: 0.32
+  swingCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 6
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 0.25
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 0.35
+      inSlope: -0.5
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+
+### FishFeedController  on GameObject "(nested/prefab root)"
+  serializationData:
+    SerializedFormat: 0
+    SerializedBytes: 
+    ReferencedUnityObjects: []
+    SerializedBytesString: 
+    Prefab: {fileID: 0}
+    PrefabModificationsReferencedUnityObjects: []
+    PrefabModifications: []
+    SerializationNodes: []
+
+### ShopItem  on GameObject "Shop_SetDayTime"
+  offer: {fileID: 11400000, guid: a18d362284e571b43aeec4ace32e9ecc, type: 2}
+  category: 0
+  outlineTargets:
+  - {fileID: 1561703647}
+  outlineMaterial: {fileID: 2100000, guid: 4960773755c492b47b6509f29760fc65, type: 2}
+  liftRoot: {fileID: 1561703644}
+  liftHeight: 0.15
+  liftSpeed: 8
+
+### ShopTackleHanger  on GameObject "Slot_Tacke_PopperLure"
+  tackle: {fileID: 11400000, guid: dd0876eb05312564d9fb9cea6a7297f5, type: 2}
+  localEuler: {x: 0, y: 0, z: 0}
+  scaleMultiplier: 0.8
+  hangFromAttachPoint: 1
+  hangOffset: {x: 0, y: 0, z: 0}
+  enableWiggle: 1
+  wiggleFrequency: 2.2
+  wiggleDamping: 0.12
+  wiggleStrength: 12
+  wiggleMaxAngle: 35
+
+### ShopItem  on GameObject "Slot_Tacke_PopperLure"
+  offer: {fileID: 11400000, guid: c93d3a77bc6a52841bc361742c2e555d, type: 2}
+  category: 0
+  outlineTargets:
+  - {fileID: 0}
+  outlineMaterial: {fileID: 2100000, guid: 4960773755c492b47b6509f29760fc65, type: 2}
+  liftRoot: {fileID: 0}
+  liftHeight: 0.15
+  liftSpeed: 8
+
+### FishVendor  on GameObject "(nested/prefab root)"
+  priceMultiplier: 1
+  baitStackSize: 1
+  baitOffers:
+  - bait: {fileID: 11400000, guid: 11ccbd758765b2a4a8e806319dce81c0, type: 2}
+    pricePerStack: 1
+  timeOfDayOffers:
+  - displayName: Change time to night
+    icon: {fileID: 0}
+    price: 1
+    mode: 2
+  - displayName: Change time to day
+    icon: {fileID: 0}
+    price: 1
+    mode: 1
+  interactionRadius: 7
+  interactKey: 101
+  sellParticles: {fileID: 0}
+  buyParticles: {fileID: 0}
+
+### WavyCanvas  on GameObject "(nested/prefab root)"
+  amplitude: 0.0023
+  wavelength: 0.2
+  speed: 0.11
+  verticalSway: 0.6
+  meshDetail: 0.06
+  affectText: 0
+  autoDetectNewElements: 1
+  useUnscaledTime: 1
+
+### BountyBoard  on GameObject "BountyBoard"
+  bountiesPerDay: 5
+  rewardMultiplier: 1.5
+  minRequired: 1
+  maxRequired: 3
+  promptUI: {fileID: 0}
+  bountyPanelUI: {fileID: 2653671368236183880}
+  bountyText: {fileID: 2301233930641330393}
+
+### SaveRenderTexture  on GameObject "SaveRT"
+  TextureToSave: {fileID: 8400000, guid: cb9f5b49feabb7842a79ceab4dbc884d, type: 2}
+  SavePath: Assets/ART/Textures/MySavedImage
+
+### AdvancedDayNightCycle  on GameObject "TimeManager"
+  nightVolume: {fileID: 1590681486}
+  duskStart: 19
+  duskDuration: 1
+  dayStart: 7
+  dayDuration: 1
+  driveNightShaderGlobal: 1
+
+### LoopingAudioWithRandomInterval  on GameObject "Soundtrack"
+  audioClips:
+  - {fileID: 8300000, guid: a5392862eeae2fa46bbeef3451793257, type: 3}
+  playOnStart: 1
+  minInterval: 15
+  maxInterval: 20
+
+### WavyCanvas  on GameObject "(nested/prefab root)"
+  amplitude: 0.0045
+  wavelength: 0.35
+  speed: 0.14
+  verticalSway: 0.6
+  meshDetail: 0.06
+  affectText: 1
+  autoDetectNewElements: 1
+  useUnscaledTime: 1
+
+### TimedAnimationTrigger  on GameObject "LeafCurved"
+  animator: {fileID: 7794008602532017477}
+  triggerName: Play
+  intervalSeconds: 200
+
+### PREFAB-INSTANCE OVERRIDES (values changed on prefab instances in this file)
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  autoRandomSeed: 1
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  RotationModule.enabled: 1
+  simulationSpeed: 0.5
+  NoiseModule.strength.scalar: 0.1
+  InitialModule.maxNumParticles: 5
+  player: 
+  numFish: 15
+  maxSpeed: 3.96
+  lockYAxis: 1
+  fishPrefab: 
+  managerSpeed: 0.4
+  wanderArea.x: 8
+  wanderArea.y: 0
+  wanderArea.z: 8
+  spawnBounds.y: 0
+  wanderInterval: 3
+  numFish: 15
+  maxSpeed: 3.9
+  lockYAxis: 1
+  fishPrefab: 
+  managerSpeed: 0.4
+  wanderArea.y: 0
+  wanderArea.z: 4
+  spawnBounds.y: 0
+  wanderInterval: 3
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  linger: 0.99
+  burstForce: 0
+  burstRadius: 0.5
+  burstUpBias: 0
+  autoRandomSeed: 1
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  linger: 0.99
+  burstForce: 0
+  burstRadius: 0.5
+  burstUpBias: 0
+  player: 
+  autoRandomSeed: 1
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 88
+  EmissionModule.rateOverDistance.scalar: 8.24
+  player: 
+  simulationSpeed: 0.5
+  NoiseModule.strength.scalar: 0.1
+  InitialModule.maxNumParticles: 5
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  ShapeModule.radius.value: 0.0001
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  ShapeModule.radius.value: 4.47
+  InitialModule.maxNumParticles: 10
+  EmissionModule.rateOverTime.scalar: 8
+  EmissionModule.rateOverDistance.scalar: 8.24
+  linger: 0.99
+  burstForce: 0
+  burstRadius: 0.5
+  burstUpBias: 0
+  linger: 0.99
+  burstForce: 0
+  burstRadius: 0.5
+  burstUpBias: 0
+  maxThrowForce: 35.2
+  minThrowForce: 13.6
+  aimSurfaceMask.m_Bits: 2147483647
+  promptColor.b: 1
+  promptColor.g: 1
+  promptColor.r: 1
+  targetFPS: 60
+  serializationData.Prefab: 
+  fightSettings.minFightSeconds: 3
+  fightSettings.calmDurationRange.x: 1
+  fightSettings.calmDurationRange.y: 5
+  fightSettings.fightDurationRange.x: 0.3
+  fightSettings.fightDurationRange.y: 0.8
+  serializationData.Prefab: 
+  serializationData.Prefab: 
+  serializationData.Prefab: 
+  conformGroundMask.m_Bits: 784
+  learnedBannerText: 
+  learnedBannerGroup: 
+  serializationData.Prefab: 
+  maxChargeTime: 0.8
+  hideSpriteWhileCharging: 
+  serializationData.Prefab: 
+  serializationData.Prefab: 
+  walkSpeed: 7.55
+  openDuration: 0.3
+  closeDuration: 0.3
+  exteriorCamera: 
+  overlayCameras.Array.data[0]: 
+  simulationSpeed: 0.5
+  NoiseModule.strength.scalar: 0.1
+  InitialModule.maxNumParticles: 8
+  InitialModule.startColor.maxColor.b: 1
+  InitialModule.startColor.maxColor.g: 1
+  InitialModule.startColor.maxColor.r: 1
+  ColorModule.gradient.maxGradient.ctime2: 65535
+  ColorModule.gradient.maxGradient.key0.b: 0.4117647
+  ColorModule.gradient.maxGradient.key0.g: 1
+  ColorModule.gradient.maxGradient.key0.r: 0.9019608
+  ColorModule.gradient.maxGradient.key1.b: 0.4117647
+  ColorModule.gradient.maxGradient.key1.g: 1
+  ColorModule.gradient.maxGradient.key1.r: 0.9019608
+  ColorModule.gradient.maxGradient.key2.b: 0.5647059
+  ColorModule.gradient.maxGradient.key2.g: 0.9372549
+  ColorModule.gradient.maxGradient.key2.r: 1
+  player: 
+  InitialModule.startColor.maxColor.b: 0.41037738
+  InitialModule.startColor.maxColor.g: 1
+  InitialModule.startColor.maxColor.r: 0.9007268
+  maxDelay: 20
+  minDelay: 5
+  serializationData.Prefab: 
+  blackFade: 
+  menuDollyVcam: 
+  cinemachineBrain: 
+  playerController: 
+  playerFollowVcam: 
+  gameplayToSuspend.Array.data[0]: 
+  gameplayToSuspend.Array.data[1]: 
+  gameplayToSuspend.Array.data[2]: 
+  serializationData.Prefab: 
+  secondsPerGameHour: 60
+  serializationData.Prefab: 
+  transitionTime: 1
+  serializationData.Prefab: 
+  title: On Fishing!?
+  promptUI: 
+  playerTransform: 

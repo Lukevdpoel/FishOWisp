@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 3982920622948446150}
   - component: {fileID: 5544081683650861013}
   - component: {fileID: 6443506012403445536}
+  - component: {fileID: 3869016204089480341}
   m_Layer: 0
   m_Name: Waterplant2
   m_TagString: Untagged
@@ -89,3 +90,24 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 0
   m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &3869016204089480341
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5064627337268287302}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b7c4e21a9f6d40c58a13e7d2b0956c8f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  reach: 0.35
+  padRadius: 0
+  bobStrength: 0.4
+  tiltStrength: 25
+  stiffness: 45
+  damping: 6
+  maxRise: 0.2
+  maxTilt: 20
+  gateByVisibility: 1

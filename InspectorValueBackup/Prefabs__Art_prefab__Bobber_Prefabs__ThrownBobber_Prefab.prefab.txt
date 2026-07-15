@@ -1,0 +1,79 @@
+# Inspector values from: Prefabs/Art_prefab/Bobber_Prefabs/ThrownBobber_Prefab.prefab
+# Backup date: 2026-07-12
+
+### BobberController  on GameObject "ThrownBobber_Prefab"
+  impactPrefab: {fileID: 3994706279997133969, guid: 97c5836dd172ef849932d809a315539d, type: 3}
+  impactLifetime: 0.8
+  wakePrefab: {fileID: 0}
+  nibblePrefab: {fileID: 1370866258836361411, guid: 083ef2191dedfb747adc6daffe6e7c63, type: 3}
+  nibbleLifetime: 2
+  bitePrefab: {fileID: 2230609935683277320, guid: 148f577ce39aebe4c9011b5515a19cdc, type: 3}
+  biteLifetime: 1
+  waterEntrySound: {fileID: 8300000, guid: dc4ba211051ab5f4cbbf9e2c4a95b238, type: 3}
+  waterEntryVolumeScale: 2.24
+  impactSound: {fileID: 8300000, guid: a6c45050064a0e648b6e521a85da2f54, type: 3}
+  castFlySound: {fileID: 8300000, guid: d107d628d6b61ff4d8628526135682c5, type: 3}
+  castFlyVolume: 0.515
+  fishStruggleSound: {fileID: 8300000, guid: 0c1d897e0e7aade46af71e315cb12902, type: 3}
+  fishStruggleVolume: 0.077
+  fishHookedIdleSound: {fileID: 8300000, guid: 4a33f26ca700f2444af890ec424bd667, type: 3}
+  fishHookedIdleVolume: 0.036
+  airTumbleTorque: 70
+  airSteerEnabled: 1
+  airSteerSideAccel: 8
+  airSteerForwardAccel: 6
+  extraGravity: 15
+  spiralOnCast: 1
+  spiralRadius: 0
+  spiralFrequency: 1.07
+  spiralRampInTime: 0.15
+  spiralDecayRate: 0.4
+  spiralChargeInfluence: 1
+  spiralOrientSpeed: 4.5
+  waterTag: Water
+  floatHeight: -0.3
+  bounceDamp: 0.08
+  buoyancyForce: 28.4
+  waterDrag: 5
+  waterAngularDamping: 2
+  waterRotationSpeed: 5
+  waterImpactVelocityRetention: 0.15
+  minNibbles: 1
+  maxNibbles: 6
+  nibbleInterval: 0.8
+  nibbleForce: 175
+  nibbleWobbleForce: 146.4
+  nibbleWobbleDeg: 10
+  nibbleWobbleDecay: 2.11
+  nibbleWobbleFrequency: 1.34
+  biteSubmergeDepth: 0.05
+  biteDelay: 0.15
+  struggleForce: 6
+  struggleHoldRange: {x: 0.4, y: 2.5}
+  maxAngleOffsetDegrees: 35
+  repeatSideChance: 0.25
+  forceMultiplierRange: {x: 0.5, y: 1.6}
+  strugglePullAwayForce: 2.5
+  maxPullAwayDistance: 3
+  pullAwayAnchorSpeed: 0.5
+  fightJumpChance: 0.15
+  jumpUpSpeed: 3.62
+  jumpForwardSpeed: 2.05
+  jumpCooldown: 5
+  maxJumpDuration: 2.5
+  jumpSpeedMultiplier: 1.1
+  tetherRadius: 3
+  tetherReturnForce: 4
+  tetherInwardBiasThreshold: 0.7
+  obstacleCheckLayers:
+    serializedVersion: 2
+    m_Bits: 256
+  obstacleCheckDistance: 0.5
+  bobberVisuals: {fileID: 3855882591336779785}
+  hookedFishSilhouetteMaterial: {fileID: 2100000, guid: 7e2d9c4f6b1a4358a9d0e3f5c8b7a624, type: 2}
+  cameraAnchor: {fileID: 0}
+  lineAttachPoint: {fileID: 4205475982215113831}
+  popperSplashPrefab: {fileID: 0}
+  popperSplashLifetime: 1
+  grabTowMaxSpeed: 6
+  waterInertiaTensorOverride: 0

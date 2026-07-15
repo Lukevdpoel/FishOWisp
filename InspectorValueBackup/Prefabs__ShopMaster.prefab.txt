@@ -1,0 +1,55 @@
+# Inspector values from: Prefabs/ShopMaster.prefab
+# Backup date: 2026-07-12
+
+### ShopDoorController  on GameObject "DoorTrigger"
+  shopRoot: {fileID: 3986791212025899576}
+  interiorCamera: {fileID: 4418929895012577941}
+  exteriorCamera: {fileID: 0}
+  doorPivot: {fileID: 5290480983592820274}
+  openEulerOffset: {x: 0, y: 90, z: 0}
+  openDuration: 0.45
+  closeDuration: 0.4
+  doorEase:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  wallFader: {fileID: 8036701772591386930}
+  entryStartMarker: {fileID: 771676014614501508}
+  entryMarker: {fileID: 6333751536209469541}
+  exitStartMarker: {fileID: 6333751536209469541}
+  exitMarker: {fileID: 771676014614501508}
+  faceAfterEntry: {fileID: 7871309060884658616}
+  faceAfterExit: {fileID: 7193831931048038397}
+  walkSpeed: 5.13
+  glideDuration: 0.35
+  interactKey: 101
+  promptIcon: {fileID: 0}
+  insideExitTrigger: {fileID: 0}
+  overlayCameras:
+  - {fileID: 0}
+
+### WallFader  on GameObject "WallFadeMesh"
+  fadeDuration: 0.4
+  opaqueAlpha: 1
+  fadedAlpha: 0
+  colorProperty: _BaseColor

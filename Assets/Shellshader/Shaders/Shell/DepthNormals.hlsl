@@ -11,6 +11,7 @@ struct Attributes
     half3 normalOS : NORMAL;
     half4 tangentOS : TANGENT;
     float2 uv : TEXCOORD0;
+    float4 color : COLOR;
 };
 
 struct Varyings
@@ -21,6 +22,7 @@ struct Varyings
     float3 normalWS : TEXCOORD2;
     float3 tangentWS : TEXCOORD3;
     float3 posWS : TEXCOORD4;
+    float  mask : TEXCOORD5;
 };
 
 Attributes vert(Attributes input)
@@ -41,8 +43,9 @@ void AppendShellVertex(inout TriangleStream<Varyings> stream, Attributes input, 
     float3 windMove = moveFactor * _WindMove.xyz * sin(windAngle + posOS * _WindMove.w);
     float3 move = moveFactor * _BaseMove.xyz;
 
+    float mask = ComputeMossMask(input.color);
     float3 shellDir = normalize(normalInput.normalWS + move + windMove);
-    float3 posWS = vertexInput.positionWS + shellDir * (_ShellStep * index);
+    float3 posWS = vertexInput.positionWS + shellDir * (_ShellStep * index * mask);
     float4 posCS = TransformWorldToHClip(posWS);
 
     output.vertex = posCS;
@@ -52,14 +55,18 @@ void AppendShellVertex(inout TriangleStream<Varyings> stream, Attributes input, 
 
     output.normalWS = normalInput.normalWS;
     output.tangentWS = normalInput.tangentWS;
-
+    output.mask = mask;
 
     stream.Append(output);
 }
 
-[maxvertexcount(63)]
+[maxvertexcount(42)]
 void geom(triangle Attributes input[3], inout TriangleStream<Varyings> stream)
 {
+    float triMask = max(ComputeMossMask(input[0].color),
+                    max(ComputeMossMask(input[1].color), ComputeMossMask(input[2].color)));
+    if (triMask <= 0.0) return;
+
     [loop] for (float i = 0; i < _ShellAmount; ++i)
     {
         [unroll] for (float j = 0; j < 3; ++j)
@@ -75,8 +82,9 @@ float4 frag(Varyings input) : SV_Target
     float2 furUV = input.uv / _BaseMap_ST.xy * _FurScale;
 
     float4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUV);
-    float alpha = furColor.r * (1.0 - input.layer);
-    if (input.layer > 0.0 && alpha < _AlphaCutout) discard;
+    float cov = MossCoverage(input.mask, furColor.r);
+    float alpha = (input.layer == 0.0) ? cov : furColor.r * (1.0 - input.layer) * cov;
+    if (alpha < _AlphaCutout) discard;
 
     float3 viewDirWS = SafeNormalize(GetCameraPositionWS() - input.posWS);
     half3 normalTS = UnpackNormalScale(

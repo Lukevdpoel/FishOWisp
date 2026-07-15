@@ -1,0 +1,118 @@
+# Inspector values from: Scenes/CAVE.unity
+# Backup date: 2026-07-12
+
+### VerletRope  on GameObject "RopeManager"
+  segmentCount: 10
+  constraintIterations: 50
+  gravity: {x: 0, y: -9.81, z: 0}
+  landedTightenAmount: 0.25
+  nibbleTightenAmount: 0.6
+  nibbleTightenDecay: 0.4
+  tugTightenAmount: 0.85
+  tugTightenDecay: 0.35
+  reelTightenAmount: 0.9
+  reelTightenAttack: 0.12
+  reelTightenRelease: 0.4
+  jumpSlackAmount: 0.85
+  jumpSlackAttack: 0.08
+  jumpSlackRelease: 0.6
+  coilOnCast: 1
+  coilTurns: 8
+  coilRadius: 0.35
+  coilSpineStraighten: 0.6
+  coilBobberFraction: 0.4
+  coilEndTaper: 0.06
+  coilRampInTime: 0.1
+  coilDecayRate: 0.5
+  coilRelease: 0.25
+  coilSpinSpeed: 1.5
+  coilChargeInfluence: 1
+  coilRenderPoints: 64
+
+### FishingZone  on GameObject "FishingZone_Up"
+  fishPool: {fileID: 11400000, guid: 5d1342804cf861d4bab7b452ddcaeb29, type: 2}
+  fishRipplePrefab: {fileID: 86703556735717939, guid: 20787bbab00640a469eb7bf0d98e9fe9, type: 3}
+  aimIndicatorPrefab: {fileID: 5836111168746242878, guid: 9890b7e5e380ce042a775fc75d55e77a, type: 3}
+  maxFishCount: 3
+  respawnTimeMin: 10
+  respawnTimeMax: 30
+  splashScareRadius: 2.5
+  lureReelScareRadius: 2.5
+  maxFollowers: 4
+  attractCallRadius: 0
+  maxBaitHoverFish: 2
+  lureBrainSettings:
+    movingRadiusMultiplier: 1.5
+    movedDurationPerYank: 0.5
+    crankMovedTopUp: 0.15
+    directHitRadius: 0.8
+    maxHoverFish: 2
+    maxActiveChasers: 2
+    ringDistance: 2.5
+    arrivalBiteDelayMin: 0.3
+    arrivalBiteDelayMax: 1.5
+    rearmBiteDelayMin: 0.25
+    rearmBiteDelayMax: 0.7
+    patienceMin: 2.5
+    patienceMax: 5.5
+    boredCooldown: 8
+    postMissCooldown: 1.5
+    responseCooldown: 0
+    baseBiteChance: 0.15
+    movingBiteChance: 0.3
+    nightChanceMultiplier: 1.5
+    neutralCatchProbability: 0.5
+    biteCommitChance: 0.4
+    popperPreferenceRadiusMultiplier: 1.5
+    popperPreferenceBiteMultiplier: 2
+  autoNibbleMin: 4
+  autoNibbleMax: 12
+  autoNibbleRetryDelay: 1.5
+  noBaitInterestMultiplier: 2.5
+  waterTag: Water
+  waterSurfaceMarker: {fileID: 0}
+  maxAttractsBeforeScare: 3
+  scareWindow: 2
+
+### SceneTrigger  on GameObject "GoToCave_Trigger"
+  sceneName: HUTBUILT
+  targetSpawnID: Caveoutside_Spawn
+
+### SpawnPoint  on GameObject "Caveinside_Spawn"
+  spawnID: Caveinside_Spawn
+
+### SceneTrigger  on GameObject "GoToWoods_Trigger"
+  sceneName: HUTBUILT
+  targetSpawnID: Caveoutside_Spawn
+
+### PREFAB-INSTANCE OVERRIDES (values changed on prefab instances in this file)
+  serializationData.Prefab: 
+  useStaticCamera: 0
+  cameraSpeed: 600
+  serializationData.Prefab: 
+  serializationData.Prefab: 
+  simulationSpeed: 0.5
+  TrailModule.enabled: 0
+  InitialModule.maxNumParticles: 5
+  ColorModule.gradient.maxGradient.key0.b: 1
+  ColorModule.gradient.maxGradient.key0.g: 0.92019224
+  ColorModule.gradient.maxGradient.key0.r: 0
+  ColorModule.gradient.maxGradient.key1.b: 1
+  ColorModule.gradient.maxGradient.key1.g: 0.92156863
+  ColorModule.gradient.maxGradient.key1.r: 0
+  serializationData.Prefab: 
+  menuDollyVcam: 
+  cinemachineBrain: 
+  playerController: 
+  playerFollowVcam: 
+  gameplayToSuspend.Array.data[0]: 
+  gameplayToSuspend.Array.data[1]: 
+  gameplayToSuspend.Array.data[2]: 
+  simulationSpeed: 0.5
+  InitialModule.maxNumParticles: 5
+  ColorModule.gradient.maxGradient.key0.b: 1
+  ColorModule.gradient.maxGradient.key0.g: 0.92019224
+  ColorModule.gradient.maxGradient.key0.r: 0
+  ColorModule.gradient.maxGradient.key1.b: 1
+  ColorModule.gradient.maxGradient.key1.g: 0.92156863
+  ColorModule.gradient.maxGradient.key1.r: 0

@@ -13,6 +13,7 @@ struct Attributes
     float4 tangentOS : TANGENT;
     float2 texcoord : TEXCOORD0;
     float2 lightmapUV : TEXCOORD1;
+    float4 color : COLOR;
     UNITY_VERTEX_INPUT_INSTANCE_ID
 };
 
@@ -26,6 +27,7 @@ struct Varyings
     DECLARE_LIGHTMAP_OR_SH(lightmapUV, vertexSH, 5);
     float4 fogFactorAndVertexLight : TEXCOORD6; // x: fogFactor, yzw: vertex light
     float  layer : TEXCOORD7;
+    float  mask : TEXCOORD8;
 };
 
 Attributes vert(Attributes input)
@@ -47,13 +49,15 @@ void AppendShellVertex(inout TriangleStream<Varyings> stream, Attributes input, 
     float3 move = moveFactor * _BaseMove.xyz;
     float3 shellDir = SafeNormalize(normalInput.normalWS + move + windMove);
     float3 viewDirWS = GetCameraPositionWS() - vertexInput.positionWS;
-    
-    output.positionWS = vertexInput.positionWS + shellDir * (_ShellStep * index);
+
+    float mask = ComputeMossMask(input.color);
+    output.positionWS = vertexInput.positionWS + shellDir * (_ShellStep * index * mask);
     output.positionCS = TransformWorldToHClip(output.positionWS);
     output.uv = TRANSFORM_TEX(input.texcoord, _BaseMap);
     output.normalWS = normalInput.normalWS;
     output.tangentWS = normalInput.tangentWS;
     output.layer = (float)index / _ShellAmount;
+    output.mask = mask;
 
     float3 vertexLight = VertexLighting(vertexInput.positionWS, normalInput.normalWS);
     float fogFactor = ComputeFogFactor(vertexInput.positionCS.z);
@@ -68,6 +72,11 @@ void AppendShellVertex(inout TriangleStream<Varyings> stream, Attributes input, 
 [maxvertexcount(42)]
 void geom(triangle Attributes input[3], inout TriangleStream<Varyings> stream)
 {
+    // Skip fully-unpainted triangles entirely (no shells emitted where there's no moss).
+    float triMask = max(ComputeMossMask(input[0].color),
+                    max(ComputeMossMask(input[1].color), ComputeMossMask(input[2].color)));
+    if (triMask <= 0.0) return;
+
     [loop] for (float i = 0; i < _ShellAmount; ++i)
     {
         [unroll] for (float j = 0; j < 3; ++j)
@@ -87,8 +96,11 @@ float4 frag(Varyings input) : SV_Target
 {
     float2 furUv = input.uv / _BaseMap_ST.xy * _FurScale;
     float4 furColor = SAMPLE_TEXTURE2D(_FurMap, sampler_FurMap, furUv);
-    float alpha = furColor.r * (1.0 - input.layer);
-    if (input.layer > 0.0 && alpha < _AlphaCutout) discard;
+    // Base layer stays solid where painted (revealing the underlying material where not);
+    // outer shells thin out toward unpainted areas. Coverage edge is broken by the fur noise.
+    float cov = MossCoverage(input.mask, furColor.r);
+    float alpha = (input.layer == 0.0) ? cov : furColor.r * (1.0 - input.layer) * cov;
+    if (alpha < _AlphaCutout) discard;
 
     float3 viewDirWS = SafeNormalize(GetCameraPositionWS() - input.positionWS);
     float3 normalTS = UnpackNormalScale(

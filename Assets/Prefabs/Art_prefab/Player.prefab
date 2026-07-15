@@ -118,7 +118,7 @@ GameObject:
   - component: {fileID: 720425465179879199}
   - component: {fileID: 2707485665116454265}
   - component: {fileID: 7281879683359913100}
-  m_Layer: 30
+  m_Layer: 20
   m_Name: Image
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -534,7 +534,7 @@ GameObject:
   - component: {fileID: 1733190382294314163}
   - component: {fileID: 4587711737049642032}
   - component: {fileID: 6267200166477372416}
-  m_Layer: 30
+  m_Layer: 20
   m_Name: Canvas_BG
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -833,7 +833,7 @@ GameObject:
   - component: {fileID: 4533714865139664242}
   - component: {fileID: 8285461102273606004}
   - component: {fileID: 16736994836710933}
-  m_Layer: 30
+  m_Layer: 20
   m_Name: Image
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1188,7 +1188,7 @@ GameObject:
   - component: {fileID: 856423208543537321}
   - component: {fileID: 7117495237556206264}
   - component: {fileID: 4894499189841604544}
-  m_Layer: 30
+  m_Layer: 20
   m_Name: Canvas_BG
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1558,7 +1558,7 @@ GameObject:
   - component: {fileID: 7000723102118689562}
   - component: {fileID: 8409355738419103754}
   - component: {fileID: 1667381656329763933}
-  m_Layer: 30
+  m_Layer: 20
   m_Name: Canvas_BG
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1660,7 +1660,7 @@ GameObject:
   - component: {fileID: 394730015797187535}
   - component: {fileID: 894068288014940005}
   - component: {fileID: 3447910376590595815}
-  m_Layer: 30
+  m_Layer: 20
   m_Name: Canvas_BG
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2245,24 +2245,23 @@ MonoBehaviour:
   startAimDistance: 6
   aimSurfaceMask:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 4294965247
   waterMask:
     serializedVersion: 2
     m_Bits: 0
   gestureSettings:
     pullEngageDistance: 0.35
     minCastSpeed: 3
-    maxCastSpeed: 14
     idleReturnRate: 3
     velocityResponsiveness: 25
     mouseSensitivity: 0.05
-    stickEngageMagnitude: 0.75
+    stickEngageMagnitude: 0.45
     stickEngageSpeed: 3.5
-    stickVelocityScale: 1
+    stickVelocityScale: 2
   minThrowForce: 8
   maxThrowForce: 23
-  minPowerDistanceFraction: 0.45
-  bobberExtraGravity: 20
+  minPowerDistanceFraction: 0.3
+  bobberExtraGravity: 15
   launchAngleFallback: 20
   playerAimRotationSpeed: 10
 --- !u!114 &9122994942126807759
@@ -2457,7 +2456,7 @@ GameObject:
   - component: {fileID: 2735532096283103312}
   - component: {fileID: 3656512521632983414}
   - component: {fileID: 7037755735478885688}
-  m_Layer: 30
+  m_Layer: 20
   m_Name: Image
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2608,7 +2607,7 @@ GameObject:
   - component: {fileID: 7038297886249184706}
   - component: {fileID: 5426702944481840402}
   - component: {fileID: 8230834966114468530}
-  m_Layer: 30
+  m_Layer: 20
   m_Name: Canvas_BG
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -2803,7 +2802,7 @@ GameObject:
   - component: {fileID: 5229306444139047603}
   - component: {fileID: 6656014609313305976}
   - component: {fileID: 9111192398946929785}
-  m_Layer: 30
+  m_Layer: 20
   m_Name: Image
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4256,7 +4255,7 @@ GameObject:
   - component: {fileID: 2312545342058193420}
   - component: {fileID: 3551039334884314999}
   - component: {fileID: 7299303119247083428}
-  m_Layer: 21
+  m_Layer: 20
   m_Name: NotebookCamera
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4318,7 +4317,7 @@ Camera:
   m_Depth: 1
   m_CullingMask:
     serializedVersion: 2
-    m_Bits: 1611661312
+    m_Bits: 537919488
   m_RenderingPath: -1
   m_TargetTexture: {fileID: 0}
   m_TargetDisplay: 0
@@ -4386,7 +4385,7 @@ GameObject:
   - component: {fileID: 2415470800157461076}
   - component: {fileID: 8505525190180784531}
   - component: {fileID: 3322749138942971201}
-  m_Layer: 30
+  m_Layer: 20
   m_Name: Canvas_BG
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -4886,7 +4885,7 @@ GameObject:
   - component: {fileID: 93655273761802559}
   - component: {fileID: 7204740354869062543}
   - component: {fileID: 5376039942814420037}
-  m_Layer: 30
+  m_Layer: 20
   m_Name: Image
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -5277,7 +5276,7 @@ GameObject:
   - component: {fileID: 9167910607811621105}
   - component: {fileID: 1195722802474930636}
   - component: {fileID: 1403085375046441488}
-  m_Layer: 30
+  m_Layer: 20
   m_Name: Image
   m_TagString: Untagged
   m_Icon: {fileID: 0}
