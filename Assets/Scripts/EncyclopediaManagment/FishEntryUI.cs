@@ -37,7 +37,11 @@ public class FishEntryUI : MonoBehaviour
         // registered the singleton yet. Skipping the 3D preview here is harmless: the
         // encyclopedia re-populates via OnSlotClicked when the notebook actually opens,
         // by which point the viewer exists.
-        if (ModelViewer.Instance != null)
+        // isActiveAndEnabled guard: when that scene-load Populate DOES find the viewer, it
+        // used to switch the studio camera on at boot with the notebook closed — an unseen
+        // second camera rendering every frame until the notebook was opened and closed.
+        // Only drive the 3D preview while this page is actually visible.
+        if (ModelViewer.Instance != null && isActiveAndEnabled)
         {
             ModelViewer.Instance.ShowModel(preset, revealed);
         }

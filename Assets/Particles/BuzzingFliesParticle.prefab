@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 1877514893453878560}
   - component: {fileID: 5815987293131610350}
   - component: {fileID: 1802332186548053622}
+  - component: {fileID: -1176843896491934541}
   m_Layer: 0
   m_Name: BuzzingFliesParticle
   m_TagString: Untagged
@@ -4856,3 +4857,20 @@ MonoBehaviour:
   tetherRadius: 1
   returnStrength: 20
   drag: 0.2
+--- !u!114 &-1176843896491934541
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1325640198395294145}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea5c6abe1d2c4cc48a94ab29625e9244, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectDistanceFade
+  fadeStart: 25
+  fadeEnd: 35
+  particleSystems: []
+  lights: []
+  materialFades: []

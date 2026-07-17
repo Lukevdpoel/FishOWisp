@@ -78,14 +78,22 @@ void AdditionalLights_float(float3 SpecColor, float Smoothness, float3 WorldPosi
     Smoothness = exp2(10 * Smoothness + 1);
     WorldNormal = normalize(WorldNormal);
     WorldView = SafeNormalize(WorldView);
-    int pixelLightCount = GetAdditionalLightsCount();
-    for (int i = 0; i < pixelLightCount; ++i)
-    {
-        Light light = GetAdditionalLight(i, WorldPosition);
+#if USE_CLUSTER_LIGHT_LOOP
+    // Forward+ light loop: LIGHT_LOOP_BEGIN reads tile/depth data from a local named `inputData`.
+    // NOTE: the graph must declare a Boolean Keyword `_CLUSTER_LIGHT_LOOP` (Multi Compile, Global)
+    // in its Blackboard, or this path is never compiled and additional lights vanish in Forward+.
+    InputData inputData = (InputData)0;
+    inputData.positionWS = WorldPosition;
+    float4 clipPos = TransformWorldToHClip(WorldPosition);
+    inputData.normalizedScreenSpaceUV = clipPos.xy / clipPos.w * 0.5 + 0.5;
+#endif
+    uint pixelLightCount = GetAdditionalLightsCount();
+    LIGHT_LOOP_BEGIN(pixelLightCount)
+        Light light = GetAdditionalLight(lightIndex, WorldPosition);
         half3 attenuatedLightColor = light.color * (light.distanceAttenuation * light.shadowAttenuation);
         diffuseColor += LightingLambert(attenuatedLightColor, light.direction, WorldNormal);
         specularColor += LightingSpecular(attenuatedLightColor, light.direction, WorldNormal, WorldView, float4(SpecColor, 0), Smoothness);
-    }
+    LIGHT_LOOP_END
 #endif
 
     Diffuse = diffuseColor;
@@ -101,14 +109,19 @@ void AdditionalLights_half(half3 SpecColor, half Smoothness, half3 WorldPosition
     Smoothness = exp2(10 * Smoothness + 1);
     WorldNormal = normalize(WorldNormal);
     WorldView = SafeNormalize(WorldView);
-    int pixelLightCount = GetAdditionalLightsCount();
-    for (int i = 0; i < pixelLightCount; ++i)
-    {
-        Light light = GetAdditionalLight(i, WorldPosition);
+#if USE_CLUSTER_LIGHT_LOOP
+    InputData inputData = (InputData)0;
+    inputData.positionWS = WorldPosition;
+    float4 clipPos = TransformWorldToHClip(WorldPosition);
+    inputData.normalizedScreenSpaceUV = clipPos.xy / clipPos.w * 0.5 + 0.5;
+#endif
+    uint pixelLightCount = GetAdditionalLightsCount();
+    LIGHT_LOOP_BEGIN(pixelLightCount)
+        Light light = GetAdditionalLight(lightIndex, WorldPosition);
         half3 attenuatedLightColor = light.color * (light.distanceAttenuation * light.shadowAttenuation);
         diffuseColor += LightingLambert(attenuatedLightColor, light.direction, WorldNormal);
         specularColor += LightingSpecular(attenuatedLightColor, light.direction, WorldNormal, WorldView, half4(SpecColor, 0), Smoothness);
-    }
+    LIGHT_LOOP_END
 #endif
 
     Diffuse = diffuseColor;

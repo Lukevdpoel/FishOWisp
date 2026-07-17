@@ -1,0 +1,180 @@
+PROFILER CAPTURE REPORT
+Generated: 2026-07-16 18:37:00
+Frames analyzed: 300 (main thread)
+
+== FRAME TIME ==
+  avg       15.49 ms  (64.6 FPS)
+  median    15.08 ms  (66.3 FPS)
+  p95       23.89 ms  (41.9 FPS)
+  worst     27.40 ms  (36.5 FPS)
+  GC alloc avg/frame: 8.0 KB
+
+== WHERE THE MAIN THREAD SPENDS ITS TIME ==
+  real CPU work                9.58 ms/frame
+  waiting on GPU (Gfx.*)       0.00 ms/frame
+  vsync/target FPS wait        0.00 ms/frame
+  editor overhead              5.91 ms/frame (absent in builds)
+  VERDICT: CPU-BOUND: main-thread work dominates. The top-markers list below is the optimization target.
+
+== TOP 50 MARKERS BY SELF TIME (avg ms/frame) ==
+      avg ms   calls/frm  marker
+       5.913         4.0  EditorLoop
+       0.978         2.0  Inl_On Record Render Graph
+       0.506       101.2  SRPBRender.ApplyShader
+       0.460         1.0  Profiler.FlushMemoryCounters
+       0.437         1.0  Assembly-CSharp.dll!::SoftBodyJiggle.LateUpdate() [Invoke]
+       0.347      1331.4  MemoryManager.FallbackAllocation
+       0.284        11.0  Assembly-CSharp.dll!::FishRipple.Update() [Invoke]
+       0.284        28.0  WaitForJobGroupID
+       0.227        23.0  Inl_NRPRGComp_ExecuteBeginRenderpassCommand
+       0.147         1.0  Assembly-CSharp.dll!::VerletRope.LateUpdate() [Invoke]
+       0.141       106.2  SRPBatcher.Flush
+       0.138         1.0  Assembly-CSharp.dll!::VerletFoliage.LateUpdate() [Invoke]
+       0.135         2.0  Inl_ExecuteRenderGraph
+       0.133        33.2  StdRender.ApplyShader
+       0.118         1.0  Inl_UniversalRenderPipeline.RenderSingleCameraInternal: ModelCamera
+       0.116        39.0  Assembly-CSharp.dll!::LilyBob.LateUpdate() [Invoke]
+       0.106        53.0  Inl_NRPRGComp_ExecuteDestroyResources
+       0.103        21.0  Material.SetPassFast
+       0.102         1.0  Assembly-CSharp.dll!::FishDisplaySway.Update() [Invoke]
+       0.100         1.0  Inl_UniversalRenderPipeline.RenderSingleCameraInternal: Main Camera
+       0.097        53.0  Inl_NRPRGComp_ExecuteInitializeResources
+       0.090         2.0  Inl_ComputeHashRenderGraph
+       0.089         1.0  Assembly-CSharp.dll!::PlayerController.Update() [Invoke]
+       0.084         2.0  Inl_RenderCameraStack
+       0.082         1.0  BehaviourUpdate
+       0.078         2.0  ExecuteRenderQueueJob
+       0.078         2.0  ExecuteRenderGraph
+       0.077         2.0  Assembly-CSharp.dll!::MossDecalManager.LateUpdate() [Invoke]
+       0.071         2.0  Inl_ScriptableRenderContext.Submit
+       0.066        15.9  RenderLoop.Draw
+       0.066         1.0  UpdateScene
+       0.064        24.9  RenderLoop.DrawSRPBatcher
+       0.059         2.0  UnityEngine.CoreModule.dll!UnityEngine.Rendering::RenderPipelineManager.DoRenderLoop_Internal() [Invoke]
+       0.058        40.0  TransformChangeSystem
+       0.057         2.0  CullQueryPortalVisibilityUmbra
+       0.055         1.0  ParticleSystem.Update
+       0.055        33.2  BatchRenderer.Flush
+       0.055         0.8  PxScene.simulate
+       0.053         2.0  Inl_Setup Light Constants
+       0.052        31.0  RenderLoop.ScheduleDraw
+       0.049         2.0  Inl_UniversalRenderPipeline.ComputeShadowCasterCullingInfos
+       0.048         2.0  Assembly-CSharp.dll!::FPSDisplay.OnGUI() [Invoke]
+       0.046         2.0  Inl_UniversalRenderTotal
+       0.046         1.0  CustomRenderTextures.Update
+       0.045         5.0  SRPBShadow.ApplyShader
+       0.043         5.0  Graphics.Blit
+       0.042         1.0  LateBehaviourUpdate
+       0.041         2.0  Inl_CompileRenderGraph
+       0.041         4.0  Inl_ScriptableRenderer.SetPerCameraShaderVariables
+       0.039         1.0  Animators.PrepareFirstPass
+
+== TOP 25 GC ALLOCATORS (avg KB/frame) ==
+       0.659  PlayerLoop
+       0.659  GC.Alloc
+       0.657  RenderPlayModeViewCameras
+       0.657  UnityEngine.CoreModule.dll!UnityEngine.Rendering::RenderPipelineManager.DoRenderLoop_Internal() [Invoke]
+       0.657  Inl_UniversalRenderTotal
+       0.657  Inl_RenderCameraStack
+       0.657  Inl_ScriptableRenderContext.Submit
+       0.657  UniversalRenderPipeline.RenderSingleCameraInternal: Main Camera
+       0.657  ExecuteRenderGraph
+       0.657  DrawScreenSpaceUI
+       0.657  GUI.Repaint
+       0.359  UnityEngine.IMGUIModule.dll!UnityEngine::GUIUtility.BeginGUI() [Invoke]
+       0.297  Assembly-CSharp.dll!::FPSDisplay.OnGUI() [Invoke]
+       0.063  UnityEngine.IMGUIModule.dll!UnityEngine::GUIStyle.GetMeshInfo() [Invoke]
+       0.002  UpdateScene
+       0.002  Update.ScriptRunBehaviourUpdate
+       0.002  BehaviourUpdate
+       0.002  Assembly-CSharp.dll!::FPSDisplay.Update() [Invoke]
+
+== 8 WORST FRAMES ==
+  Frame 3545: 27.40 ms
+         17.38 ms  EditorLoop
+          1.02 ms  Inl_On Record Render Graph
+          0.48 ms  Profiler.FlushMemoryCounters
+          0.48 ms  SRPBRender.ApplyShader
+          0.46 ms  Assembly-CSharp.dll!::SoftBodyJiggle.LateUpdate() [Invoke]
+          0.41 ms  Assembly-CSharp.dll!::VerletFoliage.LateUpdate() [Invoke]
+          0.32 ms  MemoryManager.FallbackAllocation
+          0.30 ms  Assembly-CSharp.dll!::FishRipple.Update() [Invoke]
+          0.29 ms  WaitForJobGroupID
+          0.23 ms  Inl_NRPRGComp_ExecuteBeginRenderpassCommand
+  Frame 3526: 27.28 ms
+         16.84 ms  EditorLoop
+          0.98 ms  Inl_On Record Render Graph
+          0.57 ms  SRPBRender.ApplyShader
+          0.48 ms  Profiler.FlushMemoryCounters
+          0.46 ms  Assembly-CSharp.dll!::SoftBodyJiggle.LateUpdate() [Invoke]
+          0.36 ms  MemoryManager.FallbackAllocation
+          0.35 ms  Idle
+          0.33 ms  Assembly-CSharp.dll!::FishRipple.Update() [Invoke]
+          0.32 ms  WaitForJobGroupID
+          0.22 ms  Inl_NRPRGComp_ExecuteBeginRenderpassCommand
+  Frame 3462: 26.91 ms
+         16.57 ms  EditorLoop
+          1.01 ms  Inl_On Record Render Graph
+          0.67 ms  SRPBRender.ApplyShader
+          0.65 ms  Profiler.FlushMemoryCounters
+          0.47 ms  Assembly-CSharp.dll!::SoftBodyJiggle.LateUpdate() [Invoke]
+          0.39 ms  MemoryManager.FallbackAllocation
+          0.29 ms  WaitForJobGroupID
+          0.29 ms  Assembly-CSharp.dll!::FishRipple.Update() [Invoke]
+          0.22 ms  Inl_NRPRGComp_ExecuteBeginRenderpassCommand
+          0.20 ms  SRPBatcher.Flush
+  Frame 3398: 25.92 ms
+         15.92 ms  EditorLoop
+          1.00 ms  Inl_On Record Render Graph
+          0.81 ms  Assembly-CSharp.dll!::SoftBodyJiggle.LateUpdate() [Invoke]
+          0.45 ms  Profiler.FlushMemoryCounters
+          0.42 ms  SRPBRender.ApplyShader
+          0.40 ms  Assembly-CSharp.dll!::VerletFoliage.LateUpdate() [Invoke]
+          0.33 ms  MemoryManager.FallbackAllocation
+          0.30 ms  WaitForJobGroupID
+          0.29 ms  Assembly-CSharp.dll!::FishRipple.Update() [Invoke]
+          0.22 ms  Inl_NRPRGComp_ExecuteBeginRenderpassCommand
+  Frame 3527: 25.75 ms
+         14.58 ms  EditorLoop
+          1.27 ms  Inl_On Record Render Graph
+          0.49 ms  SRPBRender.ApplyShader
+          0.46 ms  Assembly-CSharp.dll!::SoftBodyJiggle.LateUpdate() [Invoke]
+          0.41 ms  Profiler.FlushMemoryCounters
+          0.40 ms  Assembly-CSharp.dll!::VerletFoliage.LateUpdate() [Invoke]
+          0.39 ms  MemoryManager.FallbackAllocation
+          0.33 ms  Assembly-CSharp.dll!::FishRipple.Update() [Invoke]
+          0.27 ms  WaitForJobGroupID
+          0.26 ms  Inl_NRPRGComp_ExecuteBeginRenderpassCommand
+  Frame 3431: 25.56 ms
+         15.05 ms  EditorLoop
+          1.00 ms  Inl_On Record Render Graph
+          0.58 ms  SRPBRender.ApplyShader
+          0.51 ms  Assembly-CSharp.dll!::SoftBodyJiggle.LateUpdate() [Invoke]
+          0.42 ms  Profiler.FlushMemoryCounters
+          0.41 ms  Assembly-CSharp.dll!::VerletFoliage.LateUpdate() [Invoke]
+          0.36 ms  MemoryManager.FallbackAllocation
+          0.31 ms  WaitForJobGroupID
+          0.26 ms  Assembly-CSharp.dll!::FishRipple.Update() [Invoke]
+          0.25 ms  Inl_NRPRGComp_ExecuteBeginRenderpassCommand
+  Frame 3363: 25.08 ms
+         15.29 ms  EditorLoop
+          0.94 ms  Inl_On Record Render Graph
+          0.65 ms  SRPBRender.ApplyShader
+          0.46 ms  Assembly-CSharp.dll!::SoftBodyJiggle.LateUpdate() [Invoke]
+          0.44 ms  Profiler.FlushMemoryCounters
+          0.36 ms  MemoryManager.FallbackAllocation
+          0.30 ms  WaitForJobGroupID
+          0.26 ms  Assembly-CSharp.dll!::FishRipple.Update() [Invoke]
+          0.23 ms  Inl_NRPRGComp_ExecuteBeginRenderpassCommand
+          0.19 ms  SRPBatcher.Flush
+  Frame 3296: 24.76 ms
+         15.38 ms  EditorLoop
+          0.93 ms  Inl_On Record Render Graph
+          0.49 ms  Assembly-CSharp.dll!::SoftBodyJiggle.LateUpdate() [Invoke]
+          0.41 ms  Assembly-CSharp.dll!::VerletFoliage.LateUpdate() [Invoke]
+          0.41 ms  Profiler.FlushMemoryCounters
+          0.40 ms  SRPBRender.ApplyShader
+          0.33 ms  MemoryManager.FallbackAllocation
+          0.30 ms  WaitForJobGroupID
+          0.27 ms  Assembly-CSharp.dll!::FishRipple.Update() [Invoke]
+          0.24 ms  Inl_NRPRGComp_ExecuteBeginRenderpassCommand

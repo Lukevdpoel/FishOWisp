@@ -318,6 +318,10 @@ public class FishModelVisual
 
             Mesh mesh = filters[i].mesh; // instantiates a copy this class now owns
             mesh.MarkDynamic();
+            // CPU-swayed mesh: opt out of the GPU Resident Drawer, or every per-frame SetVertices
+            // re-dispatches this renderer to the batcher (InstanceCullingBatcher.BuildBatch churn).
+            if (filters[i].TryGetComponent(out MeshRenderer partRenderer))
+                GpuDrivenRenderingOptOut.Apply(partRenderer);
             Vector3[] baseVerts = mesh.vertices;
 
             Matrix4x4 partToBody = worldToBody * filters[i].transform.localToWorldMatrix;

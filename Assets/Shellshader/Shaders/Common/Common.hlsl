@@ -56,10 +56,22 @@ void ApplyRimLight(inout float3 color, float3 posWS, float3 viewDirWS, float3 no
     color += intensity * light.color;
 
 #ifdef _ADDITIONAL_LIGHTS
-    int additionalLightsCount = GetAdditionalLightsCount();
-    for (int i = 0; i < additionalLightsCount; ++i)
-    {
-        int index = GetPerObjectLightIndex(i);
+#if USE_CLUSTER_LIGHT_LOOP
+    // Forward+ light loop: the LIGHT_LOOP_BEGIN macro reads tile/depth data from a local
+    // literally named `inputData`. The screen UV from clip space matches SV_POSITION-derived
+    // GetNormalizedScreenSpaceUV on all raster orientations (both flips cancel out).
+    InputData inputData = (InputData)0;
+    inputData.positionWS = posWS;
+    float4 rimClipPos = TransformWorldToHClip(posWS);
+    inputData.normalizedScreenSpaceUV = rimClipPos.xy / rimClipPos.w * 0.5 + 0.5;
+#endif
+    uint additionalLightsCount = GetAdditionalLightsCount();
+    LIGHT_LOOP_BEGIN(additionalLightsCount)
+#if USE_CLUSTER_LIGHT_LOOP
+        int index = lightIndex; // cluster iteration yields global light-buffer indices directly
+#else
+        int index = GetPerObjectLightIndex(lightIndex);
+#endif
         Light light = GetAdditionalPerObjectLight(index, posWS);
         float lightDirDotView = dot(light.direction, viewDirWS);
         float intensity = max(-lightDirDotView, 0.0);
@@ -67,9 +79,9 @@ void ApplyRimLight(inout float3 color, float3 posWS, float3 viewDirWS, float3 no
         intensity *= light.distanceAttenuation;
 #ifdef _MAIN_LIGHT_SHADOWS
         intensity *= AdditionalLightRealtimeShadow(index, posWS);
-#endif 
+#endif
         color += intensity * light.color;
-    }
+    LIGHT_LOOP_END
 #endif
 }
 

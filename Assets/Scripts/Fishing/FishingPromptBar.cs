@@ -41,9 +41,17 @@ public class FishingPromptBar : MonoBehaviour
              "is idle (not yet cast). Turn off to only show the bar once a line is actually in the water.")]
     public bool showWhileIdle = true;
 
-    private RectTransform rowRoot;
     private CanvasGroup canvasGroup;
     private FishingRodController controller;
+    private float controllerRetryTimer;
+
+    // One fully-built row per (state, lure, interact, glyph-era) signature, built on first need and
+    // then just SetActive-swapped. Rebuilding the row from scratch on every signature change was the
+    // game's top GC allocator (AddComponent + TMP mesh churn) and hitched the frame it happened on —
+    // an interact hint flickering at range boundary could retrigger it every few frames.
+    private readonly Dictionary<int, RectTransform> rowCache = new Dictionary<int, RectTransform>();
+    private RectTransform activeRow;
+    private RectTransform selfRect;
 
     // Signature of what's currently drawn, so we only rebuild the row when something changes.
     private State builtState = (State)(-1);
@@ -84,13 +92,31 @@ public class FishingPromptBar : MonoBehaviour
     }
 
     // Force a rebuild on the next Update so the freshly active device's labels (or, once Steam
-    // starts managing a pad, its glyphs) are drawn.
+    // starts managing a pad, its glyphs) are drawn. Cached rows hold the OLD device's labels /
+    // glyphs baked into their TMP texts, so they must go too. This is rare (device swap, Steam
+    // glyph load) — the steady state never rebuilds.
     private void HandleDeviceChanged(ActiveInputDevice _) => ForceRebuild();
-    private void ForceRebuild() => builtState = (State)(-1);
+    private void ForceRebuild()
+    {
+        builtState = (State)(-1);
+        foreach (RectTransform row in rowCache.Values)
+            if (row != null) Destroy(row.gameObject);
+        rowCache.Clear();
+        activeRow = null;
+    }
 
     private void Update()
     {
-        if (controller == null) controller = ResolveController();
+        // Resolve the rod lazily but retry on a slow clock: FindFirstObjectByType is a full scene
+        // scan, and in scenes without a rod (hut, cave) a per-frame retry would pay that scan —
+        // plus its allocation — every single frame, forever.
+        if (controller == null)
+        {
+            controllerRetryTimer -= Time.unscaledDeltaTime;
+            if (controllerRetryTimer > 0f) { ApplyVisible(false); return; }
+            controllerRetryTimer = 1f;
+            controller = ResolveController();
+        }
 
         bool show = ShouldShow(out State state);
         ApplyVisible(show);
@@ -210,15 +236,24 @@ public class FishingPromptBar : MonoBehaviour
 
     private void RebuildRow(State state, bool lure, bool interact)
     {
-        if (rowRoot == null) return;
-        for (int i = rowRoot.childCount - 1; i >= 0; i--)
-            Destroy(rowRoot.GetChild(i).gameObject);
+        if (selfRect == null) return;
+        if (activeRow != null) activeRow.gameObject.SetActive(false);
 
-        foreach (Prompt p in BuildPrompts(state, lure, interact))
-            BuildPrompt(p);
+        bool gamepad = GamepadInput.IsGamepadActive;
+        int key = (int)state | (lure ? 1 << 8 : 0) | (interact ? 1 << 9 : 0) | (gamepad ? 1 << 10 : 0);
+        if (!rowCache.TryGetValue(key, out RectTransform row) || row == null)
+        {
+            row = CreateRow();
+            foreach (Prompt p in BuildPrompts(state, lure, interact))
+                BuildPrompt(row, p);
+            rowCache[key] = row;
+        }
+
+        row.gameObject.SetActive(true);
+        activeRow = row;
     }
 
-    private void BuildPrompt(Prompt p)
+    private void BuildPrompt(RectTransform rowRoot, Prompt p)
     {
         GameObject promptObj = new GameObject("Prompt", typeof(RectTransform));
         promptObj.transform.SetParent(rowRoot, false);
@@ -314,21 +349,29 @@ public class FishingPromptBar : MonoBehaviour
 
     private void BuildRoot()
     {
-        RectTransform self = GetComponent<RectTransform>();
-        if (self == null) self = gameObject.AddComponent<RectTransform>();
-        self.anchorMin = new Vector2(0f, 0f);
-        self.anchorMax = new Vector2(1f, 0f);
-        self.pivot = new Vector2(0.5f, 0f);
-        self.anchoredPosition = new Vector2(0f, bottomOffset);
-        self.sizeDelta = new Vector2(0f, 60f);
+        selfRect = GetComponent<RectTransform>();
+        if (selfRect == null) selfRect = gameObject.AddComponent<RectTransform>();
+        selfRect.anchorMin = new Vector2(0f, 0f);
+        selfRect.anchorMax = new Vector2(1f, 0f);
+        selfRect.pivot = new Vector2(0.5f, 0f);
+        selfRect.anchoredPosition = new Vector2(0f, bottomOffset);
+        selfRect.sizeDelta = new Vector2(0f, 60f);
 
+        canvasGroup = gameObject.AddComponent<CanvasGroup>();
+        canvasGroup.interactable = false;
+        canvasGroup.blocksRaycasts = false;
+    }
+
+    // One row container per cached signature; all rows share the anchor spot, one active at a time.
+    private RectTransform CreateRow()
+    {
         GameObject row = new GameObject("PromptRow", typeof(RectTransform));
-        rowRoot = row.GetComponent<RectTransform>();
-        rowRoot.SetParent(self, false);
-        rowRoot.anchorMin = new Vector2(0.5f, 0f);
-        rowRoot.anchorMax = new Vector2(0.5f, 0f);
-        rowRoot.pivot = new Vector2(0.5f, 0f);
-        rowRoot.anchoredPosition = Vector2.zero;
+        RectTransform rect = row.GetComponent<RectTransform>();
+        rect.SetParent(selfRect, false);
+        rect.anchorMin = new Vector2(0.5f, 0f);
+        rect.anchorMax = new Vector2(0.5f, 0f);
+        rect.pivot = new Vector2(0.5f, 0f);
+        rect.anchoredPosition = Vector2.zero;
 
         var hlg = row.AddComponent<HorizontalLayoutGroup>();
         hlg.spacing = promptSpacing;
@@ -336,10 +379,7 @@ public class FishingPromptBar : MonoBehaviour
         hlg.childControlWidth = hlg.childControlHeight = true;
         hlg.childForceExpandWidth = hlg.childForceExpandHeight = false;
         AddFitter(row);
-
-        canvasGroup = gameObject.AddComponent<CanvasGroup>();
-        canvasGroup.interactable = false;
-        canvasGroup.blocksRaycasts = false;
+        return rect;
     }
 
     private void ApplyVisible(bool visible)

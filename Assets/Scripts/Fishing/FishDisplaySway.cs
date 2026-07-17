@@ -52,12 +52,16 @@ public class FishDisplaySway : MonoBehaviour
     private float spineMaxZ;
 
     // CPU-deformation fallback state: per deformed mesh, the instanced mesh, its rest-pose
-    // vertices, and a scratch buffer.
+    // vertices, a scratch buffer, and the per-vertex wave constants baked once at setup (they
+    // depend only on the rest pose and the inspector parameters, not on time).
     private struct CpuMesh
     {
         public Mesh mesh;
         public Vector3[] restVertices;
         public Vector3[] workVertices;
+        public float[] wavePhase;  // phase offset along the spine: s * bodyWaves * 2π
+        public float[] waveAmp;    // waveAmplitude * bodyLength * tail mask, per vertex
+        public float[] sideAmp;    // sideAmplitude * bodyLength * head guard, per vertex
     }
     private System.Collections.Generic.List<CpuMesh> cpuMeshes;
     private Renderer[] cpuRenderers; // visibility gate for the CPU path — no viewer, no per-vertex work
@@ -122,17 +126,41 @@ public class FishDisplaySway : MonoBehaviour
             Mesh mesh = filter.mesh;
             Vector3[] rest = mesh.vertices;
 
+            // CPU-swayed mesh: opt out of the GPU Resident Drawer, or every per-frame SetVertices
+            // re-dispatches this renderer to the batcher (InstanceCullingBatcher.BuildBatch churn).
+            if (filter.TryGetComponent(out MeshRenderer meshRenderer))
+                GpuDrivenRenderingOptOut.Apply(meshRenderer);
+
             // Lock the bounds expanded by the maximum displacement once, so the renderer
             // never gets culled mid-wave and we skip per-frame bounds recalculation.
             Bounds bounds = mesh.bounds;
             bounds.Expand((waveAmplitude + sideAmplitude) * (spineMaxZ - spineMinZ) * 2f);
             mesh.bounds = bounds;
 
+            // Bake the wave constants per vertex (mirrors FishSwayLateralWave in FishSway.hlsl):
+            // only sin/cos of the running phase remains for the per-frame loop.
+            float bodyLength = spineMaxZ - spineMinZ;
+            var wavePhase = new float[rest.Length];
+            var waveAmp = new float[rest.Length];
+            var sideAmp = new float[rest.Length];
+            for (int i = 0; i < rest.Length; i++)
+            {
+                float s = Mathf.Clamp01((rest[i].z - spineMinZ) / bodyLength);
+                float mask = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((s - maskStart) / Mathf.Max(1f - maskStart, 0.0001f)));
+                float headGuard = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(s / 0.35f));
+                wavePhase[i] = s * bodyWaves * Mathf.PI * 2f;
+                waveAmp[i] = waveAmplitude * bodyLength * mask;
+                sideAmp[i] = sideAmplitude * bodyLength * headGuard;
+            }
+
             cpuMeshes.Add(new CpuMesh
             {
                 mesh = mesh,
                 restVertices = rest,
                 workVertices = (Vector3[])rest.Clone(),
+                wavePhase = wavePhase,
+                waveAmp = waveAmp,
+                sideAmp = sideAmp,
             });
         }
     }
@@ -163,11 +191,9 @@ public class FishDisplaySway : MonoBehaviour
         }
         if (!anyVisible) return;
 
-        // CPU mirror of FishSwayLateralWave in FishSway.hlsl: travelling wave masked from
-        // the head, plus drift/wobble faded in over the front third (the head guard).
-        float bodyLength = spineMaxZ - spineMinZ;
+        // CPU mirror of FishSwayLateralWave in FishSway.hlsl. The masks and amplitudes were baked
+        // per vertex at setup; only the running phase is evaluated here.
         float phase = clock * frequency * Mathf.PI * 2f;
-        float sinPhase = Mathf.Sin(phase);
         float cosPhase = Mathf.Cos(phase);
 
         for (int m = 0; m < cpuMeshes.Count; m++)
@@ -175,18 +201,17 @@ public class FishDisplaySway : MonoBehaviour
             CpuMesh entry = cpuMeshes[m];
             Vector3[] rest = entry.restVertices;
             Vector3[] work = entry.workVertices;
+            float[] wavePhase = entry.wavePhase;
+            float[] waveAmp = entry.waveAmp;
+            float[] sideAmp = entry.sideAmp;
             for (int i = 0; i < rest.Length; i++)
             {
-                Vector3 v = rest[i];
-                float s = Mathf.Clamp01((v.z - spineMinZ) / bodyLength);
-                float mask = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01((s - maskStart) / Mathf.Max(1f - maskStart, 0.0001f)));
-                float headGuard = Mathf.SmoothStep(0f, 1f, Mathf.Clamp01(s / 0.35f));
-
-                v.x += Mathf.Sin(phase - s * bodyWaves * Mathf.PI * 2f) * waveAmplitude * bodyLength * mask
-                     + cosPhase * sideAmplitude * bodyLength * headGuard;
-                work[i] = v;
+                // work[i] stays equal to rest[i] in y/z (set once at clone time); only x moves.
+                work[i].x = rest[i].x
+                          + Mathf.Sin(phase - wavePhase[i]) * waveAmp[i]
+                          + cosPhase * sideAmp[i];
             }
-            entry.mesh.vertices = work;
+            entry.mesh.SetVertices(work);
         }
     }
 

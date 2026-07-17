@@ -58,18 +58,27 @@ Shader "FishOWisp/Pond Fish Mask Clear"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            // The GPU Resident Drawer batches the props this feature re-draws, so the override
+            // pass must have a DOTS-instanced variant or BRG draws it with the error shader.
+            #pragma target 4.5
+            #pragma multi_compile _ DOTS_INSTANCING_ON
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float _DepthBias;
             CBUFFER_END
 
-            struct Attributes { float4 positionOS : POSITION; };
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
             struct Varyings   { float4 positionCS : SV_POSITION; };
 
             Varyings vert(Attributes input)
             {
                 Varyings output;
+                UNITY_SETUP_INSTANCE_ID(input);
                 float3 posWS = TransformObjectToWorld(input.positionOS.xyz);
                 float3 toCam = GetCameraPositionWS() - posWS;
                 float dist = max(length(toCam), 1e-4);

@@ -24,6 +24,7 @@ public class FPSDisplay : MonoBehaviour
     private float timeLeft;
 
     private float currentFps = 0f;
+    private string fpsLabel = "";   // formatted once per readout update, not per OnGUI draw
     private GUIStyle overlayStyle;
 
     void Start()
@@ -40,10 +41,11 @@ public class FPSDisplay : MonoBehaviour
         if (timeLeft <= 0f)
         {
             currentFps = accumulatedTime / frames;
+            fpsLabel = currentFps.ToString("F1") + " FPS";
 
             if (fpsText != null)
             {
-                fpsText.text = System.String.Format("{0:F1} FPS", currentFps);
+                fpsText.text = fpsLabel;
                 fpsText.color = ColorForFps(currentFps);
             }
 
@@ -73,11 +75,10 @@ public class FPSDisplay : MonoBehaviour
         // Cheap drop shadow for readability over bright scenes.
         Color prev = overlayStyle.normal.textColor;
         overlayStyle.normal.textColor = new Color(0f, 0f, 0f, 0.6f);
-        GUI.Label(new Rect(rect.x + 1f, rect.y + 1f, rect.width, rect.height),
-                  string.Format("{0:F1} FPS", currentFps), overlayStyle);
+        GUI.Label(new Rect(rect.x + 1f, rect.y + 1f, rect.width, rect.height), fpsLabel, overlayStyle);
         overlayStyle.normal.textColor = prev;
 
-        GUI.Label(rect, string.Format("{0:F1} FPS", currentFps), overlayStyle);
+        GUI.Label(rect, fpsLabel, overlayStyle);
     }
 
     private Color ColorForFps(float fps)

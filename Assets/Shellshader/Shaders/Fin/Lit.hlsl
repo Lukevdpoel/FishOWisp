@@ -201,6 +201,9 @@ float4 frag(Varyings input) : SV_Target
     inputData.fogCoord = input.fogFactorAndVertexLight.x;
     inputData.vertexLighting = input.fogFactorAndVertexLight.yzw;
     inputData.bakedGI = SAMPLE_GI(input.lightmapUV, input.vertexSH, inputData.normalWS);
+    // Forward+ resolves additional lights and reflection probes through the screen-space
+    // cluster; without a valid screen UV every pixel reads tile (0,0) and lighting breaks.
+    inputData.normalizedScreenSpaceUV = GetNormalizedScreenSpaceUV(input.positionCS);
 
     float4 color = UniversalFragmentPBR(inputData, surfaceData);
     ApplyRimLight(color.rgb, input.positionWS, viewDirWS, input.normalWS);

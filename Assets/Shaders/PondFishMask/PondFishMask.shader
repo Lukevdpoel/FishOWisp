@@ -42,14 +42,23 @@ Shader "FishOWisp/Pond Fish Mask"
             HLSLPROGRAM
             #pragma vertex vert
             #pragma fragment frag
+            // The GPU Resident Drawer batches the water planes this feature re-draws, so the
+            // override pass must have a DOTS-instanced variant or BRG draws it with the error shader.
+            #pragma target 4.5
+            #pragma multi_compile _ DOTS_INSTANCING_ON
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            struct Attributes { float4 positionOS : POSITION; };
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
             struct Varyings   { float4 positionCS : SV_POSITION; };
 
             Varyings vert(Attributes input)
             {
                 Varyings output;
+                UNITY_SETUP_INSTANCE_ID(input);
                 output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
                 return output;
             }

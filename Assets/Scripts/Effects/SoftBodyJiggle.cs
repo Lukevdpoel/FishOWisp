@@ -133,6 +133,21 @@ public class SoftBodyJiggle : MonoBehaviour
     private float currentIntensity = 1f; // smoothed wobble amplitude scale (1 = full, sprintIntensity while running)
     private bool initialized;
 
+    // Settle-sleep: while the whole transform chain is still AND the sim sits at rest, the mesh is
+    // parked at the exact rest pose and the solver + RecalculateNormals + SetVertices are skipped
+    // entirely. Any transform change (walking, the animator's squash, a parent scale) wakes it —
+    // detected by comparing localToWorldMatrix, which is what every excitation feeds through.
+    private Matrix4x4 lastFrameL2W;
+    private bool hasLastFrameL2W;
+    private bool resting;
+    private float restTimer;
+    private const float RestDelay = 0.35f;          // settled seconds before parking
+    private const float RestEpsilonSqr = 1e-6f;     // "at rest" = every vert within 1mm of rest
+
+    // restWorldCache / edgeTargetLen only depend on the transform; recompute only when it changes.
+    private Matrix4x4 cachedL2W;
+    private bool worldCacheValid;
+
     // --- Ground conform ---
     private float[] conformGridH;        // ground height per grid cell (row-major z*N+x), NaN-filled misses replaced
     private int conformGridN;            // grid resolution used this frame
@@ -178,6 +193,10 @@ public class SoftBodyJiggle : MonoBehaviour
         workingMesh.name = source.name + " (Jiggle)";
         workingMesh.MarkDynamic();
         meshFilter.mesh = workingMesh;
+
+        // CPU-deformed mesh: opt out of the GPU Resident Drawer, or every per-frame SetVertices
+        // re-dispatches this renderer to the batcher (InstanceCullingBatcher.BuildBatch churn).
+        GpuDrivenRenderingOptOut.Apply(meshRenderer);
 
         BuildSimData(source);
         ResetToRest();
@@ -226,6 +245,21 @@ public class SoftBodyJiggle : MonoBehaviour
         }
         lastPosition = transform.position;
 
+        // Settle-sleep: nothing moved and the sim is parked at rest — skip the whole frame. The
+        // matrix compare catches every excitation source (movement, animator squash, parent scale),
+        // so waking is never late; the sim state was left exactly at rest, ready to pick up inertia
+        // from whatever move wakes it.
+        Matrix4x4 frameL2W = transform.localToWorldMatrix;
+        bool movedThisFrame = !hasLastFrameL2W || frameL2W != lastFrameL2W;
+        lastFrameL2W = frameL2W;
+        hasLastFrameL2W = true;
+        if (resting)
+        {
+            if (!movedThisFrame) return;
+            resting = false;
+            restTimer = 0f;
+        }
+
         // Sample the ground under the flattened footprint ONCE per frame (independent of how many fixed
         // sim sub-steps run below), so WriteBack can drape the mesh onto it. Only while charging — the
         // one time the body is squashed wide enough to overhang a curved surface — so it's free otherwise.
@@ -262,19 +296,57 @@ public class SoftBodyJiggle : MonoBehaviour
         // Render the state interpolated between the last two sim steps by the leftover time, so the
         // mesh stays smooth even when steps don't line up with frames (e.g. high framerate).
         WriteBack(accumulator / fixedDt);
+
+        TrySettle(movedThisFrame);
+    }
+
+    // Once the transform has been still and every vert has hugged its rest position for RestDelay
+    // seconds (and no ground-drape is easing out), park the exact rest mesh and stop paying for the
+    // solver, normals and vertex upload until the transform moves again.
+    private void TrySettle(bool movedThisFrame)
+    {
+        if (movedThisFrame || conformOffsetLive)
+        {
+            restTimer = 0f;
+            return;
+        }
+        for (int i = 0; i < cur.Length; i++)
+        {
+            if ((cur[i] - restWorldCache[i]).sqrMagnitude > RestEpsilonSqr)
+            {
+                restTimer = 0f;
+                return;
+            }
+        }
+        restTimer += Time.deltaTime;
+        if (restTimer < RestDelay) return;
+
+        for (int i = 0; i < cur.Length; i++)
+        {
+            cur[i] = restWorldCache[i];
+            prev[i] = restWorldCache[i];
+        }
+        accumulator = 0f;
+        workingMesh.SetVertices(restLocalFull);
+        if (recalculateNormals) workingMesh.RecalculateNormals();
+        workingMesh.RecalculateBounds();
+        resting = true;
     }
 
     // Per-frame setup that depends only on the (frame-constant) transform: rest world positions and
     // edge target lengths. Resolved once here, then reused by every fixed sub-step this frame.
     private void PrepareFrame()
     {
-        // One cached matrix instead of a native TransformPoint call per vertex — same math,
-        // and these per-vertex loops are most of the component's frame cost.
+        // Recompute the rest world positions / edge lengths only when the transform changed —
+        // standing still (even mid-wobble) reuses last frame's values wholesale.
         Matrix4x4 l2w = transform.localToWorldMatrix;
+        if (worldCacheValid && l2w == cachedL2W) return;
         for (int i = 0; i < cur.Length; i++)
             restWorldCache[i] = l2w.MultiplyPoint3x4(uniqueRest[i]);
         for (int e = 0; e < edgeA.Length; e++)
             edgeTargetLen[e] = l2w.MultiplyVector(edgeRestDelta[e]).magnitude;
+        cachedL2W = l2w;
+        worldCacheValid = true;
     }
 
     // One fixed-timestep Verlet step. stiffness/damping are per-step, so a fixed step rate keeps the

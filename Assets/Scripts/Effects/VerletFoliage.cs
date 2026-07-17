@@ -146,6 +146,19 @@ public class VerletFoliage : MonoBehaviour
     private float accumulator;          // unspent real time, drained in fixed simulationRate steps
     private bool initialized;
 
+    // Plants are static in practice, so restWorldCache / edgeTargetLen only change when the
+    // transform does. Cache them against the localToWorldMatrix: wake checks and PrepareFrame then
+    // read precomputed world positions instead of paying a matrix multiply per vertex per frame —
+    // which was most of this component's cost with dozens of instances near the player.
+    private Matrix4x4 cachedL2W;
+    private bool worldCacheValid;
+
+    // Sleeping plants only run their per-vertex wake checks every few frames, staggered by instance
+    // so they don't all land on the same frame. wakeMargin already makes the check trigger early,
+    // which more than covers the added latency.
+    private const int WakeCheckInterval = 3;
+    private int wakeCheckPhase;
+
     // Sleep state + the rest-mesh bounds (local space) used as the broad phase for wake/cull checks.
     private bool asleep;
     private bool countedAwake;         // holds one MaxAwake slot right now
@@ -195,6 +208,10 @@ public class VerletFoliage : MonoBehaviour
         workingMesh.MarkDynamic();
         meshFilter.mesh = workingMesh;
 
+        // CPU-deformed mesh: opt out of the GPU Resident Drawer, or every per-frame SetVertices
+        // re-dispatches this renderer to the batcher (InstanceCullingBatcher.BuildBatch churn).
+        GpuDrivenRenderingOptOut.Apply(meshRenderer);
+
         restLocalBounds = source.bounds;
         localBoundsCenter = restLocalBounds.center;
         localBoundsRadius = restLocalBounds.extents.magnitude;
@@ -205,6 +222,7 @@ public class VerletFoliage : MonoBehaviour
         ComputeWindPhases();
         ResetToRest();
         lastPosition = transform.position;
+        wakeCheckPhase = ((GetInstanceID() % WakeCheckInterval) + WakeCheckInterval) % WakeCheckInterval;
         initialized = true;
 
         // Born asleep (the mesh IS the rest pose); the first pusher in reach wakes it. Keeps a scene
@@ -247,6 +265,7 @@ public class VerletFoliage : MonoBehaviour
             if (windStrength <= 0f)
             {
                 if (meshRenderer != null && !meshRenderer.isVisible) return;
+                if ((Time.frameCount + wakeCheckPhase) % WakeCheckInterval != 0) return;
                 bool contact = AnyPusherTouching();
                 bool wiggle = CheckImpulseTriggers();
                 if (!contact && !wiggle) return;
@@ -296,13 +315,7 @@ public class VerletFoliage : MonoBehaviour
     // positions, edge target lengths, and each pusher's resolved capsule. Reused by every sub-step.
     private void PrepareFrame()
     {
-        // One cached matrix instead of a native TransformPoint call per vertex — same math,
-        // and on a large mesh this loop is most of the component's frame cost.
-        Matrix4x4 l2w = transform.localToWorldMatrix;
-        for (int i = 0; i < cur.Length; i++)
-            restWorldCache[i] = l2w.MultiplyPoint3x4(uniqueRest[i]);
-        for (int e = 0; e < edgeA.Length; e++)
-            edgeTargetLen[e] = l2w.MultiplyVector(edgeRestDelta[e]).magnitude;
+        EnsureWorldCache();
 
         pushP0.Clear();
         pushP1.Clear();
@@ -457,16 +470,28 @@ public class VerletFoliage : MonoBehaviour
 
     private void ResetToRest()
     {
-        Matrix4x4 l2w = transform.localToWorldMatrix;
+        EnsureWorldCache();
         for (int i = 0; i < uniqueRest.Length; i++)
         {
-            Vector3 w = l2w.MultiplyPoint3x4(uniqueRest[i]);
-            cur[i] = w;
-            prev[i] = w;
-            restWorldCache[i] = w; // keep the cache honest even before the first PrepareFrame
+            cur[i] = restWorldCache[i];
+            prev[i] = restWorldCache[i];
         }
         accumulator = 0f;
         if (workingMesh != null) workingMesh.SetVertices(restLocalFull);
+    }
+
+    // Recompute restWorldCache / edgeTargetLen only when the transform actually changed. Plants sit
+    // still their whole life, so in practice this runs once and every later call is a matrix compare.
+    private void EnsureWorldCache()
+    {
+        Matrix4x4 l2w = transform.localToWorldMatrix;
+        if (worldCacheValid && l2w == cachedL2W) return;
+        for (int i = 0; i < cur.Length; i++)
+            restWorldCache[i] = l2w.MultiplyPoint3x4(uniqueRest[i]);
+        for (int e = 0; e < edgeA.Length; e++)
+            edgeTargetLen[e] = l2w.MultiplyVector(edgeRestDelta[e]).magnitude;
+        cachedL2W = l2w;
+        worldCacheValid = true;
     }
 
     // Verts never leave rest ± maxOffset, so the private mesh gets one conservative fixed bound at
@@ -501,7 +526,7 @@ public class VerletFoliage : MonoBehaviour
         var all = PlantPusher.All;
         if (all.Count == 0) return false;
         GetWorldBounds(out Vector3 c, out float br);
-        Matrix4x4 l2w = transform.localToWorldMatrix;
+        bool cacheReady = false;
         for (int i = 0; i < all.Count; i++)
         {
             PlantPusher p = all[i];
@@ -512,11 +537,12 @@ public class VerletFoliage : MonoBehaviour
             float broad = reach + br;
             if ((ClosestPointOnSegment(a, b, c) - c).sqrMagnitude >= broad * broad) continue;
 
+            if (!cacheReady) { EnsureWorldCache(); cacheReady = true; }
             float reachSqr = reach * reach;
             for (int v = 0; v < uniqueRest.Length; v++)
             {
                 if (weight[v] <= 0f) continue; // pinned verts can't move anyway
-                Vector3 w = l2w.MultiplyPoint3x4(uniqueRest[v]);
+                Vector3 w = restWorldCache[v];
                 if ((ClosestPointOnSegment(a, b, w) - w).sqrMagnitude < reachSqr) return true;
             }
         }
@@ -535,7 +561,7 @@ public class VerletFoliage : MonoBehaviour
 
         bool fired = false;
         GetWorldBounds(out Vector3 c, out float br);
-        Matrix4x4 l2w = transform.localToWorldMatrix;
+        bool cacheReady = false;
         for (int i = 0; i < all.Count; i++)
         {
             PlantPusher p = all[i];
@@ -553,12 +579,13 @@ public class VerletFoliage : MonoBehaviour
             if (!inBroad) continue;
 
             // Narrow phase: only a capsule near an actual movable rest vertex counts as a touch.
+            if (!cacheReady) { EnsureWorldCache(); cacheReady = true; }
             float reachSqr = reach * reach;
             bool touch = false;
             for (int v = 0; v < uniqueRest.Length; v++)
             {
                 if (weight[v] <= 0f) continue;
-                Vector3 w = l2w.MultiplyPoint3x4(uniqueRest[v]);
+                Vector3 w = restWorldCache[v];
                 if ((ClosestPointOnSegment(a, b, w) - w).sqrMagnitude < reachSqr) { touch = true; break; }
             }
             if (!touch) continue;

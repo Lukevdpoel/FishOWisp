@@ -31,17 +31,25 @@ void AdditionalLighting_float(float3 normalWS, float3 positionWS, float3 viewWS,
     viewWS = SafeNormalize(viewWS);
 
     // additional lights
-    int pixelLightCount = GetAdditionalLightsCount();
-    for (int i = 0; i < pixelLightCount; ++i)
-    {
-        Light light = GetAdditionalLight(i, positionWS);
+#if USE_CLUSTER_LIGHT_LOOP
+    // Forward+ light loop: LIGHT_LOOP_BEGIN reads tile/depth data from a local named `inputData`.
+    // NOTE: the graph must declare a Boolean Keyword `_CLUSTER_LIGHT_LOOP` (Multi Compile, Global)
+    // in its Blackboard, or this path is never compiled and additional lights vanish in Forward+.
+    InputData inputData = (InputData)0;
+    inputData.positionWS = positionWS;
+    float4 clipPos = TransformWorldToHClip(positionWS);
+    inputData.normalizedScreenSpaceUV = clipPos.xy / clipPos.w * 0.5 + 0.5;
+#endif
+    uint pixelLightCount = GetAdditionalLightsCount();
+    LIGHT_LOOP_BEGIN(pixelLightCount)
+        Light light = GetAdditionalLight(lightIndex, positionWS);
         float3 attenuatedLight = light.color * light.distanceAttenuation * light.shadowAttenuation;
-        
+
         float specular_soft = LightingSpecular(light.direction, normalWS, viewWS, smoothness);
         float specular_hard = smoothstep(0.005,0.01,specular_soft);
         float specular_term = lerp(specular_soft, specular_hard, hardness);
 
         specular += specular_term * attenuatedLight;
-    }
+    LIGHT_LOOP_END
     #endif
 }

@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 905113741815469480}
   - component: {fileID: 8656060908568947983}
   - component: {fileID: 3025148605064215842}
+  - component: {fileID: 4482196307251170353}
   m_Layer: 25
   m_Name: Fireflies
   m_TagString: Untagged
@@ -28,7 +29,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0.7071068, y: 0, z: 0, w: 0.7071068}
   m_LocalPosition: {x: 48.4, y: 0.77, z: 47.27}
-  m_LocalScale: {x: 1.702719, y: 1.702719, z: 1.702719}
+  m_LocalScale: {x: 1.702719, y: 1.7027191, z: 1.7027191}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
@@ -42,7 +43,7 @@ ParticleSystem:
   m_GameObject: {fileID: 5698246240888354772}
   serializedVersion: 8
   lengthInSec: 5
-  simulationSpeed: 1
+  simulationSpeed: 0.5
   stopAction: 0
   cullingMode: 0
   ringBufferMode: 0
@@ -604,7 +605,7 @@ ParticleSystem:
         m_RotationOrder: 4
     randomizeRotationDirection: 0
     gravitySource: 0
-    maxNumParticles: 12
+    maxNumParticles: 5
     customEmitterVelocity: {x: 0, y: 0, z: 0}
     size3D: 0
     rotation3D: 0
@@ -2689,7 +2690,7 @@ ParticleSystem:
     strength:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.2
+      scalar: 0.1
       minScalar: 1
       maxCurve:
         serializedVersion: 2
@@ -4836,3 +4837,20 @@ ParticleSystemRenderer:
   m_MeshWeighting2: 1
   m_MeshWeighting3: 1
   m_MaskInteraction: 0
+--- !u!114 &4482196307251170353
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5698246240888354772}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea5c6abe1d2c4cc48a94ab29625e9244, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EffectDistanceFade
+  fadeStart: 25
+  fadeEnd: 35
+  particleSystems: []
+  lights: []
+  materialFades: []
